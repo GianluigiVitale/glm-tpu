@@ -11,6 +11,7 @@ import numpy as np
 from glm_tpu.distributed.mesh import MeshContract, build_physical_mesh
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.distributed.topology import PhysicalDevice, PhysicalTopology
+
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (tests/config/test_model.py).
 from tools.equivalence.fixture import config_json
 from glm_tpu.layers.norm import final_norm, rms_norm
@@ -22,9 +23,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 def _topology() -> PhysicalTopology:
     devices = []
-    for device_id, coordinates in enumerate(
-        (x, y, z) for x in range(2) for y in range(4) for z in range(4)
-    ):
+    for device_id, coordinates in enumerate((x, y, z) for x in range(2) for y in range(4) for z in range(4)):
         devices.append(
             PhysicalDevice(
                 device_id=device_id,
@@ -44,9 +43,7 @@ def _topology() -> PhysicalTopology:
 
 
 def test_ws32_real_geometry_layout_is_one_row_and_reciprocal() -> None:
-    exact_geometry = ModelGeometry.from_hf_config(
-        config_json()
-    )
+    exact_geometry = ModelGeometry.from_hf_config(config_json())
     contract = MeshContract()
     layout = contract.layout_summary(exact_geometry)
     assert layout["mesh_shape"] == [8, 4]
@@ -111,9 +108,7 @@ def test_rms_norm_matches_glm_fp32_then_activation_rounding() -> None:
     expected = normalized.astype(jnp.bfloat16) * weight
     assert got.dtype == jnp.bfloat16
     np.testing.assert_array_equal(np.asarray(got), np.asarray(expected))
-    np.testing.assert_array_equal(
-        np.asarray(final_norm(hidden, weight, epsilon=1e-5)), np.asarray(got)
-    )
+    np.testing.assert_array_equal(np.asarray(final_norm(hidden, weight, epsilon=1e-5)), np.asarray(got))
 
 
 def test_rms_norm_refuses_shape_dtype_and_epsilon_drift() -> None:
@@ -127,34 +122,18 @@ def test_rms_norm_refuses_shape_dtype_and_epsilon_drift() -> None:
 
 def test_fused_add_rms_norm_uses_unrounded_fp32_sum() -> None:
     rng = np.random.default_rng(0)
-    hidden = jnp.asarray(
-        rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16
-    )
-    residual = jnp.asarray(
-        rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16
-    )
-    weight = jnp.asarray(
-        rng.normal(loc=1.0, scale=0.1, size=(64,)), dtype=jnp.bfloat16
-    )
+    hidden = jnp.asarray(rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16)
+    residual = jnp.asarray(rng.normal(size=(1, 64)) * 3.0, dtype=jnp.bfloat16)
+    weight = jnp.asarray(rng.normal(loc=1.0, scale=0.1, size=(64,)), dtype=jnp.bfloat16)
 
-    normalized, carried = fused_add_rms_norm(
-        hidden, residual, weight, epsilon=1e-5
-    )
+    normalized, carried = fused_add_rms_norm(hidden, residual, weight, epsilon=1e-5)
     summed = hidden.astype(jnp.float32) + residual.astype(jnp.float32)
     expected_carried = summed.astype(jnp.bfloat16)
     expected_normalized = (
-        (
-            summed
-            * jax.lax.rsqrt(
-                jnp.mean(summed * summed, axis=-1, keepdims=True) + 1e-5
-            )
-        ).astype(jnp.bfloat16)
-        * weight
+        (summed * jax.lax.rsqrt(jnp.mean(summed * summed, axis=-1, keepdims=True) + 1e-5)).astype(jnp.bfloat16) * weight
     ).astype(jnp.bfloat16)
     np.testing.assert_array_equal(np.asarray(carried), np.asarray(expected_carried))
-    np.testing.assert_array_equal(
-        np.asarray(normalized), np.asarray(expected_normalized)
-    )
+    np.testing.assert_array_equal(np.asarray(normalized), np.asarray(expected_normalized))
 
     rounded_first = rms_norm(expected_carried, weight, epsilon=1e-5)
     mismatch_count = int(
@@ -173,9 +152,7 @@ def test_fused_add_rms_norm_refuses_state_contract_drift() -> None:
     with pytest.raises(ValueError, match="shapes"):
         fused_add_rms_norm(hidden, residual[:, :3], weight, epsilon=1e-5)
     with pytest.raises(ValueError, match="dtypes"):
-        fused_add_rms_norm(
-            hidden, residual.astype(jnp.float32), weight, epsilon=1e-5
-        )
+        fused_add_rms_norm(hidden, residual.astype(jnp.float32), weight, epsilon=1e-5)
     with pytest.raises(ValueError, match="weight"):
         fused_add_rms_norm(hidden, residual, weight[:3], epsilon=1e-5)
     with pytest.raises(ValueError, match="epsilon"):

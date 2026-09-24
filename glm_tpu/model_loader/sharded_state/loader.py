@@ -51,13 +51,9 @@ def _host_tensor(tensor: Any, *, dtype: str, name: str) -> tuple[Any, str]:
         host = contiguous.view(torch.uint16).numpy().view(ml_dtypes.bfloat16)
         storage_dtype = "BF16"
     else:
-        raise CheckpointValidationError(
-            f"WS32 loader dtype drifted for {name!r}: {contiguous.dtype}"
-        )
+        raise CheckpointValidationError(f"WS32 loader dtype drifted for {name!r}: {contiguous.dtype}")
     if dtype == "U8" and bool(np.any((host == 0x7F) | (host == 0xFF))):
-        raise CheckpointValidationError(
-            f"WS32 loader found non-finite FP8 bits in {name!r}"
-        )
+        raise CheckpointValidationError(f"WS32 loader found non-finite FP8 bits in {name!r}")
     return host, sha256(memoryview(raw).cast("B")).hexdigest()
 
 
@@ -79,35 +75,19 @@ def load_runtime_checkpoint(
 
     if checkpoint.manifest.get("mesh_hash") != physical_mesh.mesh_hash:
         raise CheckpointValidationError("WS32 loader physical mesh identity drifted")
-    mesh_ids = tuple(
-        tuple(int(device.id) for device in row)
-        for row in np.asarray(mesh.devices, dtype=object).tolist()
-    )
+    mesh_ids = tuple(tuple(int(device.id) for device in row) for row in np.asarray(mesh.devices, dtype=object).tolist())
     if mesh_ids != physical_mesh.device_ids:
-        raise CheckpointValidationError(
-            "WS32 loader JAX mesh order differs from physical slots"
-        )
+        raise CheckpointValidationError("WS32 loader JAX mesh order differs from physical slots")
     addressable = tuple(
         device
         for row in np.asarray(mesh.devices, dtype=object).tolist()
         for device in row
         if int(device.process_index) == jax.process_index()
     )
-    expected_addressable = (
-        32
-        if jax.default_backend() == "cpu" and jax.process_count() == 1
-        else 4
-    )
-    if len(addressable) != expected_addressable or set(addressable) != set(
-        jax.local_devices()
-    ):
-        raise CheckpointValidationError(
-            "WS32 loader addressable-device geometry drifted"
-        )
-    slot_by_device_id = {
-        device_id: slot
-        for slot, device_id in enumerate(physical_mesh.flattened_device_ids)
-    }
+    expected_addressable = 32 if jax.default_backend() == "cpu" and jax.process_count() == 1 else 4
+    if len(addressable) != expected_addressable or set(addressable) != set(jax.local_devices()):
+        raise CheckpointValidationError("WS32 loader addressable-device geometry drifted")
+    slot_by_device_id = {device_id: slot for slot, device_id in enumerate(physical_mesh.flattened_device_ids)}
     plan_by_slot = {plan.device_slot: plan for plan in checkpoint.plans}
     before = tuple(_memory_stats(device) for device in addressable)
     arrays: dict[str, Any] = {}
@@ -124,21 +104,11 @@ def load_runtime_checkpoint(
                 )
             )
         for tensor_index, tensor_plan in enumerate(checkpoint.plans[0].tensors):
-            sharding = NamedSharding(
-                mesh, P(*tensor_plan.partition_spec)
-            )
-            shard_devices = tuple(
-                sharding.addressable_devices_indices_map(
-                    tensor_plan.global_shape
-                )
-            )
+            sharding = NamedSharding(mesh, P(*tensor_plan.partition_spec))
+            shard_devices = tuple(sharding.addressable_devices_indices_map(tensor_plan.global_shape))
             if set(shard_devices) != set(addressable):
-                raise CheckpointValidationError(
-                    f"WS32 {tensor_plan.name!r} addressable owners drifted"
-                )
-            expected_local_shape = sharding.shard_shape(
-                tensor_plan.global_shape
-            )
+                raise CheckpointValidationError(f"WS32 {tensor_plan.name!r} addressable owners drifted")
+            expected_local_shape = sharding.shard_shape(tensor_plan.global_shape)
             local_arrays = []
             for device in shard_devices:
                 slot = slot_by_device_id[int(device.id)]
@@ -151,20 +121,15 @@ def load_runtime_checkpoint(
                 )
                 if digest != record["tensor_sha256"][tensor_index]:
                     raise CheckpointValidationError(
-                        f"WS32 tensor checksum drifted while loading "
-                        f"{tensor_plan.name!r} from slot {slot}"
+                        f"WS32 tensor checksum drifted while loading {tensor_plan.name!r} from slot {slot}"
                     )
                 if tuple(host.shape) != expected_local_shape:
-                    raise CheckpointValidationError(
-                        f"WS32 local shape drifted for {tensor_plan.name!r}"
-                    )
+                    raise CheckpointValidationError(f"WS32 local shape drifted for {tensor_plan.name!r}")
                 local = jax.device_put(host, device)
                 local.block_until_ready()
                 if tuple(local.devices()) != (device,):
                     local.delete()
-                    raise CheckpointValidationError(
-                        f"WS32 {tensor_plan.name!r} missed its final owner"
-                    )
+                    raise CheckpointValidationError(f"WS32 {tensor_plan.name!r} missed its final owner")
                 local_arrays.append(local)
             arrays[tensor_plan.name] = jax.make_array_from_single_device_arrays(
                 tensor_plan.global_shape,
@@ -179,9 +144,7 @@ def load_runtime_checkpoint(
             "device_slot": slot_by_device_id[int(device.id)],
             "expert_coordinate": slot_by_device_id[int(device.id)] // 4,
             "feature_coordinate": slot_by_device_id[int(device.id)] % 4,
-            "file_sha256": checkpoint.records_by_slot[
-                slot_by_device_id[int(device.id)]
-            ]["sha256"],
+            "file_sha256": checkpoint.records_by_slot[slot_by_device_id[int(device.id)]]["sha256"],
         }
         for device in addressable
     )

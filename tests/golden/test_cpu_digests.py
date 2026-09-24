@@ -1,4 +1,5 @@
 """G3: CPU32 execution goldens (positional leaf digests) identical to the 181c013e baseline."""
+
 import pytest
 
 from tools.equivalence.common import DATA, read_json

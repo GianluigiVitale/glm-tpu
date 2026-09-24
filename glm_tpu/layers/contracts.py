@@ -86,9 +86,7 @@ class StageLocalKvLayout:
     def owner(self, positions: jax.Array) -> jax.Array:
         """Return the local chip owning each non-negative absolute position."""
 
-        return (
-            positions.astype(jnp.int32) % jnp.int32(self.logical_page_size)
-        ) // jnp.int32(self.local_rows_per_page)
+        return (positions.astype(jnp.int32) % jnp.int32(self.logical_page_size)) // jnp.int32(self.local_rows_per_page)
 
 
 def _require_shape(name: str, value: jax.Array, expected: tuple[int, ...]) -> None:
@@ -173,9 +171,7 @@ class GlmMoeNumericalContract:
     scoring_function: str = "sigmoid"
     routing_method: str = "noaux_tc"
     routing_tie_policy: str = "jax_lax_top_k_lowest_expert_id"
-    reduction_association: str = (
-        "top_k_axis_then_stage_psum; routed_and_shared_stacked_not_mixed"
-    )
+    reduction_association: str = "top_k_axis_then_stage_psum; routed_and_shared_stacked_not_mixed"
 
     def __post_init__(self) -> None:
         integer_fields = (
@@ -198,8 +194,7 @@ class GlmMoeNumericalContract:
         if self.routed_scaling_factor <= 0:
             raise ValueError("routed_scaling_factor must be positive")
         if len(self.fp8_block_shape) != 2 or any(
-            not isinstance(item, int) or isinstance(item, bool) or item <= 0
-            for item in self.fp8_block_shape
+            not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in self.fp8_block_shape
         ):
             raise ValueError("fp8_block_shape must contain two positive integers")
         if self.scoring_function != "sigmoid":

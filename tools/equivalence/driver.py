@@ -76,13 +76,13 @@ RUNTIME_CLASS = "OrdinaryRuntime"
 PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
 REQUEST_MODULE = "glm_tpu.engine.request"
 BATCHED_MODULE = "glm_tpu.engine.llm_engine"  # generate_batch (S4.1; the batched runtime before)
-CONFIG_MODULE = "glm_tpu.config.cache"        # the config class (S4.1; the decoder module before)
-CONFIG_CLASS = "CacheConfig"                # the config __init__ builds (adjusted at the class, fixture tier;
-                                           # S4.2; the research name Ws32DecoderConfig before)
-TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
-FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
+CONFIG_MODULE = "glm_tpu.config.cache"  # the config class (S4.1; the decoder module before)
+CONFIG_CLASS = "CacheConfig"  # the config __init__ builds (adjusted at the class, fixture tier;
+# S4.2; the research name Ws32DecoderConfig before)
+TMPFS = "/dev/shm"  # production's HLO originals live here; the harness never writes it
+FIXTURE_SEGMENT_BLOCK = 128  # the only fixture override of the config __init__ builds
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
-SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic chips ``stats`` reports
+SYNTHETIC_HBM = 1 << 40  # bytes_limit of the four synthetic chips ``stats`` reports
 # Every module that defines a faked loader function is patched (S2a moved them out of their 181c013e
 # homes, S2f archived those). A move elsewhere leaves the real function in place, which fails on
 # the placeholder arguments (fail-closed), and ``stub never called`` names it. Keys are the stub
@@ -102,26 +102,33 @@ ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.runner.admission")
 # the homes that look them up: ``build_program_set`` (S2c) or, at 181c013e, ``_load`` itself. G3 runs
 # them in interpret mode; every binding in an existing home is patched and each role must be bound
 # somewhere. A builder bound anywhere else runs TPU kernels on CPU and crashes (fail-closed).
-INTERPRET_BUILDERS = {"prefill": ("build_prefill_program", "build_ws32_prefill_challenger_program"),
-                      "decode": ("build_packed_decoder_program",)}
+INTERPRET_BUILDERS = {
+    "prefill": ("build_prefill_program", "build_ws32_prefill_challenger_program"),
+    "decode": ("build_packed_decoder_program",),
+}
 INTERPRET_HOMES = (PROGRAMS_MODULE, RUNTIME_MODULE)
 # Where ``_load`` looks up ``build_program_set`` (S2c): the harness records every ProgramSet built
 # while the runtime is constructed and checks the runtime compiled exactly its programs.
 PROGRAM_SET_HOME = (RUNTIME_MODULE, "build_program_set")
-MEMORY_FIELDS = ("argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes", "temp_size_in_bytes",
-                 "generated_code_size_in_bytes")
+MEMORY_FIELDS = (
+    "argument_size_in_bytes",
+    "output_size_in_bytes",
+    "alias_size_in_bytes",
+    "temp_size_in_bytes",
+    "generated_code_size_in_bytes",
+)
 STANDIN_HLO = "HloModule glm_equivalence_standin, program={name}\n"
 _STANDIN_HLO = re.compile(r"\AHloModule glm_equivalence_standin, program=(.+)\n\Z")
 
 
 @dataclass(frozen=True)
 class ProgramSpec:
-    name: str                          # production program name (HLO original file name)
-    fn: Callable[..., Any]             # the jax.jit object production handed to ``compile`` (donation applied)
-    args: tuple[Any, ...]              # arguments production passes (arrays or ShapeDtypeStructs)
-    compile_calls: Any = None          # arguments of each ``Lowered.compile`` (None: compiled by jit dispatch)
+    name: str  # production program name (HLO original file name)
+    fn: Callable[..., Any]  # the jax.jit object production handed to ``compile`` (donation applied)
+    args: tuple[Any, ...]  # arguments production passes (arrays or ShapeDtypeStructs)
+    compile_calls: Any = None  # arguments of each ``Lowered.compile`` (None: compiled by jit dispatch)
     record: dict[str, Any] | None = None  # fingerprint of the ``Lowered`` production compiled (when requested)
-    lowered: Any = None                # that ``Lowered`` (only when kept, e.g. for ``diff``/``authenticity``)
+    lowered: Any = None  # that ``Lowered`` (only when kept, e.g. for ``diff``/``authenticity``)
 
 
 def leaf_signature(leaf: Any) -> tuple[Any, ...]:
@@ -177,8 +184,9 @@ class ProgramRecorder:
                 compiled = _cpu_compile(fn, args)
                 infos = jax.tree.leaves(compiled.out_info)
                 shardings = jax.tree.leaves(compiled.output_shardings)
-                out = [jax.ShapeDtypeStruct(i.shape, i.dtype, sharding=s)
-                       for i, s in zip(infos, shardings, strict=True)]
+                out = [
+                    jax.ShapeDtypeStruct(i.shape, i.dtype, sharding=s) for i, s in zip(infos, shardings, strict=True)
+                ]
                 self._outputs[key] = jax.tree.unflatten(jax.tree.structure(compiled.out_info), out)
             return self._outputs[key]
 
@@ -194,8 +202,7 @@ class ProgramRecorder:
 def fp8_table_name(key: tuple[Any, ...]) -> str:
     bits, scale, spec, block = key
     render = ",".join("None" if axis is None else str(axis) for axis in spec)
-    return (f"fp8_table[{'x'.join(map(str, bits))}/{'x'.join(map(str, scale))}/({render})"
-            f"/{'x'.join(map(str, block))}]")
+    return f"fp8_table[{'x'.join(map(str, bits))}/{'x'.join(map(str, scale))}/({render})/{'x'.join(map(str, block))}]"
 
 
 @contextmanager
@@ -277,8 +284,16 @@ class ProductionCompile:
                 exe = real(runtime, name, fn, values, *args, **kwargs)
             finally:
                 current, self.current = self.current, None
-            self.recorder.specs.append(ProgramSpec(name, fn, tuple(values), compile_calls=current["compiles"],
-                                                   record=current["record"], lowered=current["lowered"]))
+            self.recorder.specs.append(
+                ProgramSpec(
+                    name,
+                    fn,
+                    tuple(values),
+                    compile_calls=current["compiles"],
+                    record=current["record"],
+                    lowered=current["lowered"],
+                )
+            )
             return exe
 
         return compile
@@ -301,8 +316,12 @@ class ProductionCompile:
             context = self.current
             if context is None:
                 return real_compile(lowered, compiler_options, **kwargs)
-            context["compiles"].append(dict(compiler_options=_describe_options(compiler_options),
-                                            **{k: describe(v) for k, v in sorted(kwargs.items())}))
+            context["compiles"].append(
+                dict(
+                    compiler_options=_describe_options(compiler_options),
+                    **{k: describe(v) for k, v in sorted(kwargs.items())},
+                )
+            )
             if self.fingerprint:
                 from . import normalize
 
@@ -390,19 +409,35 @@ class TmpfsOverlay:
 
     def relative(self, text: str, hlo: pathlib.Path | None) -> str:
         if hlo is not None and (text == str(hlo) or text.startswith(str(hlo) + "/")):
-            return "<hlo>" + text[len(str(hlo)):]
-        return "<tmpfs>" + text[len(TMPFS):]
+            return "<hlo>" + text[len(str(hlo)) :]
+        return "<tmpfs>" + text[len(TMPFS) :]
 
     @contextmanager
     def active(self) -> Iterator[None]:
         overlay = self
-        real = {name: getattr(pathlib.Path, name) for name in
-                ("mkdir", "write_text", "write_bytes", "read_text", "read_bytes", "replace", "rename", "exists",
-                 "is_file", "open", "unlink", "touch")}
+        real = {
+            name: getattr(pathlib.Path, name)
+            for name in (
+                "mkdir",
+                "write_text",
+                "write_bytes",
+                "read_text",
+                "read_bytes",
+                "replace",
+                "rename",
+                "exists",
+                "is_file",
+                "open",
+                "unlink",
+                "touch",
+            )
+        }
 
         def refuse(path: Any, operation: str) -> None:
-            raise RuntimeError(f"the runtime build tried to {operation} outside {TMPFS} (the harness never writes "
-                               "production files to disk); update driver.TmpfsOverlay if the HLO root moved")
+            raise RuntimeError(
+                f"the runtime build tried to {operation} outside {TMPFS} (the harness never writes "
+                "production files to disk); update driver.TmpfsOverlay if the HLO root moved"
+            )
 
         def mkdir(self: pathlib.Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
             if not overlay.owns(self):
@@ -413,8 +448,11 @@ class TmpfsOverlay:
             if not overlay.owns(self):
                 refuse(self, "write")
             raw = data.encode()
-            overlay.files[str(self)] = (len(raw), sha256(raw).hexdigest(), data if len(raw) <= overlay.KEEP_TEXT
-                                        else None)
+            overlay.files[str(self)] = (
+                len(raw),
+                sha256(raw).hexdigest(),
+                data if len(raw) <= overlay.KEEP_TEXT else None,
+            )
             return len(data)
 
         def write_bytes(self: pathlib.Path, data: bytes) -> int:
@@ -477,9 +515,20 @@ class TmpfsOverlay:
             overlay.probes.append(str(path))
             return shutil._ntuple_diskusage(1 << 40, 0, 1 << 40)
 
-        replacements = dict(mkdir=mkdir, write_text=write_text, write_bytes=write_bytes, read_text=read_text,
-                            read_bytes=read_bytes, replace=replace, rename=replace, exists=exists, is_file=is_file,
-                            open=open_, unlink=unlink, touch=touch)
+        replacements = dict(
+            mkdir=mkdir,
+            write_text=write_text,
+            write_bytes=write_bytes,
+            read_text=read_text,
+            read_bytes=read_bytes,
+            replace=replace,
+            rename=replace,
+            exists=exists,
+            is_file=is_file,
+            open=open_,
+            unlink=unlink,
+            touch=touch,
+        )
         with ExitStack() as stack:
             for name, function in replacements.items():
                 stack.enter_context(mock.patch.object(pathlib.Path, name, function))
@@ -493,11 +542,15 @@ class TmpfsOverlay:
             entry = dict(request, path=self.relative(request["path"], hlo))
             if entry not in mkdirs:
                 mkdirs.append(entry)
-        return dict(mkdir=mkdirs, mkdir_calls=len(self.mkdirs),
-                    files=sorted(self.relative(path, hlo) for path in self.files),
-                    free_space_probes=[self.relative(p, hlo) if self.owns(p) else "<outside tmpfs>"
-                                       for p in dict.fromkeys(self.probes)],
-                    hlo_under_tmpfs=hlo is not None and self.owns(hlo))
+        return dict(
+            mkdir=mkdirs,
+            mkdir_calls=len(self.mkdirs),
+            files=sorted(self.relative(path, hlo) for path in self.files),
+            free_space_probes=[
+                self.relative(p, hlo) if self.owns(p) else "<outside tmpfs>" for p in dict.fromkeys(self.probes)
+            ],
+            hlo_under_tmpfs=hlo is not None and self.owns(hlo),
+        )
 
 
 # ----------------------------------------------------------------------------- recorded protocol
@@ -542,8 +595,11 @@ class LoadStubs:
 
     def __init__(self, arrays: dict[str, Any], plans: Any, inventory: Any):
         self.arrays, self.plans, self.inventory = arrays, plans, inventory
-        self.checkpoint = SimpleNamespace(plans=plans, manifest=dict(manifest_sha256="<synthetic manifest>"),
-                                          success=dict(success_sha256="<synthetic success>"))
+        self.checkpoint = SimpleNamespace(
+            plans=plans,
+            manifest=dict(manifest_sha256="<synthetic manifest>"),
+            success=dict(success_sha256="<synthetic success>"),
+        )
         self.calls: dict[str, Any] = {}
         self.admissions: list[list[Any]] = []
         self.known: dict[str, Any] = {}
@@ -551,8 +607,10 @@ class LoadStubs:
     def _record(self, name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
         if name in self.calls:
             raise RuntimeError(f"_load called {name} twice")
-        self.calls[name] = dict(args=[describe(a, self.known) for a in args],
-                                kwargs={k: describe(v, self.known) for k, v in sorted(kwargs.items())})
+        self.calls[name] = dict(
+            args=[describe(a, self.known) for a in args],
+            kwargs={k: describe(v, self.known) for k, v in sorted(kwargs.items())},
+        )
 
     def authenticated_inventory(self, *args: Any, **kwargs: Any) -> Any:
         self._record("authenticated_inventory", args, kwargs)
@@ -587,11 +645,18 @@ def pinned_args() -> Any:
     # file; paths under it are recorded relative to the runtime's ``hlo`` directory).
     from glm_tpu.config.site import DEFAULT_HLO_DUMP_ROOT
 
-    return SimpleNamespace(model_id=model.MODEL_ID, model_revision=model.REVISION,
-                           source_inventory="<source_inventory>", source_inventory_sha256=INVENTORY_PIN,
-                           checkpoint_root="<checkpoint_root>", checkpoint_manifest_sha256="<manifest_sha256>",
-                           checkpoint_success_sha256="<success_sha256>", mesh_sha256="<mesh_sha256>",
-                           topology_sha256="<topology_sha256>", hlo_dump_root=pathlib.Path(DEFAULT_HLO_DUMP_ROOT))
+    return SimpleNamespace(
+        model_id=model.MODEL_ID,
+        model_revision=model.REVISION,
+        source_inventory="<source_inventory>",
+        source_inventory_sha256=INVENTORY_PIN,
+        checkpoint_root="<checkpoint_root>",
+        checkpoint_manifest_sha256="<manifest_sha256>",
+        checkpoint_success_sha256="<success_sha256>",
+        mesh_sha256="<mesh_sha256>",
+        topology_sha256="<topology_sha256>",
+        hlo_dump_root=pathlib.Path(DEFAULT_HLO_DUMP_ROOT),
+    )
 
 
 def _patch_homes(stack: ExitStack, stubs: LoadStubs) -> None:
@@ -617,8 +682,10 @@ def synthetic_stats() -> list[dict[str, Any]]:
     allocator statistics."""
     import jax
 
-    return [dict(device_id=int(d.id), bytes_in_use=0, bytes_limit=SYNTHETIC_HBM, peak_bytes_in_use=0)
-            for d in jax.local_devices()[:4]]
+    return [
+        dict(device_id=int(d.id), bytes_in_use=0, bytes_limit=SYNTHETIC_HBM, peak_bytes_in_use=0)
+        for d in jax.local_devices()[:4]
+    ]
 
 
 @dataclass
@@ -641,18 +708,34 @@ def programset_identity(sets: list[Any], specs: list[ProgramSpec]) -> dict[str, 
     expected = list(sets[0].specs())
     names = [spec.name for spec in expected] == [spec.name for spec in compiled]
     same = names and all(a.fn is b.fn for a, b in zip(expected, compiled, strict=True))
-    return dict(status="built", identical=same, programs=[spec.name for spec in expected],
-                compiled=[spec.name for spec in compiled], same_functions=same)
+    return dict(
+        status="built",
+        identical=same,
+        programs=[spec.name for spec in expected],
+        compiled=[spec.name for spec in compiled],
+        same_functions=same,
+    )
 
 
 def runtime_class() -> Any:
     return getattr(importlib.import_module(RUNTIME_MODULE), RUNTIME_CLASS)
 
 
-def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, arrays: dict[str, Any], plans: Any,
-                  concrete: bool, fixture_geometry: Any = None, interpret: bool = False,
-                  outputs: dict[Any, Any] | None = None, fingerprint: bool = False,
-                  keep: Callable[[str], bool] | None = None) -> Built:
+def build_runtime(
+    mesh: Any,
+    *,
+    tier: str,
+    capacity: int,
+    concurrent_size: int,
+    arrays: dict[str, Any],
+    plans: Any,
+    concrete: bool,
+    fixture_geometry: Any = None,
+    interpret: bool = False,
+    outputs: dict[Any, Any] | None = None,
+    fingerprint: bool = False,
+    keep: Callable[[str], bool] | None = None,
+) -> Built:
     """Construct the real runtime with the real ``__init__`` (which calls the real ``_load``, whose
     ``compile`` calls run the real compile path). ``fingerprint``: fingerprint every ``Lowered``
     production compiles (inside ``location_free``); ``keep(name)``: keep that ``Lowered``."""
@@ -668,8 +751,9 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
     overlay = TmpfsOverlay()
     stubs = LoadStubs(arrays, plans, _pinned_inventory(synthetic_inventory))
     local = [int(d.id) for d in jax.local_devices()]
-    physical = SimpleNamespace(mesh_hash="<synthetic mesh>",
-                               flattened_device_ids=tuple(local[:4]) + tuple(100000 + i for i in range(28)))
+    physical = SimpleNamespace(
+        mesh_hash="<synthetic mesh>", flattened_device_ids=tuple(local[:4]) + tuple(100000 + i for i in range(28))
+    )
     topology = SimpleNamespace(topology_hash="<synthetic topology>")
     phases: list[str] = []
     config_calls: list[Any] = []
@@ -703,9 +787,14 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
 
         def load(repo: Any, physical_mesh: Any) -> Any:
             recorder.context = runtime.config  # abstract outputs are cached per config across runtimes
-            stubs.known.update({"<runtime mesh>": runtime.mesh, "<physical mesh>": physical_mesh,
-                                "<authenticated inventory>": stubs.inventory,
-                                "<verified checkpoint>": stubs.checkpoint})
+            stubs.known.update(
+                {
+                    "<runtime mesh>": runtime.mesh,
+                    "<physical mesh>": physical_mesh,
+                    "<authenticated inventory>": stubs.inventory,
+                    "<verified checkpoint>": stubs.checkpoint,
+                }
+            )
             with recording_tables(recorder):
                 return cls._load(runtime, repo, physical_mesh)
 
@@ -714,8 +803,9 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         constructed: list[Any] = []
         stack.enter_context(_config_injection(tier, fixture_geometry, config_calls, constructed))
         if not concrete:
-            stack.enter_context(mock.patch.object(jax.ShapeDtypeStruct, "addressable_shards", property(_shard_probe),
-                                                  create=True))
+            stack.enter_context(
+                mock.patch.object(jax.ShapeDtypeStruct, "addressable_shards", property(_shard_probe), create=True)
+            )
         if tier == "fixture" and concurrent_size:  # the concurrent guard only (no program depends on it)
             stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
         if interpret:
@@ -728,16 +818,17 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
                 for role, names in INTERPRET_BUILDERS.items():
                     for name in names:
                         if hasattr(module, name):
-                            stack.enter_context(mock.patch.object(module, name,
-                                                                  _with_interpret(getattr(module, name))))
+                            stack.enter_context(mock.patch.object(module, name, _with_interpret(getattr(module, name))))
                             patched.add(role)
             if patched != set(INTERPRET_BUILDERS):
                 raise RuntimeError("no home binds the interpret builders; update driver.INTERPRET_BUILDERS")
         home = importlib.import_module(PROGRAM_SET_HOME[0])
         if hasattr(home, PROGRAM_SET_HOME[1]):  # 181c013e has no ProgramSet (recorded as absent)
-            stack.enter_context(mock.patch.object(home, PROGRAM_SET_HOME[1],
-                                                  _recording_program_sets(getattr(home, PROGRAM_SET_HOME[1]),
-                                                                          program_sets)))
+            stack.enter_context(
+                mock.patch.object(
+                    home, PROGRAM_SET_HOME[1], _recording_program_sets(getattr(home, PROGRAM_SET_HOME[1]), program_sets)
+                )
+            )
         stack.enter_context(lowering.location_free())  # production's lowerings are fingerprinted location-free
         # jax's persistent compilation cache would write through pathlib while the overlay refuses
         # every write outside /dev/shm; the harness's CPU compiles never need it.
@@ -746,12 +837,25 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         stack.enter_context(jax_config.enable_compilation_cache(False))
         stack.enter_context(compiler.patches())
         stack.enter_context(overlay.active())
-        cls.__init__(runtime, args=pinned_args(), repo=REPO, root=root, mesh=mesh, physical=physical,
-                     topology=topology, fleet_sha="<synthetic fleet>", vote=vote, save=lambda record: None,
-                     context_capacity=capacity, concurrent_size=concurrent_size)
+        cls.__init__(
+            runtime,
+            args=pinned_args(),
+            repo=REPO,
+            root=root,
+            mesh=mesh,
+            physical=physical,
+            topology=topology,
+            fleet_sha="<synthetic fleet>",
+            vote=vote,
+            save=lambda record: None,
+            context_capacity=capacity,
+            concurrent_size=concurrent_size,
+        )
         if len(config_calls) != 1 or runtime.config is not constructed[0]:
-            raise RuntimeError(f"the runtime's config is not the first {CONFIG_CLASS} __init__ constructs "
-                               f"({len(config_calls)} recorded); update driver._config_injection")
+            raise RuntimeError(
+                f"the runtime's config is not the first {CONFIG_CLASS} __init__ constructs "
+                f"({len(config_calls)} recorded); update driver._config_injection"
+            )
         missing = [name for name in HOMES if name not in stubs.calls]
         if missing:
             raise RuntimeError("_load no longer calls the faked " + ", ".join(missing) + "; update driver.HOMES")
@@ -763,15 +867,24 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
             phases=list(phases),
             admissions=[list(admission) for admission in stubs.admissions],  # later admissions stay out
             loader=dict(stubs.calls),
-            record=dict(keys=sorted(record), state_ownership=record.get("state_ownership"),
-                        capacity=record.get("capacity"), profile=record.get("profile"), schema=record.get("schema"),
-                        complete=record.get("complete"), checkpoint_keys=sorted(record.get("checkpoint") or {}),
-                        local_slots=record.get("physical_identity", {}).get("local_slots"),
-                        program_row_keys=sorted({k for row in record.get("programs", {}).values() for k in row})),
+            record=dict(
+                keys=sorted(record),
+                state_ownership=record.get("state_ownership"),
+                capacity=record.get("capacity"),
+                profile=record.get("profile"),
+                schema=record.get("schema"),
+                complete=record.get("complete"),
+                checkpoint_keys=sorted(record.get("checkpoint") or {}),
+                local_slots=record.get("physical_identity", {}).get("local_slots"),
+                program_row_keys=sorted({k for row in record.get("programs", {}).values() for k in row}),
+            ),
             programs=[spec.name for spec in recorder.specs],
             hlo_directory=overlay.record(pathlib.Path(hlo) if hlo is not None else None),
-            compile=dict(hlo_admissions=list(compiler.hlo_admissions), consensus_calls=len(compiler.consensus),
-                         consensus_payload_bytes=sorted(set(compiler.consensus))),
+            compile=dict(
+                hlo_admissions=list(compiler.hlo_admissions),
+                consensus_calls=len(compiler.consensus),
+                consensus_payload_bytes=sorted(set(compiler.consensus)),
+            ),
         )
         protocol["probes"] = dict(graph_consensus=compiler.consensus_probe(runtime, cls))
     del runtime.phase  # generate uses the class method
@@ -817,10 +930,11 @@ def _config_injection(tier: str, fixture_geometry: Any, calls: list[Any], constr
         bound = signature.bind(self, *args, **kwargs).arguments
         if tier == "fixture" and getattr(bound.get("geometry"), "geometry_hash", None) in substitutes:
             bound["geometry"] = fixture_geometry
-        call_args = [bound[name] for name in names[:len(args)]]
+        call_args = [bound[name] for name in names[: len(args)]]
         call_kwargs = {name: bound[name] for name in kwargs}
-        calls.append(dict(args=[describe(a) for a in call_args],
-                          kwargs={k: describe(v) for k, v in sorted(call_kwargs.items())}))
+        calls.append(
+            dict(args=[describe(a) for a in call_args], kwargs={k: describe(v) for k, v in sorted(call_kwargs.items())})
+        )
         if tier == "fixture" and "sparse_segment_block" not in bound:
             call_kwargs["sparse_segment_block"] = FIXTURE_SEGMENT_BLOCK
         constructed.append(self)
@@ -866,11 +980,13 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
     from jax.experimental import multihost_utils
 
     with ExitStack() as stack:
-        stack.enter_context(mock.patch.object(multihost_utils, "process_allgather",
-                                              lambda value: np.stack([np.asarray(value)] * 8)))
+        stack.enter_context(
+            mock.patch.object(multihost_utils, "process_allgather", lambda value: np.stack([np.asarray(value)] * 8))
+        )
         if relaxed_validation:
-            stack.enter_context(mock.patch.object(importlib.import_module(RUNTIME_MODULE), "validate",
-                                                  lambda request: None))
+            stack.enter_context(
+                mock.patch.object(importlib.import_module(RUNTIME_MODULE), "validate", lambda request: None)
+            )
             stack.enter_context(mock.patch.object(importlib.import_module(BATCHED_MODULE), "batch", _relaxed_batch))
         yield
 
@@ -880,9 +996,15 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
 # and re-recorded G1-protocol/G2-protocol with its reason (S2d c3: build_prefill_program; S4.2:
 # CacheConfig for Ws32DecoderConfig, build_decoder_program for build_ws32_challenger_decoder_program).
 DEFAULT_CLASSES = ("CacheConfig", "Ws32PerfOptions", "RoutedProjectionConfig", "SparseMlaConfig")
-DEFAULT_FUNCTIONS = ("build_prefill_program", "build_packed_decoder_program",
-                     "build_decoder_program", "build_batched_decoder_program",
-                     "build_cache_initializer", "build_wk_programs", "bf16_resident_weights")
+DEFAULT_FUNCTIONS = (
+    "build_prefill_program",
+    "build_packed_decoder_program",
+    "build_decoder_program",
+    "build_batched_decoder_program",
+    "build_cache_initializer",
+    "build_wk_programs",
+    "bf16_resident_weights",
+)
 ABSENT = "<absent>"
 
 
@@ -937,6 +1059,7 @@ def production_defaults() -> dict[str, Any]:
             out[name] = function
             continue
         parameters = inspect.signature(function).parameters
-        out[name] = {p.name: encode_default(p.default) for p in parameters.values()
-                     if p.default is not inspect.Parameter.empty}
+        out[name] = {
+            p.name: encode_default(p.default) for p in parameters.values() if p.default is not inspect.Parameter.empty
+        }
     return out

@@ -78,28 +78,111 @@ S2F_WHOLE = (
 )
 # ... and the definitions split out of research modules (the remainder is archived).
 S2F_SPLIT = (
-    ("glm_tpu/kernels/sparse_mla/kernel.py", "glm_tpu/greenfield/kernels/pallas/sparse_attention.py",
-     ("_FINITE_MASK_VALUE", "_TPU_V4_DMA_ROWS", "SparseMlaConfig", "pregathered_sparse_mla_pallas",)),
-    ("glm_tpu/layers/norm.py", "glm_tpu/greenfield/kernels/ws32.py",
-     ("ws32_rms_norm_mapped", "ws32_fused_add_rms_norm_mapped", "ws32_router_from_shards_mapped",)),
-    ("glm_tpu/models/glm_moe_dsa/_s3_ws32_layer.py", "glm_tpu/greenfield/kernels/ws32_layer.py",
-     ("Ws32QkvAWeights", "Ws32DsaWeights", "Ws32AttentionWeights", "Ws32DenseWeights", "Ws32StrategyNdDenseWeights", "Ws32MoeWeights", "Ws32PreparedAttention", "Ws32DsaResult", "Ws32AttentionResult", "Ws32AttentionLayerResult", "Ws32TransformerLayerResult", "Ws32MlpResult",)),
-    ("glm_tpu/models/glm_moe_dsa/_s3_ws32_decoder.py", "glm_tpu/greenfield/runtime/ws32_decoder.py",
-     ("Ws32LayerWeights", "Ws32DecoderWeights", "Ws32DecoderState", "Ws32DecodeStepResult", "Ws32DecoderConfig", "_qkv_specs", "_attention_specs", "_dsa_specs", "_dense_specs", "_moe_specs", "ws32_decoder_weight_specs", "_fp8_names", "ws32_decoder_weight_names", "_weight_name_leaves", "_bind_weight_name_tree", "bind_ws32_decoder_weights", "ws32_decoder_state_specs", "ws32_decode_result_specs", "_validate_local_state", "WS32_MAIN_ROPE_THETA", "build_ws32_main_rope_table",)),
-    ("glm_tpu/models/glm_moe_dsa/state.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py",
-     ("Ws32BatchedPrefillState", "Ws32BatchedPrefillResult", "ws32_batched_prefill_state_specs", "_require_config", "ws32_prefill_embedding_mapped", "_all_owners_healthy", "finish_ws32_batched_prefill",)),
-    ("glm_tpu/layers/_s3_dsa_association.py", "glm_tpu/greenfield/kernels/reference/dsa_association.py",
-     ("KeyNormMode", "affine_key_layer_norm",)),
-    ("glm_tpu/engine/request_session.py", "glm_tpu/greenfield/kernels/ws32_sampling.py",
-     ("request_uniform",)),
-    ("glm_tpu/layers/attention/mla.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py",
-     ("_require_block",)),
-    ("glm_tpu/layers/_s3_prefill_linear.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py",
-     ("_require_rows",)),
-    ("glm_tpu/layers/attention/_s3_prefill_dsa.py", "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py",
-     ("PrefillDsaInputs", "Ws32PrefillDsaResult",)),
-    ("glm_tpu/models/glm_moe_dsa/decoder_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py",
-     ("Ws32PrefillLayerResult", "Ws32PrefillPrefixResult", "ws32_prefill_router_mapped",)),
+    (
+        "glm_tpu/kernels/sparse_mla/kernel.py",
+        "glm_tpu/greenfield/kernels/pallas/sparse_attention.py",
+        (
+            "_FINITE_MASK_VALUE",
+            "_TPU_V4_DMA_ROWS",
+            "SparseMlaConfig",
+            "pregathered_sparse_mla_pallas",
+        ),
+    ),
+    (
+        "glm_tpu/layers/norm.py",
+        "glm_tpu/greenfield/kernels/ws32.py",
+        (
+            "ws32_rms_norm_mapped",
+            "ws32_fused_add_rms_norm_mapped",
+            "ws32_router_from_shards_mapped",
+        ),
+    ),
+    (
+        "glm_tpu/models/glm_moe_dsa/_s3_ws32_layer.py",
+        "glm_tpu/greenfield/kernels/ws32_layer.py",
+        (
+            "Ws32QkvAWeights",
+            "Ws32DsaWeights",
+            "Ws32AttentionWeights",
+            "Ws32DenseWeights",
+            "Ws32StrategyNdDenseWeights",
+            "Ws32MoeWeights",
+            "Ws32PreparedAttention",
+            "Ws32DsaResult",
+            "Ws32AttentionResult",
+            "Ws32AttentionLayerResult",
+            "Ws32TransformerLayerResult",
+            "Ws32MlpResult",
+        ),
+    ),
+    (
+        "glm_tpu/models/glm_moe_dsa/_s3_ws32_decoder.py",
+        "glm_tpu/greenfield/runtime/ws32_decoder.py",
+        (
+            "Ws32LayerWeights",
+            "Ws32DecoderWeights",
+            "Ws32DecoderState",
+            "Ws32DecodeStepResult",
+            "Ws32DecoderConfig",
+            "_qkv_specs",
+            "_attention_specs",
+            "_dsa_specs",
+            "_dense_specs",
+            "_moe_specs",
+            "ws32_decoder_weight_specs",
+            "_fp8_names",
+            "ws32_decoder_weight_names",
+            "_weight_name_leaves",
+            "_bind_weight_name_tree",
+            "bind_ws32_decoder_weights",
+            "ws32_decoder_state_specs",
+            "ws32_decode_result_specs",
+            "_validate_local_state",
+            "WS32_MAIN_ROPE_THETA",
+            "build_ws32_main_rope_table",
+        ),
+    ),
+    (
+        "glm_tpu/models/glm_moe_dsa/state.py",
+        "glm_tpu/greenfield/runtime/ws32_batched_prefill.py",
+        (
+            "Ws32BatchedPrefillState",
+            "Ws32BatchedPrefillResult",
+            "ws32_batched_prefill_state_specs",
+            "_require_config",
+            "ws32_prefill_embedding_mapped",
+            "_all_owners_healthy",
+            "finish_ws32_batched_prefill",
+        ),
+    ),
+    (
+        "glm_tpu/layers/_s3_dsa_association.py",
+        "glm_tpu/greenfield/kernels/reference/dsa_association.py",
+        (
+            "KeyNormMode",
+            "affine_key_layer_norm",
+        ),
+    ),
+    ("glm_tpu/engine/request_session.py", "glm_tpu/greenfield/kernels/ws32_sampling.py", ("request_uniform",)),
+    ("glm_tpu/layers/attention/mla.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py", ("_require_block",)),
+    ("glm_tpu/layers/_s3_prefill_linear.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py", ("_require_rows",)),
+    (
+        "glm_tpu/layers/attention/_s3_prefill_dsa.py",
+        "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py",
+        (
+            "PrefillDsaInputs",
+            "Ws32PrefillDsaResult",
+        ),
+    ),
+    (
+        "glm_tpu/models/glm_moe_dsa/decoder_layer.py",
+        "glm_tpu/greenfield/kernels/ws32_prefill_layer.py",
+        (
+            "Ws32PrefillLayerResult",
+            "Ws32PrefillPrefixResult",
+            "ws32_prefill_router_mapped",
+        ),
+    ),
 )
 
 
@@ -132,8 +215,11 @@ def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
     renamed in ``home`` and to every definition S4.2 renamed spelled as renamed."""
     import copy
 
-    renames = {key.partition(":")[2]: new for key, new in _symbol_moves().get("renames", {}).items()
-               if key.partition(":")[0] == home}
+    renames = {
+        key.partition(":")[2]: new
+        for key, new in _symbol_moves().get("renames", {}).items()
+        if key.partition(":")[0] == home
+    }
     public = {key.partition(":")[2]: new for key, new in _public_names().items()}
     node = copy.deepcopy(node)
     for inner in ast.walk(node):
@@ -162,8 +248,12 @@ class _RecordedKernelNames(ast.NodeTransformer):
 
     def visit_Subscript(self, node: ast.Subscript) -> ast.AST:
         node = self.generic_visit(node)
-        if (isinstance(node.value, ast.Name) and node.value.id == "KERNEL_NAMES"
-                and isinstance(node.slice, ast.Constant) and node.slice.value in self.recorded):
+        if (
+            isinstance(node.value, ast.Name)
+            and node.value.id == "KERNEL_NAMES"
+            and isinstance(node.slice, ast.Constant)
+            and node.slice.value in self.recorded
+        ):
             constant = ast.Constant(value=self.recorded[node.slice.value])
             self.substituted.add(id(constant))
             return constant
@@ -171,13 +261,22 @@ class _RecordedKernelNames(ast.NodeTransformer):
 
     def visit_JoinedStr(self, node: ast.JoinedStr) -> ast.AST:
         node = self.generic_visit(node)
-        if not any(isinstance(part, ast.FormattedValue) and id(part.value) in self.substituted
-                   and part.conversion == -1 and part.format_spec is None for part in node.values):
+        if not any(
+            isinstance(part, ast.FormattedValue)
+            and id(part.value) in self.substituted
+            and part.conversion == -1
+            and part.format_spec is None
+            for part in node.values
+        ):
             return node
         parts: list[ast.expr] = []
         for part in node.values:
-            if (isinstance(part, ast.FormattedValue) and id(part.value) in self.substituted
-                    and part.conversion == -1 and part.format_spec is None):
+            if (
+                isinstance(part, ast.FormattedValue)
+                and id(part.value) in self.substituted
+                and part.conversion == -1
+                and part.format_spec is None
+            ):
                 part = ast.Constant(value=part.value.value)
             if parts and isinstance(part, ast.Constant) and isinstance(parts[-1], ast.Constant):
                 parts[-1] = ast.Constant(value=parts[-1].value + part.value)
@@ -253,15 +352,26 @@ root = {str(REPO) + "/"!r}
 print(json.dumps(sorted(n for n, m in list(sys.modules.items())
                         if str(getattr(m, "__file__", None) or "").startswith(root))))
 """
-    return json.loads(subprocess.check_output([sys.executable, "-c", code], cwd=REPO,
-                                              env=dict(os.environ, JAX_PLATFORMS="cpu"), text=True, timeout=120))
+    return json.loads(
+        subprocess.check_output(
+            [sys.executable, "-c", code], cwd=REPO, env=dict(os.environ, JAX_PLATFORMS="cpu"), text=True, timeout=120
+        )
+    )
 
 
 def test_worker_and_runtime_modules_load_only_glm_tpu_modules():
-    loaded = _repository_modules(("glm_tpu.worker.tpu_worker", "glm_tpu.distributed.parallel_state",
-                                  "glm_tpu.runner.tpu_runner", "glm_tpu.engine.llm_engine",
-                                  "glm_tpu.distributed.topology", "glm_tpu.runner.compilation_manager",
-                                  "glm_tpu.runner.kv_cache_manager", "glm_tpu.model_loader.source_inventory"))
+    loaded = _repository_modules(
+        (
+            "glm_tpu.worker.tpu_worker",
+            "glm_tpu.distributed.parallel_state",
+            "glm_tpu.runner.tpu_runner",
+            "glm_tpu.engine.llm_engine",
+            "glm_tpu.distributed.topology",
+            "glm_tpu.runner.compilation_manager",
+            "glm_tpu.runner.kv_cache_manager",
+            "glm_tpu.model_loader.source_inventory",
+        )
+    )
     assert loaded and [m for m in loaded if m != "glm_tpu" and not m.startswith("glm_tpu.")] == []
 
 
@@ -278,7 +388,7 @@ def test_production_sources_import_only_existing_glm_tpu_modules():
             if isinstance(node, ast.Import):
                 names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
-                base = list(package[:len(package) - node.level + 1]) if node.level else []
+                base = list(package[: len(package) - node.level + 1]) if node.level else []
                 names = [".".join([*base, *([node.module] if node.module else [])])]
             for name in names:
                 top = name.split(".", 1)[0]
@@ -347,9 +457,20 @@ def test_s2f_split_definitions_equal_their_research_originals(home, origin, name
 
 
 def test_every_entry_point_loads_only_glm_tpu_modules():
-    loaded = _repository_modules((
-        "glm_tpu.entrypoints.cli.main", "glm_tpu.entrypoints.openai.serving_chat", "glm_tpu.entrypoints.serve.server",
-        "glm_tpu.entrypoints.cli.ask", "glm_tpu.runner.tpu_runner", "glm_tpu.engine.llm_engine",
-        "glm_tpu.model_loader.sharded_state.manifest", "glm_tpu.runner.admission", "glm_tpu.runner.programs",
-        "glm_tpu.executor.multihost_executor", "glm_tpu.worker.tpu_worker", "glm_tpu.model_loader.pack_worker"))
+    loaded = _repository_modules(
+        (
+            "glm_tpu.entrypoints.cli.main",
+            "glm_tpu.entrypoints.openai.serving_chat",
+            "glm_tpu.entrypoints.serve.server",
+            "glm_tpu.entrypoints.cli.ask",
+            "glm_tpu.runner.tpu_runner",
+            "glm_tpu.engine.llm_engine",
+            "glm_tpu.model_loader.sharded_state.manifest",
+            "glm_tpu.runner.admission",
+            "glm_tpu.runner.programs",
+            "glm_tpu.executor.multihost_executor",
+            "glm_tpu.worker.tpu_worker",
+            "glm_tpu.model_loader.pack_worker",
+        )
+    )
     assert loaded and [m for m in loaded if m != "glm_tpu" and not m.startswith("glm_tpu.")] == []

@@ -156,7 +156,7 @@ class StorageConfig:
 @dataclass(frozen=True)
 class LocksConfig:
     workload: tuple[Path, ...]  # LOCK_EX | LOCK_NB: a live model owner refuses the launch
-    sync: tuple[Path, ...]      # LOCK_EX blocking: a repository backup delays staging; released after it
+    sync: tuple[Path, ...]  # LOCK_EX blocking: a repository backup delays staging; released after it
 
 
 @dataclass(frozen=True)
@@ -197,8 +197,11 @@ class SiteConfig:
             raise SiteConfigError(f"site file {location} is not valid TOML: {exc}") from None
         site = cls.from_mapping(value)
         if environ:
-            site = site.with_overrides(run_root=envs.GLM_TPU_RUN_ROOT, model_path=envs.GLM_TPU_MODEL_PATH,
-                                       hlo_dump_root=envs.GLM_TPU_HLO_DUMP_ROOT)
+            site = site.with_overrides(
+                run_root=envs.GLM_TPU_RUN_ROOT,
+                model_path=envs.GLM_TPU_MODEL_PATH,
+                hlo_dump_root=envs.GLM_TPU_HLO_DUMP_ROOT,
+            )
         return site
 
     @classmethod
@@ -228,25 +231,43 @@ class SiteConfig:
         return cls.from_resolved_json(raw)
 
     # ------------------------------------------------------------------ views
-    def with_overrides(self, *, run_root: Path | str | None = None, model_path: Path | str | None = None,
-                       hlo_dump_root: Path | str | None = None) -> SiteConfig:
+    def with_overrides(
+        self,
+        *,
+        run_root: Path | str | None = None,
+        model_path: Path | str | None = None,
+        hlo_dump_root: Path | str | None = None,
+    ) -> SiteConfig:
         """Controller-side path overrides (CLI flag or environment), validated like the file."""
-        changes = {name: _path(value, f"paths.{name}") for name, value in
-                   dict(run_root=run_root, model_path=model_path, hlo_dump_root=hlo_dump_root).items()
-                   if value not in (None, "")}
+        changes = {
+            name: _path(value, f"paths.{name}")
+            for name, value in dict(run_root=run_root, model_path=model_path, hlo_dump_root=hlo_dump_root).items()
+            if value not in (None, "")
+        }
         return replace(self, paths=replace(self.paths, **changes)) if changes else self
 
     def resolved(self) -> dict[str, Any]:
         """The configuration a worker receives (controller-only keys omitted), JSON-ready."""
         fleet = {k: v for k, v in _asdict(self.fleet).items() if k != "known_hosts"}
         paths = {k: v for k, v in _asdict(self.paths).items() if k != "repo"}
-        return dict(schema=RESOLVED_SCHEMA, fleet=fleet, paths=paths, checkpoint=_asdict(self.checkpoint),
-                    topology=_asdict(self.topology), storage=_asdict(self.storage), locks=_asdict(self.locks))
+        return dict(
+            schema=RESOLVED_SCHEMA,
+            fleet=fleet,
+            paths=paths,
+            checkpoint=_asdict(self.checkpoint),
+            topology=_asdict(self.topology),
+            storage=_asdict(self.storage),
+            locks=_asdict(self.locks),
+        )
 
     def resolved_json(self) -> bytes:
         """Canonical bytes of :meth:`resolved` (hash contract: sorted, compact, ASCII) + newline."""
-        return json.dumps(self.resolved(), sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-                          allow_nan=False).encode() + b"\n"
+        return (
+            json.dumps(
+                self.resolved(), sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+            ).encode()
+            + b"\n"
+        )
 
     def resolved_sha256(self) -> str:
         return sha256(self.resolved_json()).hexdigest()
@@ -267,8 +288,10 @@ def set_current_site(site: SiteConfig | None) -> SiteConfig | None:
 
 def get_current_site() -> SiteConfig:
     if _CURRENT is None:
-        raise SiteConfigError("no site configuration is installed in this process (the executor, worker and "
-                              "pack worker install the validated site; tests install an example site)")
+        raise SiteConfigError(
+            "no site configuration is installed in this process (the executor, worker and "
+            "pack worker install the validated site; tests install an example site)"
+        )
     return _CURRENT
 
 
@@ -280,6 +303,7 @@ def approved_source_uri(uri: Any) -> bool:
 # ----------------------------------------------------------------------------- TOML text
 def to_toml(value: dict[str, Any]) -> str:
     """Serialize a site mapping (string/int/bool scalars and string lists in named tables) as TOML."""
+
     def scalar(item: Any, key: str) -> str:
         if isinstance(item, bool):
             return "true" if item else "false"
@@ -301,20 +325,42 @@ def to_toml(value: dict[str, Any]) -> str:
 # ----------------------------------------------------------------------------- validation
 _REQUIRED, _CONTROLLER = object(), object()
 _TABLES: dict[str, dict[str, Any]] = {
-    "fleet": dict(tpu_name=_REQUIRED, zone=_REQUIRED, project="", num_hosts=NUM_HOSTS, chips_per_host=CHIPS_PER_HOST,
-                  host_rank_regex=DEFAULT_HOST_RANK_REGEX, coordinator_address=_REQUIRED, worker_python=_REQUIRED,
-                  worker_pythonpath=_REQUIRED, helper_python="python3", known_hosts=DEFAULT_KNOWN_HOSTS),
+    "fleet": dict(
+        tpu_name=_REQUIRED,
+        zone=_REQUIRED,
+        project="",
+        num_hosts=NUM_HOSTS,
+        chips_per_host=CHIPS_PER_HOST,
+        host_rank_regex=DEFAULT_HOST_RANK_REGEX,
+        coordinator_address=_REQUIRED,
+        worker_python=_REQUIRED,
+        worker_pythonpath=_REQUIRED,
+        helper_python="python3",
+        known_hosts=DEFAULT_KNOWN_HOSTS,
+    ),
     "paths": dict(repo="", run_root=_REQUIRED, model_path=_REQUIRED, hlo_dump_root=DEFAULT_HLO_DUMP_ROOT),
-    "checkpoint": dict(namespace=_REQUIRED, root=_REQUIRED, inventory_namespace=_REQUIRED, source_inventory=_REQUIRED,
-                       source_inventory_sha256=_REQUIRED, manifest_sha256=_REQUIRED, success_sha256=_REQUIRED,
-                       source_complete_sha256=_REQUIRED),
-    "topology": dict(binding_dir=_REQUIRED, binding_sha256=_REQUIRED, capture_root=_REQUIRED,
-                     topology_sha256=_REQUIRED, topology_fleet_sha256=_REQUIRED, mesh_sha256=_REQUIRED,
-                     slice_name=_REQUIRED),
+    "checkpoint": dict(
+        namespace=_REQUIRED,
+        root=_REQUIRED,
+        inventory_namespace=_REQUIRED,
+        source_inventory=_REQUIRED,
+        source_inventory_sha256=_REQUIRED,
+        manifest_sha256=_REQUIRED,
+        success_sha256=_REQUIRED,
+        source_complete_sha256=_REQUIRED,
+    ),
+    "topology": dict(
+        binding_dir=_REQUIRED,
+        binding_sha256=_REQUIRED,
+        capture_root=_REQUIRED,
+        topology_sha256=_REQUIRED,
+        topology_fleet_sha256=_REQUIRED,
+        mesh_sha256=_REQUIRED,
+        slice_name=_REQUIRED,
+    ),
     "storage": dict(source_uri=_REQUIRED, allowed_source_uri_prefixes=_REQUIRED),
     "locks": dict(workload=_REQUIRED, sync=_REQUIRED),
-    "launch": dict(allowed_branches=["main", "release/*"], expected_origin="", require_clean=True,
-                   require_pushed=True),
+    "launch": dict(allowed_branches=["main", "release/*"], expected_origin="", require_clean=True, require_pushed=True),
 }
 _CONTROLLER_ONLY = {"fleet": ("known_hosts",), "paths": ("repo",)}
 
@@ -357,8 +403,9 @@ def _parse(value: Any, *, resolved: bool) -> SiteConfig:
     storage = _storage(read["storage"])
     locks = _locks(read["locks"])
     launch = None if resolved else _launch(read["launch"])
-    return SiteConfig(fleet=fleet, paths=paths, checkpoint=checkpoint, topology=topology, storage=storage, locks=locks,
-                      launch=launch)
+    return SiteConfig(
+        fleet=fleet, paths=paths, checkpoint=checkpoint, topology=topology, storage=storage, locks=locks, launch=launch
+    )
 
 
 def _string(value: Any, key: str, pattern: re.Pattern[str] | None = None, *, empty: bool = False) -> str:
@@ -396,8 +443,10 @@ def _path(value: Any, key: str) -> Path:
         raise SiteConfigError(f"{key} must be an absolute path without '..' (after '~' expansion)")
     path = Path(os.path.normpath(path))
     if _PLAIN_PATH.fullmatch(str(path)) is None:
-        raise SiteConfigError(f"{key} must be a plain path: letters, digits and . _ + / @ = , - only "
-                              "(no spaces, quotes, control or non-ASCII characters)")
+        raise SiteConfigError(
+            f"{key} must be a plain path: letters, digits and . _ + / @ = , - only "
+            "(no spaces, quotes, control or non-ASCII characters)"
+        )
     return path
 
 
@@ -427,28 +476,35 @@ def _fleet(v: dict[str, Any], *, resolved: bool) -> FleetConfig:
         # literal, which refuses a bracketed IPv6 address; an unbracketed one is ambiguous.
         ipaddress.IPv4Address(host)
     except ValueError:
-        raise SiteConfigError("fleet.coordinator_address must be <IPv4 address>:8476 (the worker admits an IP "
-                              "literal only)") from None
+        raise SiteConfigError(
+            "fleet.coordinator_address must be <IPv4 address>:8476 (the worker admits an IP literal only)"
+        ) from None
     if port != COORDINATOR_PORT:
         raise SiteConfigError("fleet.coordinator_address port must be 8476")
     worker_python = str(_path(v["worker_python"], "fleet.worker_python"))
     if _PLAIN_PATH.fullmatch(worker_python) is None:
         raise SiteConfigError("fleet.worker_python must be a plain absolute path")
-    pythonpath = tuple(str(_path(p, "fleet.worker_pythonpath"))
-                       for p in _strings(v["worker_pythonpath"], "fleet.worker_pythonpath"))
+    pythonpath = tuple(
+        str(_path(p, "fleet.worker_pythonpath")) for p in _strings(v["worker_pythonpath"], "fleet.worker_pythonpath")
+    )
     if any(":" in p for p in pythonpath):
         raise SiteConfigError("fleet.worker_pythonpath entries must not contain ':'")
     helper = _string(v["helper_python"], "fleet.helper_python")
     if _COMMAND.fullmatch(helper) is None and (_PLAIN_PATH.fullmatch(helper) is None or ".." in helper.split("/")):
         raise SiteConfigError("fleet.helper_python must be a bare command or a plain absolute path")
     return FleetConfig(
-        tpu_name=_string(v["tpu_name"], "fleet.tpu_name", _NAME), zone=_string(v["zone"], "fleet.zone", _NAME),
+        tpu_name=_string(v["tpu_name"], "fleet.tpu_name", _NAME),
+        zone=_string(v["zone"], "fleet.zone", _NAME),
         project=_string(v["project"], "fleet.project", _PROJECT, empty=True),
         num_hosts=_integer(v["num_hosts"], "fleet.num_hosts", NUM_HOSTS),
         chips_per_host=_integer(v["chips_per_host"], "fleet.chips_per_host", CHIPS_PER_HOST),
-        host_rank_regex=regex, coordinator_address=coordinator, worker_python=worker_python,
-        worker_pythonpath=pythonpath, helper_python=helper,
-        known_hosts=None if resolved else _path(v["known_hosts"], "fleet.known_hosts"))
+        host_rank_regex=regex,
+        coordinator_address=coordinator,
+        worker_python=worker_python,
+        worker_pythonpath=pythonpath,
+        helper_python=helper,
+        known_hosts=None if resolved else _path(v["known_hosts"], "fleet.known_hosts"),
+    )
 
 
 def _paths(v: dict[str, Any], *, resolved: bool) -> PathsConfig:
@@ -456,9 +512,12 @@ def _paths(v: dict[str, Any], *, resolved: bool) -> PathsConfig:
     if not resolved:
         text = _string(v["repo"], "paths.repo", empty=True)
         repo = _path(text, "paths.repo") if text else None
-    return PathsConfig(repo=repo, run_root=_path(v["run_root"], "paths.run_root"),
-                       model_path=_path(v["model_path"], "paths.model_path"),
-                       hlo_dump_root=_path(v["hlo_dump_root"], "paths.hlo_dump_root"))
+    return PathsConfig(
+        repo=repo,
+        run_root=_path(v["run_root"], "paths.run_root"),
+        model_path=_path(v["model_path"], "paths.model_path"),
+        hlo_dump_root=_path(v["hlo_dump_root"], "paths.hlo_dump_root"),
+    )
 
 
 def _checkpoint(v: dict[str, Any]) -> CheckpointConfig:
@@ -468,9 +527,15 @@ def _checkpoint(v: dict[str, Any]) -> CheckpointConfig:
     _inside(root, namespace, "checkpoint.root", "checkpoint.namespace")
     _inside(inventory, inventories, "checkpoint.source_inventory", "checkpoint.inventory_namespace")
     return CheckpointConfig(
-        namespace=namespace, root=root, inventory_namespace=inventories, source_inventory=inventory,
-        **{k: _hex(v[k], "checkpoint." + k) for k in ("source_inventory_sha256", "manifest_sha256", "success_sha256",
-                                                      "source_complete_sha256")})
+        namespace=namespace,
+        root=root,
+        inventory_namespace=inventories,
+        source_inventory=inventory,
+        **{
+            k: _hex(v[k], "checkpoint." + k)
+            for k in ("source_inventory_sha256", "manifest_sha256", "success_sha256", "source_complete_sha256")
+        },
+    )
 
 
 def _topology(v: dict[str, Any]) -> TopologyConfig:
@@ -478,19 +543,22 @@ def _topology(v: dict[str, Any]) -> TopologyConfig:
         binding_dir=_path(v["binding_dir"], "topology.binding_dir"),
         capture_root=_path(v["capture_root"], "topology.capture_root"),
         slice_name=_string(v["slice_name"], "topology.slice_name", _NAME),
-        **{k: _hex(v[k], "topology." + k) for k in ("binding_sha256", "topology_sha256", "topology_fleet_sha256",
-                                                    "mesh_sha256")})
+        **{
+            k: _hex(v[k], "topology." + k)
+            for k in ("binding_sha256", "topology_sha256", "topology_fleet_sha256", "mesh_sha256")
+        },
+    )
 
 
 def _storage(v: dict[str, Any]) -> StorageConfig:
     prefixes = tuple(_strings(v["allowed_source_uri_prefixes"], "storage.allowed_source_uri_prefixes"))
     if any(_GS_PREFIX.fullmatch(p) is None or _dot_segment(p) for p in prefixes):
-        raise SiteConfigError("storage.allowed_source_uri_prefixes entries must be gs://<bucket>/[<path>/] "
-                              "without '.' or '..' segments")
+        raise SiteConfigError(
+            "storage.allowed_source_uri_prefixes entries must be gs://<bucket>/[<path>/] without '.' or '..' segments"
+        )
     source_uri = _string(v["source_uri"], "storage.source_uri")
     if _dot_segment(source_uri) or any(not c.isprintable() or c.isspace() for c in source_uri):
-        raise SiteConfigError("storage.source_uri must not contain '.' or '..' segments, spaces or control "
-                              "characters")
+        raise SiteConfigError("storage.source_uri must not contain '.' or '..' segments, spaces or control characters")
     storage = StorageConfig(source_uri=source_uri, allowed_source_uri_prefixes=prefixes)
     if not storage.approved(storage.source_uri) or storage.source_uri in prefixes:
         raise SiteConfigError("storage.source_uri must lie under storage.allowed_source_uri_prefixes")
@@ -514,9 +582,12 @@ def _launch(v: dict[str, Any]) -> LaunchPolicy:
     if any(not b or b != b.strip() or any(c in b for c in " \t\n") for b in branches):
         raise SiteConfigError("launch.allowed_branches entries must be branch names or fnmatch patterns")
     origin = _string(v["expected_origin"], "launch.expected_origin", empty=True)
-    return LaunchPolicy(allowed_branches=tuple(branches), expected_origin=origin or None,
-                        require_clean=_flag(v["require_clean"], "launch.require_clean"),
-                        require_pushed=_flag(v["require_pushed"], "launch.require_pushed"))
+    return LaunchPolicy(
+        allowed_branches=tuple(branches),
+        expected_origin=origin or None,
+        require_clean=_flag(v["require_clean"], "launch.require_clean"),
+        require_pushed=_flag(v["require_pushed"], "launch.require_pushed"),
+    )
 
 
 def _asdict(section: Any) -> dict[str, Any]:
@@ -537,8 +608,9 @@ def _read_private(path: Path, *, what: str) -> bytes:
     try:
         facts = os.lstat(path)
     except FileNotFoundError:
-        raise SiteConfigError(f"no {what} at {path} (copy examples/site.example.toml, chmod 600, fill in every "
-                              "<...> value)") from None
+        raise SiteConfigError(
+            f"no {what} at {path} (copy examples/site.example.toml, chmod 600, fill in every <...> value)"
+        ) from None
     if stat.S_ISLNK(facts.st_mode) or not stat.S_ISREG(facts.st_mode):
         raise SiteConfigError(f"{what} {path} must be a regular file, not a symlink")
     if facts.st_uid != os.geteuid() or stat.S_IMODE(facts.st_mode) not in (0o600, 0o400):
@@ -557,10 +629,12 @@ def require_site(args):
     The verified GLM-5.3 packing result must provide its own inventory digest.
     Source acquisition alone does not supply a usable runtime checkpoint.
     """
-    if (getattr(args, 'model_id', None) != MODEL_ID
-            or getattr(args, 'model_revision', None) != REVISION
-            or not getattr(args, 'source_inventory_sha256', None)):
-        raise ValueError('verified GLM-5.3 runtime checkpoint binding is required')
+    if (
+        getattr(args, "model_id", None) != MODEL_ID
+        or getattr(args, "model_revision", None) != REVISION
+        or not getattr(args, "source_inventory_sha256", None)
+    ):
+        raise ValueError("verified GLM-5.3 runtime checkpoint binding is required")
 
 
 def site_args(args, site):
@@ -573,14 +647,18 @@ def site_args(args, site):
     permission to fall back to retired GLM-5.2 weights.
     """
     checkpoint = site.checkpoint
-    raw = read_bounded(site.paths.model_path / 'SOURCE_COMPLETE.json', 1 << 20)
+    raw = read_bounded(site.paths.model_path / "SOURCE_COMPLETE.json", 1 << 20)
     if sha256(raw).hexdigest() != checkpoint.source_complete_sha256:
-        raise ValueError('GLM-5.3 source completion identity differs')
+        raise ValueError("GLM-5.3 source completion identity differs")
     complete = json.loads(raw)
-    if (complete.get('passed') is not True or complete.get('repository') != MODEL_ID
-            or complete.get('revision') != REVISION or complete.get('verified_shards') != 141
-            or complete.get('verified_bytes') != 755632050320):
-        raise ValueError('GLM-5.3 canonical source is incomplete')
+    if (
+        complete.get("passed") is not True
+        or complete.get("repository") != MODEL_ID
+        or complete.get("revision") != REVISION
+        or complete.get("verified_shards") != 141
+        or complete.get("verified_bytes") != 755632050320
+    ):
+        raise ValueError("GLM-5.3 canonical source is incomplete")
     args.model_id, args.model_revision = MODEL_ID, REVISION
     args.source_inventory_sha256 = checkpoint.source_inventory_sha256
     args.checkpoint_manifest_sha256 = checkpoint.manifest_sha256
@@ -588,7 +666,7 @@ def site_args(args, site):
     args.source_complete_sha256 = checkpoint.source_complete_sha256
     args.checkpoint_root = checkpoint.root
     args.source_inventory = checkpoint.source_inventory
-    args.checkpoint_transport = 'shm'
+    args.checkpoint_transport = "shm"
     args.hlo_dump_root = site.paths.hlo_dump_root
     topology_args(args, site)
     require_site(args)

@@ -42,8 +42,16 @@ import subprocess
 
 from glm_tpu.config.site import LaunchPolicy, SiteConfig
 
-__all__ = ["LaunchPolicy", "LaunchPolicyError", "SourceIdentity", "normalize_origin", "package_checkout",
-           "require_controller_checkout", "resolve_repo", "source_identity"]
+__all__ = [
+    "LaunchPolicy",
+    "LaunchPolicyError",
+    "SourceIdentity",
+    "normalize_origin",
+    "package_checkout",
+    "require_controller_checkout",
+    "resolve_repo",
+    "source_identity",
+]
 
 _PIN = re.compile(r"[0-9a-f]{40}")
 _SCHEME = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://(.*)", re.DOTALL)
@@ -58,9 +66,9 @@ class LaunchPolicyError(ValueError):
 
 @dataclass(frozen=True)
 class SourceIdentity:
-    pin: str                # the 40-hex commit that is archived and staged
-    branch: str             # the checked-out branch that matched ``allowed_branches``
-    origin: str | None      # normalized origin URL (None when neither compared nor needed); never printed
+    pin: str  # the 40-hex commit that is archived and staged
+    branch: str  # the checked-out branch that matched ``allowed_branches``
+    origin: str | None  # normalized origin URL (None when neither compared nor needed); never printed
 
 
 def _origin(url: str, base: Path | str | None) -> tuple[bool, str]:
@@ -76,7 +84,7 @@ def _origin(url: str, base: Path | str | None) -> tuple[bool, str]:
         port = ""
         if host.startswith("["):
             end = host.find("]")
-            host, port = (host[:end + 1], host[end + 2:]) if end != -1 else (host, "")
+            host, port = (host[: end + 1], host[end + 2 :]) if end != -1 else (host, "")
         elif ":" in host:
             host, _, port = host.partition(":")
         if port and port != _DEFAULT_PORTS.get(scheme):
@@ -104,8 +112,9 @@ def normalize_origin(url: str, base: Path | str | None = None) -> str:
 def _git(repo: Path, *args: str, timeout: float = 60) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
     try:
-        return subprocess.run(["git", *args], cwd=repo, env=env, capture_output=True, text=True, timeout=timeout,
-                              check=False)
+        return subprocess.run(
+            ["git", *args], cwd=repo, env=env, capture_output=True, text=True, timeout=timeout, check=False
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise LaunchPolicyError(f"git {args[0]} could not run in the checkout ({type(exc).__name__})") from None
 
@@ -124,8 +133,9 @@ def source_identity(repo: Path, policy: LaunchPolicy | None) -> SourceIdentity:
         raise LaunchPolicyError("no launch policy: the controller needs the site file's [launch] table")
     repo = Path(repo)
     if policy.require_clean and _output(repo, "status", "--porcelain", "--untracked-files=normal").strip():
-        raise LaunchPolicyError("source must be clean (launch.require_clean): commit or remove every change, "
-                                "untracked files included")
+        raise LaunchPolicyError(
+            "source must be clean (launch.require_clean): commit or remove every change, untracked files included"
+        )
     pin = _output(repo, "rev-parse", "--verify", "HEAD^{commit}").strip()
     if _PIN.fullmatch(pin) is None:
         raise LaunchPolicyError("HEAD is not a 40-hex commit")
@@ -134,8 +144,10 @@ def source_identity(repo: Path, policy: LaunchPolicy | None) -> SourceIdentity:
     if result.returncode != 0 or not branch:
         raise LaunchPolicyError("detached HEAD refused: check out a branch allowed by launch.allowed_branches")
     if not any(fnmatch.fnmatchcase(branch, pattern) for pattern in policy.allowed_branches):
-        raise LaunchPolicyError(f"branch {branch!r} is not allowed by launch.allowed_branches "
-                                "(use a release branch or main, or add its pattern to the site file)")
+        raise LaunchPolicyError(
+            f"branch {branch!r} is not allowed by launch.allowed_branches "
+            "(use a release branch or main, or add its pattern to the site file)"
+        )
     origin = None
     if policy.expected_origin is not None or policy.require_pushed:
         result = _git(repo, "remote", "get-url", "origin")
@@ -149,11 +161,15 @@ def source_identity(repo: Path, policy: LaunchPolicy | None) -> SourceIdentity:
     if policy.require_pushed:
         ref = "refs/heads/" + branch
         result = _git(repo, "ls-remote", "--exit-code", "origin", ref, timeout=LS_REMOTE_TIMEOUT)
-        heads = [fields[0] for fields in (line.split("\t") for line in result.stdout.splitlines())
-                 if len(fields) == 2 and fields[1] == ref]
+        heads = [
+            fields[0]
+            for fields in (line.split("\t") for line in result.stdout.splitlines())
+            if len(fields) == 2 and fields[1] == ref
+        ]
         if result.returncode != 0 or heads != [pin]:
-            raise LaunchPolicyError(f"source must be pushed before deployment: origin {ref} does not name HEAD "
-                                    "(launch.require_pushed)")
+            raise LaunchPolicyError(
+                f"source must be pushed before deployment: origin {ref} does not name HEAD (launch.require_pushed)"
+            )
     return SourceIdentity(pin=pin, branch=branch, origin=origin)
 
 
@@ -168,9 +184,11 @@ def require_controller_checkout(repo: Path, *controller: Path) -> None:
     remote helper texts are sent). Another checkout would be proven clean and pinned while the
     controller's own code and helper texts stayed unverified."""
     if not controller or {Path(p).resolve() for p in controller} != {Path(repo).resolve()}:
-        raise LaunchPolicyError("--repo / paths.repo must name this controller's own checkout: the controller's "
-                                "code and the remote helpers it sends are read from it, and only the staged "
-                                "checkout is proven clean and pinned (run the controller from the checkout to stage)")
+        raise LaunchPolicyError(
+            "--repo / paths.repo must name this controller's own checkout: the controller's "
+            "code and the remote helpers it sends are read from it, and only the staged "
+            "checkout is proven clean and pinned (run the controller from the checkout to stage)"
+        )
 
 
 def _toplevel(path: Path) -> Path | None:
@@ -195,7 +213,8 @@ def resolve_repo(site: SiteConfig, cli_repo: Path | str | None = None, *, defaul
     candidate = candidate.resolve()
     if _toplevel(candidate) != candidate:
         if source is None:
-            raise LaunchPolicyError("launching requires a git checkout of glm-tpu (the staged source is "
-                                    "`git archive <pin>`); pass --repo")
+            raise LaunchPolicyError(
+                "launching requires a git checkout of glm-tpu (the staged source is `git archive <pin>`); pass --repo"
+            )
         raise LaunchPolicyError(f"{source} must name the top level of a git checkout")
     return candidate

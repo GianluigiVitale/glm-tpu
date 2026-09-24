@@ -1,4 +1,5 @@
 """G6/G7 comparison through the reviewed rename table (``tools/equivalence/closure_map.toml``)."""
+
 from tools.equivalence import closure_map
 from tools.equivalence.closure_map import ClosureMap, compare_functions, compare_modules, layering_entry
 
@@ -15,7 +16,9 @@ def test_module_moves_map_to_recorded_names_and_closures_may_only_shrink():
     assert result["added"] == []  # the new parent package of a mapped module is allowed
     assert result["removed"] == ["pkg.old.runtime"]  # shrinking is allowed (reported)
     assert compare_modules(recorded, moved, ClosureMap(), is_package=lambda name: True)["added"] == [
-        "pkg.old.routed", "pkg.old.routed.fp8_experts"]
+        "pkg.old.routed",
+        "pkg.old.routed.fp8_experts",
+    ]
 
 
 def test_new_modules_fail_unless_reviewed():
@@ -38,8 +41,11 @@ def test_function_renames_additions_and_removals():
     result = compare_functions(recorded, current, ClosureMap())
     assert result["added"] == ["m:_bf16_dot", "p:build_program_set"]
     assert result["removed"] == ["f:bind_dependencies", "m:_dot_f32"]
-    table = ClosureMap(functions={"m:_bf16_dot": "m:_dot_f32"}, added={"p:build_program_set": "S2c"},
-                       removed={"f:bind_dependencies": "S2d c3"})
+    table = ClosureMap(
+        functions={"m:_bf16_dot": "m:_dot_f32"},
+        added={"p:build_program_set": "S2c"},
+        removed={"f:bind_dependencies": "S2d c3"},
+    )
     result = compare_functions(recorded, current, table)
     assert result["added"] == [] and result["removed"] == [] and result["declared_removed"] == ["f:bind_dependencies"]
     assert table.current_names("_dot_f32") == ("_dot_f32", "_bf16_dot")

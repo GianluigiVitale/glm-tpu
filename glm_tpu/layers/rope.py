@@ -31,24 +31,11 @@ def build_rotary_table_host(
     the latter remains the established dynamic DSA path.
     """
 
-    if (
-        not isinstance(context_capacity, int)
-        or isinstance(context_capacity, bool)
-        or context_capacity <= 0
-    ):
+    if not isinstance(context_capacity, int) or isinstance(context_capacity, bool) or context_capacity <= 0:
         raise ValueError("rotary table capacity must be a positive integer")
-    if (
-        not isinstance(rotary_dim, int)
-        or isinstance(rotary_dim, bool)
-        or rotary_dim <= 0
-        or rotary_dim % 2
-    ):
+    if not isinstance(rotary_dim, int) or isinstance(rotary_dim, bool) or rotary_dim <= 0 or rotary_dim % 2:
         raise ValueError("rotary table dimension must be positive and even")
-    if (
-        not isinstance(theta, (int, float))
-        or isinstance(theta, bool)
-        or theta <= 0
-    ):
+    if not isinstance(theta, (int, float)) or isinstance(theta, bool) or theta <= 0:
         raise ValueError("rotary table theta must be positive")
 
     dimensions = np.arange(0, rotary_dim, 2, dtype=np.float32)
@@ -58,9 +45,7 @@ def build_rotary_table_host(
         dtype=np.float32,
     )
     positions = np.arange(context_capacity, dtype=np.float32)
-    angles = np.multiply(
-        positions[:, None], frequencies[None, :], dtype=np.float32
-    )
+    angles = np.multiply(positions[:, None], frequencies[None, :], dtype=np.float32)
     table = np.concatenate(
         (
             np.cos(angles, dtype=np.float32),
@@ -108,8 +93,7 @@ def rotary_cos_sin(
 
     frequencies = jnp.power(
         jnp.float32(theta),
-        -jnp.arange(0, rotary_dim, 2, dtype=jnp.float32)
-        / jnp.float32(rotary_dim),
+        -jnp.arange(0, rotary_dim, 2, dtype=jnp.float32) / jnp.float32(rotary_dim),
     )
     angles = positions.astype(jnp.float32)[..., None] * frequencies
     return jnp.cos(angles).astype(output_dtype), jnp.sin(angles).astype(output_dtype)
@@ -135,9 +119,7 @@ def apply_rotary(
         raise ValueError("rotary input final dimension must be positive and even")
     half = value.shape[-1] // 2
     if cos.shape[-1:] != (half,) or sin.shape != cos.shape:
-        raise ValueError(
-            f"rotary cos/sin must share a final pair dimension of {half}"
-        )
+        raise ValueError(f"rotary cos/sin must share a final pair dimension of {half}")
     if not isinstance(interleaved, bool):
         raise ValueError("interleaved must be boolean")
 
@@ -187,9 +169,7 @@ def apply_rotary_fp32_final_round(
         raise ValueError("rotary input dtype must be inexact")
     half = value.shape[-1] // 2
     if cos.shape[-1:] != (half,) or sin.shape != cos.shape:
-        raise ValueError(
-            f"rotary cos/sin must share a final pair dimension of {half}"
-        )
+        raise ValueError(f"rotary cos/sin must share a final pair dimension of {half}")
     if not isinstance(interleaved, bool):
         raise ValueError("interleaved must be boolean")
 

@@ -112,17 +112,11 @@ class HloModule:
 
     @property
     def collectives(self) -> tuple[HloInstruction, ...]:
-        return tuple(
-            instruction
-            for instruction in self.instructions
-            if instruction.is_collective
-        )
+        return tuple(instruction for instruction in self.instructions if instruction.is_collective)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "instructions": [
-                instruction.to_dict() for instruction in self.instructions
-            ],
+            "instructions": [instruction.to_dict() for instruction in self.instructions],
             "name": self.name,
             "num_partitions": self.num_partitions,
             "num_replicas": self.num_replicas,
@@ -132,11 +126,7 @@ class HloModule:
 def _parse_shapes(value: str) -> tuple[HloShape, ...]:
     result = []
     for match in _SHAPE_RE.finditer(value):
-        dimensions = (
-            ()
-            if not match.group(2)
-            else tuple(int(item) for item in match.group(2).split(","))
-        )
+        dimensions = () if not match.group(2) else tuple(int(item) for item in match.group(2).split(","))
         result.append(HloShape(match.group(1), dimensions))
     return tuple(result)
 
@@ -185,62 +175,32 @@ def _braced_groups(attributes: str, name: str) -> tuple[tuple[int, ...], ...]:
     value = attributes[start + len(marker) :].lstrip()
     mesh_match = re.match(r"mesh\[([^]]+)\]\s*\{([^}]*)\}", value)
     if mesh_match is not None:
-        axis_items = re.findall(
-            r"'([^']+)'\s*=\s*([0-9]+)", mesh_match.group(1)
-        )
+        axis_items = re.findall(r"'([^']+)'\s*=\s*([0-9]+)", mesh_match.group(1))
         selected_axes = re.findall(r"'([^']+)'", mesh_match.group(2))
         if not axis_items or not selected_axes:
             raise ValueError(f"malformed mesh {name} in HLO attributes")
         axis_names = tuple(item[0] for item in axis_items)
         axis_sizes = tuple(int(item[1]) for item in axis_items)
-        if len(set(axis_names)) != len(axis_names) or any(
-            size <= 0 for size in axis_sizes
-        ):
+        if len(set(axis_names)) != len(axis_names) or any(size <= 0 for size in axis_sizes):
             raise ValueError(f"invalid mesh {name} axes in HLO attributes")
-        if len(set(selected_axes)) != len(selected_axes) or any(
-            axis not in axis_names for axis in selected_axes
-        ):
+        if len(set(selected_axes)) != len(selected_axes) or any(axis not in axis_names for axis in selected_axes):
             raise ValueError(f"unknown mesh {name} group axis in HLO attributes")
 
         selected = frozenset(selected_axes)
-        fixed_indices = tuple(
-            index
-            for index, axis in enumerate(axis_names)
-            if axis not in selected
-        )
-        varied_indices = tuple(
-            index
-            for index, axis in enumerate(axis_names)
-            if axis in selected
-        )
-        strides = tuple(
-            math.prod(axis_sizes[index + 1 :])
-            for index in range(len(axis_sizes))
-        )
+        fixed_indices = tuple(index for index, axis in enumerate(axis_names) if axis not in selected)
+        varied_indices = tuple(index for index, axis in enumerate(axis_names) if axis in selected)
+        strides = tuple(math.prod(axis_sizes[index + 1 :]) for index in range(len(axis_sizes)))
         groups = []
-        for fixed_values in product(
-            *(range(axis_sizes[index]) for index in fixed_indices)
-        ):
+        for fixed_values in product(*(range(axis_sizes[index]) for index in fixed_indices)):
             fixed = dict(zip(fixed_indices, fixed_values, strict=True))
             group = []
-            for varied_values in product(
-                *(range(axis_sizes[index]) for index in varied_indices)
-            ):
+            for varied_values in product(*(range(axis_sizes[index]) for index in varied_indices)):
                 coordinates = [0] * len(axis_sizes)
                 for index, coordinate in fixed.items():
                     coordinates[index] = coordinate
-                for index, coordinate in zip(
-                    varied_indices, varied_values, strict=True
-                ):
+                for index, coordinate in zip(varied_indices, varied_values, strict=True):
                     coordinates[index] = coordinate
-                group.append(
-                    sum(
-                        coordinate * stride
-                        for coordinate, stride in zip(
-                            coordinates, strides, strict=True
-                        )
-                    )
-                )
+                group.append(sum(coordinate * stride for coordinate, stride in zip(coordinates, strides, strict=True)))
             groups.append(tuple(group))
         return tuple(groups)
     start = attributes.find("{", start + len(marker))
@@ -346,29 +306,18 @@ def parse_hlo_module(text: str) -> HloModule:
             )
         )
 
-    shapes_by_name = {
-        (instruction.computation, instruction.name): instruction.result_shapes
-        for instruction in pending
-    }
+    shapes_by_name = {(instruction.computation, instruction.name): instruction.result_shapes for instruction in pending}
     instructions = []
     for instruction in pending:
         operand_shapes = tuple(
             shape
             for operand in instruction.operand_names
-            for shape in shapes_by_name.get(
-                (instruction.computation, operand), ()
-            )
+            for shape in shapes_by_name.get((instruction.computation, operand), ())
         )
-        replica_groups = _braced_groups(
-            instruction.attributes, "replica_groups"
-        )
-        source_target_pairs = _braced_groups(
-            instruction.attributes, "source_target_pairs"
-        )
+        replica_groups = _braced_groups(instruction.attributes, "replica_groups")
+        source_target_pairs = _braced_groups(instruction.attributes, "source_target_pairs")
         if any(len(pair) != 2 for pair in source_target_pairs):
-            raise ValueError(
-                f"collective-permute {instruction.name} has malformed source-target pairs"
-            )
+            raise ValueError(f"collective-permute {instruction.name} has malformed source-target pairs")
         instructions.append(
             HloInstruction(
                 index=instruction.index,
@@ -380,25 +329,13 @@ def parse_hlo_module(text: str) -> HloModule:
                 operand_names=instruction.operand_names,
                 operand_shapes=operand_shapes,
                 replica_groups=replica_groups,
-                source_target_pairs=tuple(
-                    (pair[0], pair[1]) for pair in source_target_pairs
-                ),
-                channel_id=_integer_attribute(
-                    instruction.attributes, "channel_id"
-                ),
-                use_global_device_ids=(
-                    "use_global_device_ids=true" in instruction.attributes
-                ),
+                source_target_pairs=tuple((pair[0], pair[1]) for pair in source_target_pairs),
+                channel_id=_integer_attribute(instruction.attributes, "channel_id"),
+                use_global_device_ids=("use_global_device_ids=true" in instruction.attributes),
                 op_name=_quoted_attribute(instruction.attributes, "op_name"),
-                source_file=_quoted_attribute(
-                    instruction.attributes, "source_file"
-                ),
-                source_line=_integer_attribute(
-                    instruction.attributes, "source_line"
-                ),
-                source_stack=_quoted_attribute(
-                    instruction.attributes, "source_stack"
-                ),
+                source_file=_quoted_attribute(instruction.attributes, "source_file"),
+                source_line=_integer_attribute(instruction.attributes, "source_line"),
+                source_stack=_quoted_attribute(instruction.attributes, "source_stack"),
                 raw_line=instruction.raw_line,
             )
         )

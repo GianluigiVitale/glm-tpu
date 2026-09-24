@@ -59,27 +59,19 @@ TINY = model.ReferenceConfig(
 )
 
 
-def tiny_checkpoint(
-    config: model.ReferenceConfig, seed: int = 7
-) -> dict[str, np.ndarray]:
+def tiny_checkpoint(config: model.ReferenceConfig, seed: int = 7) -> dict[str, np.ndarray]:
     """A random checkpoint with the production tensor names (FP8 bits + FP32 block scales)."""
     rng = np.random.default_rng(seed)
     arrays: dict[str, np.ndarray] = {}
 
     def fp8(name: str, shape: tuple[int, ...]) -> None:
-        bits = np.asarray(rng.normal(0, 0.15, shape), ml_dtypes.float8_e4m3fn).view(
-            np.uint8
-        )
+        bits = np.asarray(rng.normal(0, 0.15, shape), ml_dtypes.float8_e4m3fn).view(np.uint8)
         blocks = shape[:-2] + tuple(-(-d // 128) for d in shape[-2:])
         arrays[name + ".weight_bits"] = bits
         arrays[name + ".scale_inv"] = rng.uniform(0.5, 1.5, blocks).astype(np.float32)
 
-    def bf16(
-        name: str, shape: tuple[int, ...], scale: float = 0.1, offset: float = 0.0
-    ) -> None:
-        arrays[name] = np.asarray(
-            offset + rng.normal(0, scale, shape), ml_dtypes.bfloat16
-        )
+    def bf16(name: str, shape: tuple[int, ...], scale: float = 0.1, offset: float = 0.0) -> None:
+        arrays[name] = np.asarray(offset + rng.normal(0, scale, shape), ml_dtypes.bfloat16)
 
     c = config
     heads, qk = c.attention_heads, c.qk_nope_head_dim + c.qk_rope_head_dim
@@ -116,9 +108,7 @@ def tiny_checkpoint(
             # ~N(0, 0.8), scores spread by ~0.17), so the bias decides top-k choices and
             # a bias applied the wrong way changes routes (the frozen fixture's bias is
             # all zeros, VALIDATION.md).
-            arrays[p + ".mlp.gate.e_score_correction_bias"] = rng.normal(
-                0, 0.1, e
-            ).astype(np.float32)
+            arrays[p + ".mlp.gate.e_score_correction_bias"] = rng.normal(0, 0.1, e).astype(np.float32)
             fp8(p + ".mlp.experts.gate_proj", (e, m, c.hidden_size))
             fp8(p + ".mlp.experts.up_proj", (e, m, c.hidden_size))
             fp8(p + ".mlp.experts.down_proj", (e, c.hidden_size, m))
@@ -137,9 +127,7 @@ def tiny() -> tuple[model.ReferenceConfig, model.ReferenceWeights]:
     return TINY, model.load_weights(tiny_checkpoint(TINY), TINY)
 
 
-def run_blocks(
-    config: Any, weights: Any, prompt: list[int], sizes: list[int]
-) -> list[model.ForwardResult]:
+def run_blocks(config: Any, weights: Any, prompt: list[int], sizes: list[int]) -> list[model.ForwardResult]:
     rope, state, results, start = (
         model.rope_table(config),
         model.initial_state(config),
@@ -147,11 +135,7 @@ def run_blocks(
         0,
     )
     for size in sizes:
-        results.append(
-            model.forward(
-                config, weights, state, prompt[start : start + size], rope=rope
-            )
-        )
+        results.append(model.forward(config, weights, state, prompt[start : start + size], rope=rope))
         state, start = results[-1].state, start + size
     assert start == len(prompt)
     return results
@@ -165,18 +149,12 @@ def as_f32(value: Any) -> np.ndarray:
 def test_dequantize_equals_independent_e4m3_block_decode():
     rng = np.random.default_rng(11)
     bits = rng.integers(0, 256, (256, 384), dtype=np.uint8)
-    bits[(bits & 0x7F) == 0x7F] = (
-        0  # the two NaN encodings are a loader refusal, not arithmetic
-    )
+    bits[(bits & 0x7F) == 0x7F] = 0  # the two NaN encodings are a loader refusal, not arithmetic
     scale = rng.uniform(0.25, 2.0, (2, 3)).astype(np.float32)
-    expected = bits.view(ml_dtypes.float8_e4m3fn).astype(np.float32) * np.repeat(
-        np.repeat(scale, 128, 0), 128, 1
-    )
+    expected = bits.view(ml_dtypes.float8_e4m3fn).astype(np.float32) * np.repeat(np.repeat(scale, 128, 0), 128, 1)
     actual = np.asarray(dequantize(bits, scale))
     assert actual.dtype == ml_dtypes.bfloat16
-    np.testing.assert_array_equal(
-        actual.view(np.uint16), expected.astype(ml_dtypes.bfloat16).view(np.uint16)
-    )
+    np.testing.assert_array_equal(actual.view(np.uint16), expected.astype(ml_dtypes.bfloat16).view(np.uint16))
 
 
 def test_tie_rules_lowest_token_position_and_expert(tiny):
@@ -198,9 +176,7 @@ def test_tie_rules_lowest_token_position_and_expert(tiny):
         layer.indexer,
         contract=config.indexer_contract,
     )
-    np.testing.assert_array_equal(
-        np.asarray(selected.positions), [[0, 1, 2, 3], [0, 1, -1, -1]]
-    )
+    np.testing.assert_array_equal(np.asarray(selected.positions), [[0, 1, 2, 3], [0, 1, -1, -1]])
     np.testing.assert_array_equal(np.asarray(selected.valid_counts), [4, 2])
     assert np.isneginf(np.asarray(selected.scores)[1, 2:]).all()
     # noaux_tc: equal logits pick the lowest expert ids; the bias moves ids, never weights.
@@ -265,9 +241,7 @@ def test_router_adds_the_correction_bias_to_the_sigmoid_scores(tiny):
     np.testing.assert_array_equal(expected, [[0, 1], [0, 2], [0, 2]])
     np.testing.assert_array_equal(np.asarray(routes.expert_ids), expected)
     chosen = np.take_along_axis(scores, expected, axis=1)
-    np.testing.assert_allclose(
-        np.asarray(routes.weights), chosen / chosen.sum(1, keepdims=True), rtol=1e-6
-    )
+    np.testing.assert_allclose(np.asarray(routes.weights), chosen / chosen.sum(1, keepdims=True), rtol=1e-6)
     ordered = np.sort(choice, axis=1)
     np.testing.assert_allclose(
         np.asarray(routes.margin),
@@ -290,9 +264,7 @@ def test_margins_when_every_candidate_is_chosen(tiny):
     """top_k equal to the context capacity or to the expert count: margin +inf, no error."""
     config, weights = tiny
     scores = jnp.asarray([[3.0, 1.0, 2.0, 0.5]] * 2)
-    np.testing.assert_array_equal(
-        dsa.decision_margin(scores, jnp.asarray([4, 2]), 2), [1.0, np.inf]
-    )
+    np.testing.assert_array_equal(dsa.decision_margin(scores, jnp.asarray([4, 2]), 2), [1.0, np.inf])
     assert np.isposinf(dsa.decision_margin(scores, jnp.asarray([4, 4]), 4)).all()
     wide = dataclasses.replace(config, index_top_k=config.context_capacity)
     rng = np.random.default_rng(17)
@@ -311,9 +283,7 @@ def test_margins_when_every_candidate_is_chosen(tiny):
     )
     assert np.isposinf(np.asarray(selected.margin)).all()
     np.testing.assert_array_equal(np.asarray(selected.valid_counts), np.arange(1, 7))
-    routes = moe.route(
-        normalized, weights.layers[1].mlp, top_k=config.num_routed_experts
-    )
+    routes = moe.route(normalized, weights.layers[1].mlp, top_k=config.num_routed_experts)
     assert np.isposinf(np.asarray(routes.margin)).all()
     np.testing.assert_allclose(np.asarray(routes.weights).sum(axis=1), 1.0, rtol=1e-6)
 
@@ -332,9 +302,7 @@ def test_absorbed_attention_equals_explicit_mla(tiny):
     )
     rng = np.random.default_rng(5)
     normalized = jnp.asarray(rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16)
-    prepared = attention.prepare(
-        normalized, layer.qkv_a, epsilon=config.rms_norm_epsilon
-    )
+    prepared = attention.prepare(normalized, layer.qkv_a, epsilon=config.rms_norm_epsilon)
     positions = jnp.arange(rows, dtype=jnp.int32)
     # Row r attends to every position <= r, listed in a scrambled order.
     selected = np.full((rows, 8), -1, np.int32)
@@ -345,9 +313,7 @@ def test_absorbed_attention_equals_explicit_mla(tiny):
         prepared,
         positions,
         jnp.zeros((config.context_capacity, lora + rope_dim), jnp.bfloat16),
-        SelectedPositions(
-            jnp.asarray(selected), jnp.arange(1, rows + 1, dtype=jnp.int32)
-        ),
+        SelectedPositions(jnp.asarray(selected), jnp.arange(1, rows + 1, dtype=jnp.int32)),
         layer.attention,
         contract=contract,
         rope_table=table,
@@ -368,9 +334,7 @@ def test_absorbed_attention_equals_explicit_mla(tiny):
     values = np.einsum("hvc,tc->thv", kv_b[:, nope:], latent)
     q_rope = rotate_hf(q[..., nope:], cos[:, None], sin[:, None])
     k_rope = rotate_hf(as_f32(prepared.key_rope_input), cos, sin)
-    scores = np.einsum("rhd,thd->rht", q[..., :nope], keys_nope) + np.einsum(
-        "rhd,td->rht", q_rope, k_rope
-    )
+    scores = np.einsum("rhd,thd->rht", q[..., :nope], keys_nope) + np.einsum("rhd,td->rht", q_rope, k_rope)
     scores = scores * (nope + rope_dim) ** -0.5
     scores = np.where(
         np.arange(rows)[None, None, :] <= np.arange(rows)[:, None, None],
@@ -379,13 +343,9 @@ def test_absorbed_attention_equals_explicit_mla(tiny):
     )
     probabilities = np.exp(scores - scores.max(-1, keepdims=True))
     probabilities /= probabilities.sum(-1, keepdims=True)
-    attended = np.einsum("rht,thv->rhv", probabilities, values).reshape(
-        rows, heads * v_dim
-    )
+    attended = np.einsum("rht,thv->rhv", probabilities, values).reshape(rows, heads * v_dim)
     expected = attended @ as_f32(layer.attention.o).T
-    np.testing.assert_allclose(
-        as_f32(output), expected, rtol=0.05, atol=0.05 * np.abs(expected).max()
-    )
+    np.testing.assert_allclose(as_f32(output), expected, rtol=0.05, atol=0.05 * np.abs(expected).max())
     # The cache holds [latent | rope(k)] at each written position and zeros elsewhere.
     np.testing.assert_array_equal(as_f32(cache[:rows, :lora]), latent)
     assert not np.any(as_f32(cache[rows:]))
@@ -420,55 +380,55 @@ def test_forward_is_causal(tiny):
         np.testing.assert_array_equal(x[:, :11], y[:, :11])
         assert not np.array_equal(x[:, 11], y[:, 11])
     for sa, sb in zip(a.selections, b.selections, strict=True):
-        np.testing.assert_array_equal(
-            np.asarray(sa.positions)[:11], np.asarray(sb.positions)[:11]
-        )
+        np.testing.assert_array_equal(np.asarray(sa.positions)[:11], np.asarray(sb.positions)[:11])
         assert int(np.asarray(sa.positions)[-1].max()) <= 11
 
 
 # The engine's reference (oracle) definitions: the S2f reference package, at their S4.1 homes
 # (``module:name``; the remaining oracles are in tests/reference/).
-ORACLE_DEFINITIONS = frozenset((
-    "glm_tpu.kernels.sparse_mla.kernel:SparseAttentionResult",
-    "glm_tpu.kernels.sparse_mla.kernel:sparse_mla_attention",
-    "glm_tpu.layers.attention.dsa_indexer:ScoredSelectedPositions",
-    "glm_tpu.layers.attention.dsa_indexer:_merge_topk_candidates_scored",
-    "glm_tpu.layers.attention.dsa_indexer:dsa_index_keys_from_projection",
-    "glm_tpu.layers.attention.dsa_indexer:dsa_scores",
-    "glm_tpu.layers.attention.dsa_indexer:local_topk_candidates",
-    "glm_tpu.layers.attention.dsa_indexer:merge_topk_candidates_with_scores",
-    "glm_tpu.layers.attention.dsa_indexer:prompt_index_key_chunk",
-    "glm_tpu.layers.attention.kv_cache:CanonicalSelectedPositions",
-    "glm_tpu.layers.attention.kv_cache:SelectedKvSegment",
-    "glm_tpu.layers.attention.kv_cache:canonicalize_selected_positions",
-    "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv",
-    "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv_aligned",
-    "glm_tpu.layers.attention.kv_cache:selected_positions_for_owner",
-    "glm_tpu.layers.contracts:DsaNumericalContract",
-    "glm_tpu.layers.contracts:GlmMoeNumericalContract",
-    "glm_tpu.layers.contracts:MlaNumericalContract",
-    "glm_tpu.layers.contracts:SelectedPositions",
-    "glm_tpu.layers.contracts:StageLocalKvLayout",
-    "glm_tpu.layers.contracts:_require_int32",
-    "glm_tpu.layers.contracts:_require_shape",
-    "glm_tpu.layers.fp8:decode_stage_local_prefill_index_wk_bf16",
-    "glm_tpu.layers.fp8:dequantize_fp8_bits_block_weight",
-    "glm_tpu.layers.fp8:fp8_e4m3fn_lookup",
-    "glm_tpu.layers.fp8:promote_stage_local_prefill_index_wk",
-    "glm_tpu.layers.linear:residual_add",
-    "glm_tpu.layers.moe.router:route_glm_noaux_tc_logits",
-    "glm_tpu.layers.norm:_accepted_schedule_normalized",
-    "glm_tpu.layers.norm:_affine_layer_norm",
-    "glm_tpu.layers.norm:affine_key_layer_norm",
-    "glm_tpu.layers.norm:final_norm",
-    "glm_tpu.layers.norm:rms_norm",
-    "glm_tpu.layers.rope:apply_rotary",
-    "glm_tpu.layers.rope:apply_rotary_fp32_final_round",
-    "glm_tpu.layers.rope:build_rotary_table_host",
-    "glm_tpu.layers.rope:rotary_cos_sin",
-    "glm_tpu.layers.rope:rotary_cos_sin_from_rows",
-    "glm_tpu.layers.rope:rotary_table_sha256",
-))
+ORACLE_DEFINITIONS = frozenset(
+    (
+        "glm_tpu.kernels.sparse_mla.kernel:SparseAttentionResult",
+        "glm_tpu.kernels.sparse_mla.kernel:sparse_mla_attention",
+        "glm_tpu.layers.attention.dsa_indexer:ScoredSelectedPositions",
+        "glm_tpu.layers.attention.dsa_indexer:_merge_topk_candidates_scored",
+        "glm_tpu.layers.attention.dsa_indexer:dsa_index_keys_from_projection",
+        "glm_tpu.layers.attention.dsa_indexer:dsa_scores",
+        "glm_tpu.layers.attention.dsa_indexer:local_topk_candidates",
+        "glm_tpu.layers.attention.dsa_indexer:merge_topk_candidates_with_scores",
+        "glm_tpu.layers.attention.dsa_indexer:prompt_index_key_chunk",
+        "glm_tpu.layers.attention.kv_cache:CanonicalSelectedPositions",
+        "glm_tpu.layers.attention.kv_cache:SelectedKvSegment",
+        "glm_tpu.layers.attention.kv_cache:canonicalize_selected_positions",
+        "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv",
+        "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv_aligned",
+        "glm_tpu.layers.attention.kv_cache:selected_positions_for_owner",
+        "glm_tpu.layers.contracts:DsaNumericalContract",
+        "glm_tpu.layers.contracts:GlmMoeNumericalContract",
+        "glm_tpu.layers.contracts:MlaNumericalContract",
+        "glm_tpu.layers.contracts:SelectedPositions",
+        "glm_tpu.layers.contracts:StageLocalKvLayout",
+        "glm_tpu.layers.contracts:_require_int32",
+        "glm_tpu.layers.contracts:_require_shape",
+        "glm_tpu.layers.fp8:decode_stage_local_prefill_index_wk_bf16",
+        "glm_tpu.layers.fp8:dequantize_fp8_bits_block_weight",
+        "glm_tpu.layers.fp8:fp8_e4m3fn_lookup",
+        "glm_tpu.layers.fp8:promote_stage_local_prefill_index_wk",
+        "glm_tpu.layers.linear:residual_add",
+        "glm_tpu.layers.moe.router:route_glm_noaux_tc_logits",
+        "glm_tpu.layers.norm:_accepted_schedule_normalized",
+        "glm_tpu.layers.norm:_affine_layer_norm",
+        "glm_tpu.layers.norm:affine_key_layer_norm",
+        "glm_tpu.layers.norm:final_norm",
+        "glm_tpu.layers.norm:rms_norm",
+        "glm_tpu.layers.rope:apply_rotary",
+        "glm_tpu.layers.rope:apply_rotary_fp32_final_round",
+        "glm_tpu.layers.rope:build_rotary_table_host",
+        "glm_tpu.layers.rope:rotary_cos_sin",
+        "glm_tpu.layers.rope:rotary_cos_sin_from_rows",
+        "glm_tpu.layers.rope:rotary_table_sha256",
+    )
+)
 
 
 def test_reference_executes_only_oracle_functions(tiny):
@@ -527,9 +487,7 @@ def test_prefill_block_partition_and_decode_agree(tiny):
     # Every row's selection: the one-block run against the per-token runs.
     for layer in range(len(config.full_layers)):
         one = np.asarray(last["one"].selections[layer].positions)
-        per_token = np.concatenate(
-            [np.asarray(r.selections[layer].positions) for r in runs["tokens"]]
-        )
+        per_token = np.concatenate([np.asarray(r.selections[layer].positions) for r in runs["tokens"]])
         np.testing.assert_array_equal(np.sort(one, axis=1), np.sort(per_token, axis=1))
 
 
@@ -543,15 +501,11 @@ def test_reference_reads_exactly_the_fixture_checkpoint():
     )
     weights = model.load_weights(frozen.arrays, config)
     assert len(weights.layers) == 8 and config.full_layers == (0, 1, 2, 6)
-    assert [layer.indexer is not None for layer in weights.layers] == [
-        k == "full" for k in config.indexer_types
-    ]
+    assert [layer.indexer is not None for layer in weights.layers] == [k == "full" for k in config.indexer_types]
     leaves = jax.tree.leaves(weights)
     assert all(leaf.dtype in (jnp.bfloat16, jnp.float32) for leaf in leaves)
     assert weights.layers[3].mlp.expert_gate.shape == (64, 256, 1024)
-    extra = dict(
-        frozen.arrays, **{"model.layers.0.unexpected": np.zeros(1, np.float32)}
-    )
+    extra = dict(frozen.arrays, **{"model.layers.0.unexpected": np.zeros(1, np.float32)})
     with pytest.raises(ValueError, match="does not read"):
         model.load_weights(extra, config)
     with pytest.raises(ValueError, match="does not implement"):
@@ -584,9 +538,7 @@ DECISION_TOL = 0.02
 # the biased scores then differ by FP32 rounding only (measured at most 1.0e-7 on six input
 # draws), so the routed set must be the restatement's own top-k up to a tie of that size.
 ROUTER_COMPONENT_TOL = 1e-5
-INDEPENDENT_IMPORTS = frozenset(
-    {"__future__", "collections", "ml_dtypes", "numpy", "typing"}
-)
+INDEPENDENT_IMPORTS = frozenset({"__future__", "collections", "ml_dtypes", "numpy", "typing"})
 
 
 def test_independent_restatement_imports_no_repository_code():
@@ -613,10 +565,7 @@ def reference_decisions(
     rows = sum(int(result.final_residual.shape[0]) for result in results)
     selected = {layer: np.zeros((rows, rows), bool) for layer in config.full_layers}
     scores = {layer: np.full((rows, rows), np.nan) for layer in config.full_layers}
-    experts = {
-        layer: np.zeros((rows, config.routed_top_k), np.int64)
-        for layer in config.sparse_layers
-    }
+    experts = {layer: np.zeros((rows, config.routed_top_k), np.int64) for layer in config.sparse_layers}
     start = 0
     for result in results:
         count = int(result.final_residual.shape[0])
@@ -626,14 +575,8 @@ def reference_decisions(
                 row, live = start + j, positions[j] >= 0
                 selected[layer][row, positions[j, live]] = True
                 scores[layer][row, positions[j, live]] = values[j, live]
-                assert (
-                    live.sum()
-                    == selected[layer][row].sum()
-                    == min(config.index_top_k, row + 1)
-                )
-                assert not selected[layer][row, row + 1 :].any(), (
-                    "selection is not causal"
-                )
+                assert live.sum() == selected[layer][row].sum() == min(config.index_top_k, row + 1)
+                assert not selected[layer][row, row + 1 :].any(), "selection is not causal"
         for layer, routes in zip(config.sparse_layers, result.routes, strict=True):
             experts[layer][start : start + count] = np.asarray(routes.expert_ids)
         start += count
@@ -658,9 +601,7 @@ def test_reference_matches_independent_fp64_restatement(tiny):
     results = run_blocks(config, weights, prompt, [12])
     rope, tokens = model.rope_table(config), [int(results[-1].next_token)]
     for _ in range(6):
-        results.append(
-            model.forward(config, weights, results[-1].state, [tokens[-1]], rope=rope)
-        )
+        results.append(model.forward(config, weights, results[-1].state, [tokens[-1]], rope=rope))
         tokens.append(int(results[-1].next_token))
     sequence = prompt + tokens[:-1]
     rows = len(sequence)
@@ -700,16 +641,10 @@ def test_reference_matches_independent_fp64_restatement(tiny):
     lora = config.kv_lora_rank
     errors = {}
     for layer in range(config.num_layers):
-        errors[f"latent {layer}"] = relative_error(
-            kv[layer, :, :lora], exact.latent[layer]
-        )
-        errors[f"key rope {layer}"] = relative_error(
-            kv[layer, :, lora:], exact.key_rope[layer]
-        )
+        errors[f"latent {layer}"] = relative_error(kv[layer, :, :lora], exact.latent[layer])
+        errors[f"key rope {layer}"] = relative_error(kv[layer, :, lora:], exact.key_rope[layer])
     for slot, layer in enumerate(config.full_layers):
-        errors[f"index keys {layer}"] = relative_error(
-            index[slot], exact.index_keys[layer]
-        )
+        errors[f"index keys {layer}"] = relative_error(index[slot], exact.index_keys[layer])
     errors["final residual"] = relative_error(
         jnp.concatenate([result.final_residual for result in results]), exact.residual
     )
@@ -720,9 +655,7 @@ def test_reference_matches_independent_fp64_restatement(tiny):
         # Greedy: the reference's token is the restatement's unless the two are within error.
         best = int(np.argmax(expected))
         assert expected[best] - expected[tokens[step]] <= 2 * error.max(), (step, best)
-    assert max(errors.values()) <= CONTINUOUS_TOL, {
-        k: round(v, 4) for k, v in errors.items() if v > CONTINUOUS_TOL
-    }
+    assert max(errors.values()) <= CONTINUOUS_TOL, {k: round(v, 4) for k, v in errors.items() if v > CONTINUOUS_TOL}
 
 
 def test_layer_components_match_independent_fp64_restatement(tiny):
@@ -753,9 +686,7 @@ def test_layer_components_match_independent_fp64_restatement(tiny):
     for layer in (0, 1):  # dense MLP, then sparse MoE
         p, a = f"model.layers.{layer}", f"model.layers.{layer}.self_attn"
         layer_weights = weights.layers[layer]
-        normalized, _ = add_rms_norm(
-            update, residual, layer_weights.input_norm, epsilon=eps
-        )
+        normalized, _ = add_rms_norm(update, residual, layer_weights.input_norm, epsilon=eps)
         x = as_f32(normalized).astype(np.float64)
         errors[f"norm {layer}"] = relative_error(
             normalized,
@@ -777,12 +708,8 @@ def test_layer_components_match_independent_fp64_restatement(tiny):
             rope_table=model.rope_table(config),
         )
         errors[f"q_resid {layer}"] = relative_error(prepared.q_residual, inputs.q_resid)
-        errors[f"latent {layer}"] = relative_error(
-            cache[:rows, : config.kv_lora_rank], inputs.latent
-        )
-        errors[f"key rope {layer}"] = relative_error(
-            cache[:rows, config.kv_lora_rank :], inputs.key_rope
-        )
+        errors[f"latent {layer}"] = relative_error(cache[:rows, : config.kv_lora_rank], inputs.latent)
+        errors[f"key rope {layer}"] = relative_error(cache[:rows, config.kv_lora_rank :], inputs.key_rope)
         errors[f"attention {layer}"] = relative_error(
             output, independent.attention(inputs, attended, exact_weights, a, config)
         )
@@ -811,9 +738,7 @@ def test_layer_components_match_independent_fp64_restatement(tiny):
             actual = moe.dense_mlp(normalized, layer_weights.mlp)
             expected = independent.swiglu(x, exact_weights, p + ".mlp")
         errors[f"mlp {layer}"] = relative_error(actual, expected)
-    assert max(errors.values()) <= COMPONENT_TOL, {
-        k: round(v, 4) for k, v in errors.items() if v > COMPONENT_TOL
-    }
+    assert max(errors.values()) <= COMPONENT_TOL, {k: round(v, 4) for k, v in errors.items() if v > COMPONENT_TOL}
 
 
 def test_indexer_matches_independent_fp64_restatement(tiny):
@@ -824,17 +749,11 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
     positions = jnp.arange(rows, dtype=jnp.int32)
     contract = config.indexer_contract
     for layer in config.full_layers:
-        normalized = jnp.asarray(
-            rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16
-        )
-        q_residual = jnp.asarray(
-            rng.normal(0, 1, (rows, config.q_lora_rank)), jnp.bfloat16
-        )
+        normalized = jnp.asarray(rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16)
+        q_residual = jnp.asarray(rng.normal(0, 1, (rows, config.q_lora_rank)), jnp.bfloat16)
         indexer = weights.layers[layer].indexer
         keys = dsa.index_keys(normalized, indexer, positions, contract=contract)
-        cache = jnp.zeros(
-            (config.context_capacity, config.index_head_dim), jnp.bfloat16
-        )
+        cache = jnp.zeros((config.context_capacity, config.index_head_dim), jnp.bfloat16)
         chosen = dsa.select(
             normalized,
             q_residual,
@@ -851,14 +770,10 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
             config,
         )
         # The cache stores the key rounded to BF16: one rounding.
-        np.testing.assert_allclose(
-            as_f32(keys), exact_keys, rtol=2**-8, atol=1e-3 * np.abs(exact_keys).max()
-        )
+        np.testing.assert_allclose(as_f32(keys), exact_keys, rtol=2**-8, atol=1e-3 * np.abs(exact_keys).max())
         scale = np.abs(scores[np.isfinite(scores)]).max()
         selection = [p[p >= 0] for p in np.asarray(chosen.positions)]
-        np.testing.assert_array_equal(
-            np.asarray(chosen.valid_counts), np.minimum(np.arange(1, rows + 1), 4)
-        )
+        np.testing.assert_array_equal(np.asarray(chosen.valid_counts), np.minimum(np.arange(1, rows + 1), 4))
         for row, picked in enumerate(selection):
             assert len(set(picked)) == picked.size and picked.max() <= row
             boundary = np.sort(scores[row, : row + 1])[::-1][picked.size - 1]
@@ -915,9 +830,7 @@ def reports() -> Any:
     return get
 
 
-def assert_criteria(
-    report: dict[str, Any], floor: dict[str, Any], *, strict: tuple[str, ...]
-) -> None:
+def assert_criteria(report: dict[str, Any], floor: dict[str, Any], *, strict: tuple[str, ...]) -> None:
     s, f = report["summary"], floor["summary"]
     assert report["engine_inputs_equal_reference"] == dict(wk=True, rope=True)
     failed = [key for key in strict if not s[key]]
@@ -940,13 +853,9 @@ def assert_criteria(
                 fraction,
                 f,
             )
-    carried = [
-        r["selections"][str(max(map(int, r["selections"])))] for r in report["decode"]
-    ]
+    carried = [r["selections"][str(max(map(int, r["selections"])))] for r in report["decode"]]
     floor_carried = [next(iter(r["selections"].values())) for r in floor["decode"]]
-    assert sum(not c["set_equal"] for c in carried) <= sum(
-        not c["set_equal"] for c in floor_carried
-    )
+    assert sum(not c["set_equal"] for c in carried) <= sum(not c["set_equal"] for c in floor_carried)
 
 
 SHORT = (
@@ -990,5 +899,9 @@ def test_recorded_floors_are_the_final_oracle_runs():
     assert value["pair"] == "production:fp8-oracle" and set(value["floors"]) == {"short", "a"}
     for floor in value["floors"].values():
         assert set(floor["summary"]) == {
-            "prefill_bound_ratio", "prefill_outside_fraction", "decode_bound_ratio", "decode_outside_fraction"}
+            "prefill_bound_ratio",
+            "prefill_outside_fraction",
+            "decode_bound_ratio",
+            "decode_outside_fraction",
+        }
         assert floor["decode"] and all(len(r["selections"]) == 1 for r in floor["decode"])

@@ -61,9 +61,14 @@ def _scalar(value: Any) -> Any:
 
 def fixture_request(request_id: str, ids: list[int], max_new_tokens: int, config: Any) -> dict[str, Any]:
     """The request fields ``generate`` reads, on the fixture's profile (1,536 slots, vocabulary 256)."""
-    value = dict(request_id=request_id, prompt_ids=list(ids), max_new_tokens=max_new_tokens,
-                 context_capacity=config.context_capacity, vocab_size=config.geometry.vocab_size,
-                 eos_ids=list(EOS_IDS))
+    value = dict(
+        request_id=request_id,
+        prompt_ids=list(ids),
+        max_new_tokens=max_new_tokens,
+        context_capacity=config.context_capacity,
+        vocab_size=config.geometry.vocab_size,
+        eos_ids=list(EOS_IDS),
+    )
     return dict(value, request_sha256=sha256_hex(canonical_json(value)))
 
 
@@ -97,21 +102,33 @@ def composition(mesh: Any) -> dict[str, Any]:
     timed("fixture")
 
     # --- load: the real OrdinaryRuntime.__init__ / _load
-    built = driver.build_runtime(mesh, tier="fixture", capacity=fixture.CAPACITY, concurrent_size=0, arrays=arrays,
-                                 plans=plans, concrete=True, fixture_geometry=frozen.config.geometry, interpret=True)
+    built = driver.build_runtime(
+        mesh,
+        tier="fixture",
+        capacity=fixture.CAPACITY,
+        concurrent_size=0,
+        arrays=arrays,
+        plans=plans,
+        concrete=True,
+        fixture_geometry=frozen.config.geometry,
+        interpret=True,
+    )
     runtime = built.runtime
     config = runtime.config
     raw = bind_decoder_weights(arrays, config)  # what _load bound from the same loaded arrays
     wk_decode = built.recorder.program("wk_decode").fn
-    decoded = [jax.block_until_ready(wk_decode(raw.layers[i].dsa.wk_bits_local, raw.layers[i].dsa.wk_scale_local))
-               for i in config.full_index_slots]
+    decoded = [
+        jax.block_until_ready(wk_decode(raw.layers[i].dsa.wk_bits_local, raw.layers[i].dsa.wk_scale_local))
+        for i in config.full_index_slots
+    ]
     groups["wk_decode"] = tree_record(decoded)
     groups["wk_promote"] = tree_record(runtime.wk)
     groups["resident_bf16"] = tree_record(runtime.weights)
     tables = {str(config.context_capacity): np.asarray(runtime.rope)}
     for capacity in ROPE_CAPACITIES:
-        tables[str(capacity)] = np.asarray(build_main_rope_table(
-            fixture.decoder_config(panel_geometry=True, capacity=capacity)))
+        tables[str(capacity)] = np.asarray(
+            build_main_rope_table(fixture.decoder_config(panel_geometry=True, capacity=capacity))
+        )
     groups["rope_tables"] = tree_record(tables, labels=True)
     groups["cache_init_157"] = tree_record(jax.block_until_ready(runtime.initialize(runtime.put(np.int32(157)))))
     del raw, decoded
@@ -138,25 +155,39 @@ def composition(mesh: Any) -> dict[str, Any]:
 
     # Prompt C: one more block on B's finished state must be refused without side effects.
     block = np.asarray(PROMPT_A[:114], np.int32)
-    refused = jax.block_until_ready(prefill_programs[114](put(block), put(np.int32(114)), result_b.state,
-                                                          runtime.weights, runtime.wk, runtime.rope))
+    refused = jax.block_until_ready(
+        prefill_programs[114](put(block), put(np.int32(114)), result_b.state, runtime.weights, runtime.wk, runtime.rope)
+    )
     before, after = result_b.state, refused.state
     groups["prompt_c_refused"] = dict(
-        state=tree_record(after), next_token=_scalar(refused.next_token),
+        state=tree_record(after),
+        next_token=_scalar(refused.next_token),
         health=_scalar(after.decoder.contract_valid),
-        caches_unchanged=bool(np.array_equal(np.asarray(before.decoder.kv_cache_local),
-                                             np.asarray(after.decoder.kv_cache_local))
-                              and np.array_equal(np.asarray(before.decoder.index_cache_local),
-                                                 np.asarray(after.decoder.index_cache_local))),
-        frontier_unchanged=bool(np.array_equal(np.asarray(before.decoder.position), np.asarray(after.decoder.position))
-                                and np.array_equal(np.asarray(before.decoder.context_lengths),
-                                                   np.asarray(after.decoder.context_lengths))))
+        caches_unchanged=bool(
+            np.array_equal(np.asarray(before.decoder.kv_cache_local), np.asarray(after.decoder.kv_cache_local))
+            and np.array_equal(
+                np.asarray(before.decoder.index_cache_local), np.asarray(after.decoder.index_cache_local)
+            )
+        ),
+        frontier_unchanged=bool(
+            np.array_equal(np.asarray(before.decoder.position), np.asarray(after.decoder.position))
+            and np.array_equal(np.asarray(before.decoder.context_lengths), np.asarray(after.decoder.context_lengths))
+        ),
+    )
     timed("prompt_c")
 
     # Batch bank initializer and donated insertion of a real concurrent runtime (compile_batch in _load).
-    batched = driver.build_runtime(mesh, tier="fixture", capacity=fixture.CAPACITY, concurrent_size=4, arrays=arrays,
-                                   plans=plans, concrete=True, fixture_geometry=frozen.config.geometry,
-                                   interpret=True).runtime
+    batched = driver.build_runtime(
+        mesh,
+        tier="fixture",
+        capacity=fixture.CAPACITY,
+        concurrent_size=4,
+        arrays=arrays,
+        plans=plans,
+        concrete=True,
+        fixture_geometry=frozen.config.geometry,
+        interpret=True,
+    ).runtime
     bank = jax.block_until_ready(batched.initialize_batch(put(np.array([157, 114, 3, 1], np.int32))))
     groups["batch_cache_init"] = tree_record(bank)
     lanes = [finish_batched_prefill(result_a)[0], finish_batched_prefill(result_b)[0]]
@@ -164,8 +195,14 @@ def composition(mesh: Any) -> dict[str, Any]:
         bank = jax.block_until_ready(batched.insert_batch(bank, lane_state, put(np.int32(index * 2 + 1))))
     groups["batch_insert"] = tree_record(bank)
     timed("batch")
-    groups["batch_generate"] = batch_generate(batched, config, clock, sequential=dict(
-        a=groups["prompt_a"]["blocks"][-1]["state"]["digest"], b=groups["prompt_b"]["blocks"][-1]["state"]["digest"]))
+    groups["batch_generate"] = batch_generate(
+        batched,
+        config,
+        clock,
+        sequential=dict(
+            a=groups["prompt_a"]["blocks"][-1]["state"]["digest"], b=groups["prompt_b"]["blocks"][-1]["state"]["digest"]
+        ),
+    )
     timed("batch_generate")
 
     # --- every fixture run's load products, and prompt A through the donated runtime's own
@@ -178,16 +215,27 @@ def composition(mesh: Any) -> dict[str, Any]:
         if run["capacity"] == fixture.CAPACITY and run["concurrent_size"] in (0, 4):
             built_run = runtime if run["concurrent_size"] == 0 else batched
         else:
-            built_run = driver.build_runtime(mesh, tier="fixture", capacity=run["capacity"],
-                                             concurrent_size=run["concurrent_size"], arrays=arrays, plans=plans,
-                                             concrete=True, fixture_geometry=frozen.config.geometry,
-                                             interpret=True).runtime
+            built_run = driver.build_runtime(
+                mesh,
+                tier="fixture",
+                capacity=run["capacity"],
+                concurrent_size=run["concurrent_size"],
+                arrays=arrays,
+                plans=plans,
+                concrete=True,
+                fixture_geometry=frozen.config.geometry,
+                interpret=True,
+            ).runtime
         loads[key] = load_products(built_run, put)
         if run["donating"]:
             donated = generate_recorded(built_run, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
-            groups["donated_prompt_a"] = dict(capacity=run["capacity"], state_ownership=built_run.record.get(
-                "state_ownership"), blocks=donated["blocks"], decode_steps=donated["decode_steps"],
-                request_session=donated["session"])
+            groups["donated_prompt_a"] = dict(
+                capacity=run["capacity"],
+                state_ownership=built_run.record.get("state_ownership"),
+                blocks=donated["blocks"],
+                decode_steps=donated["decode_steps"],
+                request_session=donated["session"],
+            )
         del built_run
         timed("load_" + key)
     groups["load_by_run"] = loads
@@ -203,8 +251,12 @@ def load_products(runtime: Any, put: Any) -> dict[str, Any]:
         record = tree_record(tree)
         return dict(count=record["count"], digest=record["digest"])
 
-    return dict(rope=brief(np.asarray(runtime.rope)), wk=brief(runtime.wk), weights=brief(runtime.weights),
-                cache_init_157=brief(jax.block_until_ready(runtime.initialize(put(np.int32(157))))))
+    return dict(
+        rope=brief(np.asarray(runtime.rope)),
+        wk=brief(runtime.wk),
+        weights=brief(runtime.weights),
+        cache_init_157=brief(jax.block_until_ready(runtime.initialize(put(np.int32(157))))),
+    )
 
 
 def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: int, clock: Any) -> dict[str, Any]:
@@ -224,18 +276,30 @@ def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: i
     def prefill(rows: int, fn: Any) -> Any:
         def call(*args: Any) -> Any:
             result = fn(*args)
-            blocks.append(dict(rows=rows, state=tree_record(result.state), next_token=_scalar(result.next_token),
-                               health=_scalar(result.state.decoder.contract_valid),
-                               finished=_scalar(result.state.finished)))
+            blocks.append(
+                dict(
+                    rows=rows,
+                    state=tree_record(result.state),
+                    next_token=_scalar(result.next_token),
+                    health=_scalar(result.state.decoder.contract_valid),
+                    finished=_scalar(result.state.finished),
+                )
+            )
             results.append(result)
             return result
+
         return call
 
     def decode(*args: Any) -> Any:
         packed = decode_program(*args)
         if len(steps) < DECODE_STEPS:
-            steps.append(dict(metadata=_scalar(packed.metadata), state=tree_record(packed.decoded.state),
-                              next_token=_scalar(packed.decoded.next_token)))
+            steps.append(
+                dict(
+                    metadata=_scalar(packed.metadata),
+                    state=tree_record(packed.decoded.state),
+                    next_token=_scalar(packed.decoded.next_token),
+                )
+            )
         return packed
 
     runtime.prefill = {rows: prefill(rows, fn) for rows, fn in programs.items()}
@@ -243,17 +307,28 @@ def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: i
     events: list[Any] = []
     try:
         with driver.serving_fakes(relaxed_validation=True):
-            tokens, _report = runtime.generate(fixture_request(name, ids, max_new_tokens, config),
-                                               deliver=events.append, deadline=float("inf"), clock=clock)
+            tokens, _report = runtime.generate(
+                fixture_request(name, ids, max_new_tokens, config),
+                deliver=events.append,
+                deadline=float("inf"),
+                clock=clock,
+            )
     finally:
         runtime.prefill, runtime.decode = programs, decode_program
     lines = [json.dumps(asdict(event), sort_keys=True) for event in events]
     token_list = [int(t) for t in np.asarray(tokens).tolist()]
-    return dict(blocks=blocks, prefill=results,
-                decode_steps=dict(first_token=blocks[-1]["next_token"], steps=steps),
-                session=dict(tokens=token_list, token_sha256=sha256_hex(np.asarray(token_list, np.int32).tobytes()),
-                             jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)),
-                             finish_reason=events[-1].finish_reason, events=len(lines)))
+    return dict(
+        blocks=blocks,
+        prefill=results,
+        decode_steps=dict(first_token=blocks[-1]["next_token"], steps=steps),
+        session=dict(
+            tokens=token_list,
+            token_sha256=sha256_hex(np.asarray(token_list, np.int32).tobytes()),
+            jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)),
+            finish_reason=events[-1].finish_reason,
+            events=len(lines),
+        ),
+    )
 
 
 class _BatchedDecodeReached(Exception):
@@ -274,6 +349,7 @@ def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[st
             result = fn(*args)
             calls.append((rows, result))
             return result
+
         return call
 
     captured: dict[str, Any] = {}
@@ -284,8 +360,10 @@ def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[st
 
     runtime.prefill = {rows: recording(fn, rows) for rows, fn in programs.items()}
     runtime.decode_batch = decode_batch
-    requests = [fixture_request(f"golden-lane{lane}", list(ids), BATCH_NEW_TOKENS, config)
-                for lane, ids in enumerate(BATCH_PROMPTS)]
+    requests = [
+        fixture_request(f"golden-lane{lane}", list(ids), BATCH_NEW_TOKENS, config)
+        for lane, ids in enumerate(BATCH_PROMPTS)
+    ]
     lines: list[str] = []
 
     def deliver(lane: int, event: Any, round_index: int) -> None:
@@ -300,17 +378,29 @@ def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[st
             pass
         else:
             raise RuntimeError("generate_concurrent finished without reaching batch_decode")
-    blocks = [dict(rows=rows, state=tree_record(result.state), next_token=_scalar(result.next_token),
-                   health=_scalar(result.state.decoder.contract_valid)) for rows, result in calls]
+    blocks = [
+        dict(
+            rows=rows,
+            state=tree_record(result.state),
+            next_token=_scalar(result.next_token),
+            health=_scalar(result.state.decoder.contract_valid),
+        )
+        for rows, result in calls
+    ]
     # generate_batch prefills the lanes one after the other, 128-row blocks and a 114-row tail.
     ends = np.cumsum([-(-len(ids) // 128) for ids in BATCH_PROMPTS])
     if len(blocks) != ends[-1]:
         raise RuntimeError(f"generate_batch ran {len(blocks)} prefill blocks, expected {ends[-1]}")
     finals = [blocks[end - 1]["state"]["digest"] for end in ends]
-    return dict(blocks=blocks, bank=tree_record(captured["state"]),
-                tokens=np.asarray(captured["tokens"]).tolist(), active=np.asarray(captured["active"]).tolist(),
-                round0_jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)), round0_events=len(lines),
-                lane_equal_sequential=dict(a=finals[0] == sequential["a"], b=finals[1] == sequential["b"]))
+    return dict(
+        blocks=blocks,
+        bank=tree_record(captured["state"]),
+        tokens=np.asarray(captured["tokens"]).tolist(),
+        active=np.asarray(captured["active"]).tolist(),
+        round0_jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)),
+        round0_events=len(lines),
+        lane_equal_sequential=dict(a=finals[0] == sequential["a"], b=finals[1] == sequential["b"]),
+    )
 
 
 def components(mesh: Any) -> dict[str, Any]:
@@ -334,11 +424,19 @@ def components(mesh: Any) -> dict[str, Any]:
     sub = Mesh(np.asarray(jax.devices()[:8], object), ("expert",))
 
     def body(scores: Any, positions: Any, lengths: Any) -> Any:
-        return two_stage_topk(scores[0], positions[0], lengths, top_k=16, global_context_size=256,
-                                     candidates_per_owner=4)
+        return two_stage_topk(
+            scores[0], positions[0], lengths, top_k=16, global_context_size=256, candidates_per_owner=4
+        )
 
-    fn = jax.jit(jax.shard_map(body, mesh=sub, in_specs=(P("expert"), P("expert"), P()),
-                               out_specs=(ScoredSelectedPositions(P(), P(), P()), P()), check_vma=False))
+    fn = jax.jit(
+        jax.shard_map(
+            body,
+            mesh=sub,
+            in_specs=(P("expert"), P("expert"), P()),
+            out_specs=(ScoredSelectedPositions(P(), P(), P()), P()),
+            check_vma=False,
+        )
+    )
     # The draw sequence of tests/layers/attention/test_dsa_indexer.py (seed 334, 60 trials).
     topk_rng = np.random.default_rng(334)
     positions = np.arange(256, dtype=np.int32).reshape(8, 32)
@@ -378,8 +476,11 @@ def main() -> int:
         result = composition(mesh)
         result["components"] = components(mesh)
     result.update(environment=environment(), source=source_record(), seconds=round(time.perf_counter() - started, 1))
-    result["digest"] = sha256_hex(json.dumps(dict(groups=result["groups"], components=result["components"]),
-                                             sort_keys=True, separators=(",", ":")))
+    result["digest"] = sha256_hex(
+        json.dumps(
+            dict(groups=result["groups"], components=result["components"]), sort_keys=True, separators=(",", ":")
+        )
+    )
     emit(result)
     return 0
 

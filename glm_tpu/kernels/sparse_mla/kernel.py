@@ -13,6 +13,7 @@ This module is deliberately default-off and independent of legacy execution.
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -124,9 +125,7 @@ def pregathered_sparse_mla_pallas(
         ),
         axis=-1,
     )
-    blocked_cache = selected_cache.reshape(
-        rows, block_count, segment_block, cache_width
-    )
+    blocked_cache = selected_cache.reshape(rows, block_count, segment_block, cache_width)
 
     def kernel(
         valid_count_ref: Any,
@@ -141,22 +140,13 @@ def pregathered_sparse_mla_pallas(
 
         @pl.when(block == 0)
         def initialize() -> None:
-            maximum_ref[...] = jnp.full(
-                maximum_ref.shape, _FINITE_MASK_VALUE, jnp.float32
-            )
-            denominator_ref[...] = jnp.zeros(
-                denominator_ref.shape, jnp.float32
-            )
-            accumulator_ref[...] = jnp.zeros(
-                accumulator_ref.shape, jnp.float32
-            )
+            maximum_ref[...] = jnp.full(maximum_ref.shape, _FINITE_MASK_VALUE, jnp.float32)
+            denominator_ref[...] = jnp.zeros(denominator_ref.shape, jnp.float32)
+            accumulator_ref[...] = jnp.zeros(accumulator_ref.shape, jnp.float32)
 
         query = query_ref[0]
         cache = cache_ref[0, 0]
-        slots = (
-            lax.broadcasted_iota(jnp.int32, (1, segment_block), 1)
-            + block * segment_block
-        )
+        slots = lax.broadcasted_iota(jnp.int32, (1, segment_block), 1) + block * segment_block
         scores = lax.dot_general(
             query,
             cache,
@@ -173,10 +163,7 @@ def pregathered_sparse_mla_pallas(
         maximum = jnp.maximum(maximum_ref[...], block_maximum)
         correction = jnp.exp(maximum_ref[...] - maximum)
         probabilities = jnp.exp(scores - maximum)
-        denominator = (
-            denominator_ref[...] * correction
-            + jnp.sum(probabilities, axis=1, keepdims=True)
-        )
+        denominator = denominator_ref[...] * correction + jnp.sum(probabilities, axis=1, keepdims=True)
         partial = lax.dot_general(
             probabilities.astype(cache.dtype),
             cache[:, :latent],
@@ -193,30 +180,19 @@ def pregathered_sparse_mla_pallas(
         def finalize() -> None:
             maximum_final = jnp.maximum(maximum, _FINITE_MASK_VALUE)
             final_correction = jnp.exp(maximum - maximum_final)
-            denominator_final = (
-                denominator * final_correction
-                + jnp.exp(_FINITE_MASK_VALUE - maximum_final)
-            )
-            normalized = (
-                accumulator * final_correction / denominator_final
-            )
-            output_ref[0] = jnp.where(
-                maximum > _FINITE_MASK_VALUE, normalized, 0.0
-            ).astype(jnp.bfloat16)
+            denominator_final = denominator * final_correction + jnp.exp(_FINITE_MASK_VALUE - maximum_final)
+            normalized = accumulator * final_correction / denominator_final
+            output_ref[0] = jnp.where(maximum > _FINITE_MASK_VALUE, normalized, 0.0).astype(jnp.bfloat16)
 
     def query_map(row: Any, block: Any, valid_count: Any) -> tuple[Any, int, int]:
         del block, valid_count
         return row, 0, 0
 
-    def cache_map(
-        row: Any, block: Any, valid_count: Any
-    ) -> tuple[Any, Any, int, int]:
+    def cache_map(row: Any, block: Any, valid_count: Any) -> tuple[Any, Any, int, int]:
         del valid_count
         return row, block, 0, 0
 
-    def output_map(
-        row: Any, block: Any, valid_count: Any
-    ) -> tuple[Any, int, int]:
+    def output_map(row: Any, block: Any, valid_count: Any) -> tuple[Any, int, int]:
         del block, valid_count
         return row, 0, 0
 
@@ -227,9 +203,7 @@ def pregathered_sparse_mla_pallas(
             grid=(rows, block_count),
             in_specs=(
                 pl.BlockSpec((1, heads, cache_width), query_map),
-                pl.BlockSpec(
-                    (1, 1, segment_block, cache_width), cache_map
-                ),
+                pl.BlockSpec((1, 1, segment_block, cache_width), cache_map),
             ),
             out_specs=pl.BlockSpec((1, heads, latent), output_map),
             scratch_shapes=(
@@ -238,9 +212,7 @@ def pregathered_sparse_mla_pallas(
                 pltpu.VMEM((heads, latent), jnp.float32),
             ),
         ),
-        out_shape=jax.ShapeDtypeStruct(
-            (rows, heads, latent), query_nope_absorbed.dtype
-        ),
+        out_shape=jax.ShapeDtypeStruct((rows, heads, latent), query_nope_absorbed.dtype),
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=("parallel" if prefill else "arbitrary", "arbitrary"),
             vmem_limit_bytes=config.vmem_limit_bytes,
@@ -248,8 +220,7 @@ def pregathered_sparse_mla_pallas(
         interpret=interpret,
         name=(
             f"{KERNEL_NAMES['sparse_mla']}_"
-            f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}"
-            + (f"_prefill_m{rows}" if prefill else "")
+            f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}" + (f"_prefill_m{rows}" if prefill else "")
         ),
     )
     return call(valid_counts, packed_query, blocked_cache)
@@ -293,9 +264,7 @@ def sparse_mla_attention(
         raise ValueError("selected KV positions must have shape [rows,top_k]")
     width = segment.positions.shape[1]
     if width != contract.top_k:
-        raise ValueError(
-            f"selected KV width must equal contract top_k={contract.top_k}, got {width}"
-        )
+        raise ValueError(f"selected KV width must equal contract top_k={contract.top_k}, got {width}")
     _require_shape(
         "selected KV segment",
         segment.values,
@@ -310,9 +279,7 @@ def sparse_mla_attention(
     if segment.values.dtype != query_nope_absorbed.dtype:
         raise ValueError("queries and selected KV segment must share the cache dtype")
 
-    safe_counts = jnp.clip(
-        segment.valid_counts, jnp.int32(0), jnp.int32(width)
-    )
+    safe_counts = jnp.clip(segment.valid_counts, jnp.int32(0), jnp.int32(width))
     position_slots = jnp.arange(width, dtype=jnp.int32)[None, :]
     position_live = position_slots < safe_counts[:, None]
     positions_well_formed = jnp.all(
@@ -332,24 +299,16 @@ def sparse_mla_attention(
         axis=1,
     )
     metadata_valid = (
-        (segment.valid_counts >= 0)
-        & (segment.valid_counts <= width)
-        & positions_well_formed
-        & positions_ascending
+        (segment.valid_counts >= 0) & (segment.valid_counts <= width) & positions_well_formed & positions_ascending
     )
 
-    precision = (
-        lax.Precision.HIGHEST
-        if query_nope_absorbed.dtype == jnp.float32
-        else lax.Precision.DEFAULT
-    )
+    precision = lax.Precision.HIGHEST if query_nope_absorbed.dtype == jnp.float32 else lax.Precision.DEFAULT
     q_nope = query_nope_absorbed
     q_rope = query_rope
     kv_latent = segment.values[..., : contract.kv_lora_rank]
     kv_rope = segment.values[
         ...,
-        contract.kv_lora_rank : contract.kv_lora_rank
-        + contract.qk_rope_head_dim,
+        contract.kv_lora_rank : contract.kv_lora_rank + contract.qk_rope_head_dim,
     ]
     scores = (
         jnp.einsum(
@@ -373,9 +332,7 @@ def sparse_mla_attention(
     has_live = safe_counts > 0
     maximum = jnp.max(masked_scores, axis=-1, keepdims=True)
     safe_maximum = jnp.where(has_live[:, None, None], maximum, 0.0)
-    unnormalized = jnp.where(
-        live, jnp.exp(masked_scores - safe_maximum), 0.0
-    )
+    unnormalized = jnp.where(live, jnp.exp(masked_scores - safe_maximum), 0.0)
     denominator = jnp.sum(unnormalized, axis=-1, keepdims=True)
     safe_denominator = jnp.where(has_live[:, None, None], denominator, 1.0)
     weighted_values = jnp.einsum(

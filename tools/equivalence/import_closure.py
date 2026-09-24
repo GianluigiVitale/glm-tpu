@@ -89,9 +89,13 @@ HARNESS = "tools.equivalence"
 
 def lean_violations(stages: dict[str, Any]) -> list[str]:
     """Modules of the lean-checked stages outside glm_tpu."""
-    return [f"stages.{stage}.not_lean+{module}" for stage in LEAN_STAGES if stage in stages
-            for module in stages[stage]["modules"]
-            if not (module == "glm_tpu" or module.startswith("glm_tpu."))]
+    return [
+        f"stages.{stage}.not_lean+{module}"
+        for stage in LEAN_STAGES
+        if stage in stages
+        for module in stages[stage]["modules"]
+        if not (module == "glm_tpu" or module.startswith("glm_tpu."))
+    ]
 
 
 def _repo_modules() -> list[str]:
@@ -140,8 +144,7 @@ def run_stage(stage: str) -> dict[str, Any]:
 
             launcher_record()
     modules = _repo_modules()
-    return dict(modules=modules, count=len(modules), jax_imported="jax" in sys.modules,
-                third_party=_third_party())
+    return dict(modules=modules, count=len(modules), jax_imported="jax" in sys.modules, third_party=_third_party())
 
 
 def static_layering() -> list[str]:
@@ -168,11 +171,24 @@ def record(*, light: bool = False) -> dict[str, Any]:
     names = tuple(STAGES) if light else (*STAGES, *EXERCISED)
     devices = {"graph": 32}
     with ThreadPoolExecutor(max_workers=len(names)) as pool:
-        futures = {stage: pool.submit(run_child, "tools.equivalence.import_closure", "--stage", stage, timeout=1200,
-                                      devices=devices.get(stage, 1)) for stage in names}
+        futures = {
+            stage: pool.submit(
+                run_child,
+                "tools.equivalence.import_closure",
+                "--stage",
+                stage,
+                timeout=1200,
+                devices=devices.get(stage, 1),
+            )
+            for stage in names
+        }
         stages = {stage: future.result() for stage, future in futures.items()}
-    return dict(stages=stages, static_layering=static_layering(), entries={k: list(v) for k, v in STAGES.items()},
-                exercised=[] if light else list(EXERCISED))
+    return dict(
+        stages=stages,
+        static_layering=static_layering(),
+        entries={k: list(v) for k, v in STAGES.items()},
+        exercised=[] if light else list(EXERCISED),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

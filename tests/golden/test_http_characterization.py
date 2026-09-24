@@ -1,5 +1,6 @@
 """G9 (HTTP): the real UI/API handler with a fake resident -- status, headers (CSP), body bytes
 and SSE streams, ids/timestamps normalized."""
+
 import pytest
 
 from tools.equivalence import gates, wire

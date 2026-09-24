@@ -21,9 +21,7 @@ def write_source(root: Path) -> None:
 
     root.mkdir()
     first = {
-        "model.layers.0.proj.weight": torch.arange(
-            6, dtype=torch.bfloat16
-        ).reshape(2, 3),
+        "model.layers.0.proj.weight": torch.arange(6, dtype=torch.bfloat16).reshape(2, 3),
     }
     second = {
         "lm_head.weight": torch.arange(4, dtype=torch.float32).reshape(2, 2),

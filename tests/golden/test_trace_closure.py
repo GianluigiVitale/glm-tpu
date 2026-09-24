@@ -1,4 +1,5 @@
 """G7: executed-function set of the fixture production composition equals the S0 set (S1-S3)."""
+
 import pytest
 
 

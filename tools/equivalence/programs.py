@@ -78,8 +78,12 @@ def fixture_arrays(mesh: Any, frozen: Any, *, concrete: bool) -> dict[str, Any]:
         raise ValueError("frozen fixture tensor set differs from the production name tree")
     if concrete:
         return {name: jax.device_put(frozen.arrays[name], NamedSharding(mesh, spec)) for name, spec in pairs}
-    return {name: jax.ShapeDtypeStruct(frozen.arrays[name].shape, frozen.arrays[name].dtype,
-                                       sharding=NamedSharding(mesh, spec)) for name, spec in pairs}
+    return {
+        name: jax.ShapeDtypeStruct(
+            frozen.arrays[name].shape, frozen.arrays[name].dtype, sharding=NamedSharding(mesh, spec)
+        )
+        for name, spec in pairs
+    }
 
 
 def production_arrays(mesh: Any, plans: Any) -> dict[str, Any]:
@@ -90,9 +94,12 @@ def production_arrays(mesh: Any, plans: Any) -> dict[str, Any]:
     from jax.sharding import NamedSharding, PartitionSpec as P
 
     dtypes = {"U8": np.dtype(np.uint8), "F32": np.dtype(np.float32), "BF16": np.dtype(ml_dtypes.bfloat16)}
-    return {t.name: jax.ShapeDtypeStruct(tuple(t.global_shape), dtypes[t.dtype],
-                                         sharding=NamedSharding(mesh, P(*t.partition_spec)))
-            for t in plans[0].tensors}
+    return {
+        t.name: jax.ShapeDtypeStruct(
+            tuple(t.global_shape), dtypes[t.dtype], sharding=NamedSharding(mesh, P(*t.partition_spec))
+        )
+        for t in plans[0].tensors
+    }
 
 
 def variants(tier: str) -> list[dict[str, Any]]:
@@ -101,10 +108,14 @@ def variants(tier: str) -> list[dict[str, Any]]:
     if tier == "fixture":
         from .fixture import CAPACITY
 
-        return ([dict(capacity=CAPACITY, donating=CAPACITY > DONATION_THRESHOLD, concurrent_size=0),
-                 dict(capacity=FIXTURE_DONATED_CAPACITY, donating=FIXTURE_DONATED_CAPACITY > DONATION_THRESHOLD,
-                      concurrent_size=0)]
-                + [dict(capacity=CAPACITY, donating=False, concurrent_size=n) for n in FIXTURE_BATCH_SIZES])
+        return [
+            dict(capacity=CAPACITY, donating=CAPACITY > DONATION_THRESHOLD, concurrent_size=0),
+            dict(
+                capacity=FIXTURE_DONATED_CAPACITY,
+                donating=FIXTURE_DONATED_CAPACITY > DONATION_THRESHOLD,
+                concurrent_size=0,
+            ),
+        ] + [dict(capacity=CAPACITY, donating=False, concurrent_size=n) for n in FIXTURE_BATCH_SIZES]
     if tier == "production":
         runs = [dict(capacity=c, donating=c > DONATION_THRESHOLD, concurrent_size=0) for c in PRODUCTION_CAPACITIES]
         runs.append(dict(capacity=BATCH_CAPACITY, donating=True, concurrent_size=BATCH_SIZE))
@@ -113,8 +124,11 @@ def variants(tier: str) -> list[dict[str, Any]]:
 
 
 def variant_key(run: dict[str, Any]) -> str:
-    return f"{run['capacity']}" + ("+donated" if run["donating"] else "") + (
-        f"#n{run['concurrent_size']}" if run["concurrent_size"] else "")
+    return (
+        f"{run['capacity']}"
+        + ("+donated" if run["donating"] else "")
+        + (f"#n{run['concurrent_size']}" if run["concurrent_size"] else "")
+    )
 
 
 class TierPrograms(dict):
@@ -128,8 +142,16 @@ class TierPrograms(dict):
     donations: dict[str, tuple[int, ...]]
 
 
-def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
-                  adapter: str = "runtime", fingerprint: bool = False, keep_lowered: bool = False) -> TierPrograms:
+def program_specs(
+    tier: str,
+    mesh: Any,
+    *,
+    concrete: bool = False,
+    only: set[str] | None = None,
+    adapter: str = "runtime",
+    fingerprint: bool = False,
+    keep_lowered: bool = False,
+) -> TierPrograms:
     """Programs of every run of a tier, keyed per run (``program_key``); ``only`` filters keys.
     ``fingerprint``: fingerprint the ``Lowered`` production compiled for each program;
     ``keep_lowered``: keep that ``Lowered`` for the keys in ``only`` (``diff``, ``authenticity``)."""
@@ -158,15 +180,28 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
     for run in variants(tier):
         keep = None
         if keep_lowered and only:
+
             def keep(name: str, run: dict[str, Any] = run) -> bool:
                 return program_key(name, run) in only
+
         built = driver.build_runtime(
-            mesh, tier=tier, capacity=run["capacity"], concurrent_size=run["concurrent_size"], arrays=arrays,
-            plans=plans, concrete=concrete, fixture_geometry=geometry, outputs=outputs, fingerprint=fingerprint,
-            keep=keep)
+            mesh,
+            tier=tier,
+            capacity=run["capacity"],
+            concurrent_size=run["concurrent_size"],
+            arrays=arrays,
+            plans=plans,
+            concrete=concrete,
+            fixture_geometry=geometry,
+            outputs=outputs,
+            fingerprint=fingerprint,
+            keep=keep,
+        )
         if built.protocol["record"]["state_ownership"] != ("exclusive_donated" if run["donating"] else "non_donating"):
-            raise RuntimeError(f"run {variant_key(run)}: the runtime's donation differs from the 181c013e rule; "
-                               "update programs.variants")
+            raise RuntimeError(
+                f"run {variant_key(run)}: the runtime's donation differs from the 181c013e rule; "
+                "update programs.variants"
+            )
         out.protocol[variant_key(run)] = built.protocol
         out.program_sets[variant_key(run)] = built.program_set
         out.configs[variant_key(run)] = built.runtime.config
@@ -203,8 +238,11 @@ def donated_argnums(lowered: Any) -> list[int]:
     import jax
 
     args, _ = lowered.args_info
-    return [index for index, arg in enumerate(args)
-            if (leaves := jax.tree.leaves(arg)) and all(leaf.donated for leaf in leaves)]
+    return [
+        index
+        for index, arg in enumerate(args)
+        if (leaves := jax.tree.leaves(arg)) and all(leaf.donated for leaf in leaves)
+    ]
 
 
 def fingerprint_programset(specs: TierPrograms) -> dict[str, Any]:
@@ -225,8 +263,7 @@ def fingerprint_programset(specs: TierPrograms) -> dict[str, Any]:
     return records
 
 
-def _add_run(out: dict[str, ProgramSpec], specs: list[ProgramSpec], run: dict[str, Any],
-             only: set[str] | None) -> None:
+def _add_run(out: dict[str, ProgramSpec], specs: list[ProgramSpec], run: dict[str, Any], only: set[str] | None) -> None:
     seen: set[str] = set()
     for spec in specs:
         key = program_key(spec.name, run)
@@ -253,16 +290,23 @@ def adapter_consistency(mesh: Any, abstract: TierPrograms | None = None) -> dict
 
     def compiled(spec: ProgramSpec) -> Any:
         record = spec.record or {}
-        return (record.get("digest"), record.get("signature_digest"), record.get("jit_compiler_options"),
-                spec.compile_calls)
+        return (
+            record.get("digest"),
+            record.get("signature_digest"),
+            record.get("jit_compiler_options"),
+            spec.compile_calls,
+        )
 
     for key in concrete:
         if key not in abstract:
             continue
         left, ltree = jax.tree.flatten(abstract_like(concrete[key].args))
         right, rtree = jax.tree.flatten(abstract_like(abstract[key].args))
-        if (ltree != rtree or [leaf_signature(x) for x in left] != [leaf_signature(x) for x in right]
-                or compiled(concrete[key]) != compiled(abstract[key])):
+        if (
+            ltree != rtree
+            or [leaf_signature(x) for x in left] != [leaf_signature(x) for x in right]
+            or compiled(concrete[key]) != compiled(abstract[key])
+        ):
             mismatches.append(key)
     if concrete.protocol != abstract.protocol:
         mismatches.append("load protocol")
@@ -307,8 +351,9 @@ def tier_digest(records: dict[str, Any]) -> str:
     return sha256_hex(canonical_json({k: [v["digest"], v["signature_digest"]] for k, v in sorted(records.items())}))
 
 
-def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = None,
-             adapter: str = "runtime") -> dict[str, Any]:
+def run_tier(
+    tier: str, *, consistency: bool = False, only: set[str] | None = None, adapter: str = "runtime"
+) -> dict[str, Any]:
     from . import fixture, lowering
 
     require_cpu()
@@ -318,17 +363,27 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
         specs = program_specs(tier, mesh, only=only, adapter=adapter, fingerprint=adapter == "runtime")
     built = time.perf_counter() - started
     records = fingerprint_programset(specs) if adapter == "programset" else fingerprint_specs(specs)
-    result = dict(tier=tier, adapter=adapter, environment=environment(), source=source_record(), programs=records,
-                  tier_digest=tier_digest(records), runtime=specs.protocol, build_seconds=round(built, 1),
-                  seconds=round(time.perf_counter() - started, 1))
+    result = dict(
+        tier=tier,
+        adapter=adapter,
+        environment=environment(),
+        source=source_record(),
+        programs=records,
+        tier_digest=tier_digest(records),
+        runtime=specs.protocol,
+        build_seconds=round(built, 1),
+        seconds=round(time.perf_counter() - started, 1),
+    )
     if adapter == "runtime":
         from . import driver, verdicts
 
         result["defaults"] = driver.production_defaults()
         cases = verdicts.admission_cases()
         result["verdicts"] = cases
-        result["safety"] = dict(runs={key: verdicts.run_safety(run) for key, run in specs.protocol.items()},
-                                admission=verdicts.safety_verdicts(cases))
+        result["safety"] = dict(
+            runs={key: verdicts.run_safety(run) for key, run in specs.protocol.items()},
+            admission=verdicts.safety_verdicts(cases),
+        )
         result["program_sets"] = specs.program_sets
     if consistency:
         with lowering.tpu_v4_info():
@@ -339,9 +394,13 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--tier", choices=("fixture", "production"), required=True)
-    parser.add_argument("--adapter", choices=("runtime", "programset"), default="runtime",
-                        help="runtime: the real OrdinaryRuntime (the gate); programset: build_program_set "
-                             "standalone with the runtime's arguments (cross-check)")
+    parser.add_argument(
+        "--adapter",
+        choices=("runtime", "programset"),
+        default="runtime",
+        help="runtime: the real OrdinaryRuntime (the gate); programset: build_program_set "
+        "standalone with the runtime's arguments (cross-check)",
+    )
     parser.add_argument("--consistency", action="store_true", help="also run the fixture adapter-consistency check")
     parser.add_argument("--only", action="append", help="restrict to these record keys")
     parser.add_argument("--text", action="store_true", help="emit the normalized text of the single --only program")
@@ -349,8 +408,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.text:
         emit(normalized_text(args.tier, args.only, adapter=args.adapter))
         return 0
-    emit(run_tier(args.tier, consistency=args.consistency, only=set(args.only) if args.only else None,
-                  adapter=args.adapter))
+    emit(
+        run_tier(
+            args.tier, consistency=args.consistency, only=set(args.only) if args.only else None, adapter=args.adapter
+        )
+    )
     return 0
 
 

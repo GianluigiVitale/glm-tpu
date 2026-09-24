@@ -1,6 +1,7 @@
 """Golden data stay compact and public-safe (digests and small summaries, versions recorded, no host
 paths or run directories), the harness source carries no private infrastructure literals, and a data
 file recorded on a changed production tree says why."""
+
 import json
 import re
 from pathlib import Path
@@ -15,12 +16,19 @@ FORBIDDEN = re.compile(r"/home/|/dev/shm|/tmp/|optimized_request_\d|greenfield_w
 # Private site values have public-looking shapes; the harness never spells a home directory, a
 # private IPv4 address, a timestamped run or pack name, or a bucket URI other than the neutral
 # placeholder of examples/site.example.toml (``gs://example-bucket/``) its synthetic sites use.
-PRIVATE_SOURCE = re.compile(r"/home/|\b192\.168\.\d|\b10\.\d+\.\d+\.\d+|optimized_request_\d{8}|"
-                            r"greenfield_ws32_runtime_pack_\d{8}|gs://(?!example-bucket/)")
+PRIVATE_SOURCE = re.compile(
+    r"/home/|\b192\.168\.\d|\b10\.\d+\.\d+\.\d+|optimized_request_\d{8}|"
+    r"greenfield_ws32_runtime_pack_\d{8}|gs://(?!example-bucket/)"
+)
 FROZEN_FILES = {DATA_FILES[gate] for gate in FROZEN_DATA}
 HARNESS_SOURCES = sorted(
-    [*(HARNESS_REPO / "tools" / "equivalence").rglob("*.py"), *(HARNESS_REPO / "tools" / "equivalence").glob("*.md"),
-     *(HARNESS_REPO / "tools" / "equivalence").glob("*.toml"), *(HARNESS_REPO / "tests" / "golden").glob("*.py")])
+    [
+        *(HARNESS_REPO / "tools" / "equivalence").rglob("*.py"),
+        *(HARNESS_REPO / "tools" / "equivalence").glob("*.md"),
+        *(HARNESS_REPO / "tools" / "equivalence").glob("*.toml"),
+        *(HARNESS_REPO / "tests" / "golden").glob("*.py"),
+    ]
+)
 
 
 @pytest.mark.parametrize("path", sorted(DATA.glob("*.json")), ids=lambda p: p.name)
@@ -52,8 +60,10 @@ def test_rebaseline_reason_accepts_exact_tokens(reason):
     assert valid_reason(reason)
 
 
-@pytest.mark.parametrize("reason", [None, "", "defaced", "cafebabe tweak", "c13e0884", "S3 moves", "fix H3",
-                                    "H0", "h3", "S", "WU-", "S2d,S3"])
+@pytest.mark.parametrize(
+    "reason",
+    [None, "", "defaced", "cafebabe tweak", "c13e0884", "S3 moves", "fix H3", "H0", "h3", "S", "WU-", "S2d,S3"],
+)
 def test_rebaseline_reason_refuses_anything_else(reason):
     assert not valid_reason(reason)
 

@@ -70,10 +70,7 @@ class ReferenceConfig:
     fp8_block_shape: tuple[int, int] = FP8_BLOCK
 
     def __post_init__(self) -> None:
-        if (
-            len(self.mlp_layer_types) != self.num_layers
-            or len(self.indexer_types) != self.num_layers
-        ):
+        if len(self.mlp_layer_types) != self.num_layers or len(self.indexer_types) != self.num_layers:
             raise ValueError("one MLP and one indexer type per layer")
         if self.indexer_types[0] != "full" or set(self.indexer_types) - {
             "full",
@@ -84,9 +81,7 @@ class ReferenceConfig:
             raise ValueError("MLP types are dense/sparse")
 
     @classmethod
-    def from_geometry(
-        cls, geometry: Any, hf_config: Mapping[str, Any], *, context_capacity: int
-    ) -> ReferenceConfig:
+    def from_geometry(cls, geometry: Any, hf_config: Mapping[str, Any], *, context_capacity: int) -> ReferenceConfig:
         """Dimensions from a model geometry, scalar constants from the HF ``config.json``.
 
         Refuses a config whose routing/RoPE semantics this reference does not implement.
@@ -103,14 +98,10 @@ class ReferenceConfig:
             n_shared_experts=1,
             tie_word_embeddings=False,
         )
-        drift = {
-            k: hf_config.get(k) for k, v in expected.items() if hf_config.get(k) != v
-        }
+        drift = {k: hf_config.get(k) for k, v in expected.items() if hf_config.get(k) != v}
         rope = hf_config.get("rope_parameters", {})
         if drift or rope.get("rope_type", "default") != "default":
-            raise ValueError(
-                f"reference does not implement this config: {drift or rope}"
-            )
+            raise ValueError(f"reference does not implement this config: {drift or rope}")
         return cls(
             num_layers=geometry.num_layers,
             hidden_size=geometry.hidden_size,
@@ -134,9 +125,7 @@ class ReferenceConfig:
             rms_norm_epsilon=float(hf_config["rms_norm_eps"]),
             rope_theta=float(rope["rope_theta"]),
             routed_scaling_factor=float(hf_config["routed_scaling_factor"]),
-            fp8_block_shape=tuple(
-                hf_config["quantization_config"]["weight_block_size"]
-            ),
+            fp8_block_shape=tuple(hf_config["quantization_config"]["weight_block_size"]),
         )
 
     @property
@@ -145,9 +134,7 @@ class ReferenceConfig:
 
     @property
     def sparse_layers(self) -> tuple[int, ...]:
-        return tuple(
-            i for i, kind in enumerate(self.mlp_layer_types) if kind == "sparse"
-        )
+        return tuple(i for i, kind in enumerate(self.mlp_layer_types) if kind == "sparse")
 
     @property
     def attention_contract(self) -> MlaNumericalContract:
@@ -207,9 +194,7 @@ class ForwardResult(NamedTuple):
     routes: tuple[moe.Routes, ...]  # one per sparse layer, in layer order
 
 
-def load_weights(
-    arrays: Mapping[str, Any], config: ReferenceConfig
-) -> ReferenceWeights:
+def load_weights(arrays: Mapping[str, Any], config: ReferenceConfig) -> ReferenceWeights:
     """Bind checkpoint tensors by name and dequantize every FP8 pair to BF16.
 
     Refuses a missing or an unused tensor, so the reference reads exactly the
@@ -267,9 +252,7 @@ def load_weights(
                     fp8(a + ".kv_a_proj_with_mqa"),
                     raw(a + ".kv_a_layernorm.weight"),
                 ),
-                attention.AttentionWeights(
-                    fp8(a + ".q_b_proj"), fp8(a + ".kv_b_proj"), fp8(a + ".o_proj")
-                ),
+                attention.AttentionWeights(fp8(a + ".q_b_proj"), fp8(a + ".kv_b_proj"), fp8(a + ".o_proj")),
                 indexer,
                 raw(p + ".post_attention_layernorm.weight"),
                 mlp,
@@ -283,9 +266,7 @@ def load_weights(
     )
     unused = sorted(set(arrays) - used)
     if unused:
-        raise ValueError(
-            f"checkpoint tensors the reference does not read: {unused[:4]}"
-        )
+        raise ValueError(f"checkpoint tensors the reference does not read: {unused[:4]}")
     return weights
 
 
@@ -332,15 +313,11 @@ def forward(
     selection: dsa.Selection | None = None
     selections, routes = [], []
     for layer_id, layer in enumerate(weights.layers):
-        normalized, residual = add_rms_norm(
-            update, residual, layer.input_norm, epsilon=eps
-        )
+        normalized, residual = add_rms_norm(update, residual, layer.input_norm, epsilon=eps)
         prepared = attention.prepare(normalized, layer.qkv_a, epsilon=eps)
         if layer.indexer is not None:
             slot = config.full_layers.index(layer_id)
-            keys = dsa.index_keys(
-                normalized, layer.indexer, positions, contract=config.indexer_contract
-            )
+            keys = dsa.index_keys(normalized, layer.indexer, positions, contract=config.indexer_contract)
             index_cache = index_cache.at[slot, positions].set(keys)
             selection = dsa.select(
                 normalized,
@@ -362,9 +339,7 @@ def forward(
             rope_table=rope,
         )
         kv_cache = kv_cache.at[layer_id].set(layer_cache)
-        normalized, residual = add_rms_norm(
-            output, residual, layer.post_attention_norm, epsilon=eps
-        )
+        normalized, residual = add_rms_norm(output, residual, layer.post_attention_norm, epsilon=eps)
         if isinstance(layer.mlp, moe.MoeWeights):
             update, layer_routes = moe.moe(
                 normalized,
@@ -375,9 +350,7 @@ def forward(
             routes.append(layer_routes)
         else:
             update = moe.dense_mlp(normalized, layer.mlp)
-    normalized, final_residual = add_rms_norm(
-        update, residual, weights.final_norm, epsilon=eps
-    )
+    normalized, final_residual = add_rms_norm(update, residual, weights.final_norm, epsilon=eps)
     logits = project(normalized[-1:], weights.lm_head)[0]
     return ForwardResult(
         ReferenceState(kv_cache, index_cache, state.length + rows),
@@ -403,11 +376,7 @@ def generate(
     prompt = list(prompt)
     results = []
     for start in range(0, len(prompt), block_rows):
-        results.append(
-            forward(
-                config, weights, state, prompt[start : start + block_rows], rope=rope
-            )
-        )
+        results.append(forward(config, weights, state, prompt[start : start + block_rows], rope=rope))
         state = results[-1].state
     tokens = [int(results[-1].next_token)]
     while len(tokens) < new_tokens:

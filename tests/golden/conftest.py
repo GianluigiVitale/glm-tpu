@@ -6,6 +6,7 @@ the reason -- unless ``GLM_EQUIVALENCE_STRICT=1`` (CI, integrator), where a mism
 missing data file is always a failure, never a skip. While a TPU run is live on this host, the
 heavy (``cpu32``) goldens skip instead of competing with the run (D25).
 """
+
 from __future__ import annotations
 
 import json
@@ -23,10 +24,12 @@ _GATE_OF_FILE = {name: gate for gate, name in DATA_FILES.items()}
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    for line in ("golden: compares against tests/golden/data (bound to the recorded package versions)",
-                 "golden_data(name): the data file a golden test compares against",
-                 "cpu32: runs a child process on 32 forced CPU devices",
-                 "slow: takes more than ~30 s on a 4-core host"):
+    for line in (
+        "golden: compares against tests/golden/data (bound to the recorded package versions)",
+        "golden_data(name): the data file a golden test compares against",
+        "cpu32: runs a child process on 32 forced CPU devices",
+        "slow: takes more than ~30 s on a 4-core host",
+    ):
         config.addinivalue_line("markers", line)
 
 

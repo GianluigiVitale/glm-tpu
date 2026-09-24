@@ -42,27 +42,27 @@ INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)  # Pall
 
 @dataclass(frozen=True)
 class ProgramSpec:
-    name: str                          # frozen: HLO original file names and runtime-record program keys
-    fn: Callable[..., Any]             # the jitted program the runtime compiles (donation applied)
+    name: str  # frozen: HLO original file names and runtime-record program keys
+    fn: Callable[..., Any]  # the jitted program the runtime compiles (donation applied)
     donate_argnums: tuple[int, ...] = ()
-    model: bool = True                 # a model graph: its optimized HLO passes the collective admission
+    model: bool = True  # a model graph: its optimized HLO passes the collective admission
 
 
 @dataclass(frozen=True)
 class BatchPrograms:
-    cache_init: ProgramSpec            # batch_cache_init: one fresh decoder state per lane
-    insert: ProgramSpec                # batch_insert: write one prefilled state into a lane (bank donated)
-    decode: ProgramSpec                # batch_decode: one decode step for every lane
-    state_shardings: Any               # the bank's shardings (lane axis unsharded)
+    cache_init: ProgramSpec  # batch_cache_init: one fresh decoder state per lane
+    insert: ProgramSpec  # batch_insert: write one prefilled state into a lane (bank donated)
+    decode: ProgramSpec  # batch_decode: one decode step for every lane
+    state_shardings: Any  # the bank's shardings (lane axis unsharded)
 
 
 @dataclass(frozen=True)
 class ProgramSet:
-    wk: tuple[ProgramSpec, ProgramSpec]    # wk_decode, wk_promote (never fused)
+    wk: tuple[ProgramSpec, ProgramSpec]  # wk_decode, wk_promote (never fused)
     cache_init: ProgramSpec
-    prefill: Mapping[int, ProgramSpec]     # by block rows: 128, 114
-    decode: ProgramSpec | None             # the packed decode step (sequential runtime)
-    batch: BatchPrograms | None            # the batch programs (concurrent runtime)
+    prefill: Mapping[int, ProgramSpec]  # by block rows: 128, 114
+    decode: ProgramSpec | None  # the packed decode step (sequential runtime)
+    batch: BatchPrograms | None  # the batch programs (concurrent runtime)
 
     def specs(self) -> tuple[ProgramSpec, ...]:
         """Every program in the runtime's compile order."""
@@ -77,8 +77,9 @@ def donates_state(capacity: int) -> bool:
     return capacity > CAPACITY
 
 
-def build_program_set(mesh: Any, config: cache.CacheConfig, *, concurrent_size: int = 0,
-                      interpret: bool = False) -> ProgramSet:
+def build_program_set(
+    mesh: Any, config: cache.CacheConfig, *, concurrent_size: int = 0, interpret: bool = False
+) -> ProgramSet:
     """The programs of a runtime over ``mesh`` with ``config`` (its context capacity decides
     donation) and ``concurrent_size`` lanes (0: sequential). ``interpret`` runs the Pallas kernels
     of the prefill and decode programs in interpret mode (CPU tests)."""
@@ -113,4 +114,5 @@ def _batch_programs(mesh: Any, config: cache.CacheConfig, n: int, kernels: dict[
         ProgramSpec("batch_cache_init", bank, model=False),
         ProgramSpec("batch_insert", jax.jit(insert, donate_argnums=(0,)), (0,), model=False),
         ProgramSpec("batch_decode", build_batched_decoder_program(mesh, config, batch_size=n, **kernels), (1,)),
-        shardings)
+        shardings,
+    )

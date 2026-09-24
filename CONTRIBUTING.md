@@ -29,10 +29,11 @@ ruff format --check .
 ```
 
 The configuration covers the whole repository with Python 3.12 rules, except the remote
-helpers in `glm_tpu/executor/remote/`, which are checked and formatted as Python 3.10
-programs (they run under the hosts' system `python3`). Until the one tree-wide formatting
-commit lands, introduce no new `ruff check` findings and do not reformat existing code:
-`ruff format` on a changed file would reformat the whole file.
+helpers in `glm_tpu/executor/remote/`, which are checked as Python 3.10 programs (they run
+under the hosts' system `python3`) and are not formatted: the controller sends their text
+to the hosts byte for byte and the equivalence harness records its SHA-256 (G9), so a
+change to them is a host change. Until the tree-wide lint cleanup lands, introduce no new
+`ruff check` findings.
 
 Keep formatting changes in formatting-only commits (`ruff format` keeps the syntax tree,
 up to docstring whitespace) and review the diff. The recorded programs are location-free

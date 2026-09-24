@@ -60,11 +60,25 @@ from libcst.metadata import (
 REPO = Path(__file__).resolve().parents[2]
 PY_ROOTS = ("glm_tpu/", "tests/", "tools/")
 NEVER = ("tools/migration/", "tests/golden/data/")
-TEXT_SKIP = ("AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md", "tests/reference/VALIDATION.md",
-             "tools/equivalence/closure_map.toml")
+TEXT_SKIP = (
+    "AGENTS.md",
+    "HANDOFF.md",
+    "goal.md",
+    "docs/release/STATUS.md",
+    "tests/reference/VALIDATION.md",
+    "tools/equivalence/closure_map.toml",
+)
 TEXT_SUFFIXES = (".toml", ".md")
-PATCH_CALLS = ("setattr", "getattr", "hasattr", "delattr", "monkeypatch.setattr", "monkeypatch.delattr",
-               "mock.patch.object", "patch.object")
+PATCH_CALLS = (
+    "setattr",
+    "getattr",
+    "hasattr",
+    "delattr",
+    "monkeypatch.setattr",
+    "monkeypatch.delattr",
+    "mock.patch.object",
+    "patch.object",
+)
 
 
 def git(*args: str) -> str:
@@ -85,8 +99,12 @@ def in_python_scope(path: str) -> bool:
 
 
 def in_text_scope(path: str) -> bool:
-    return (path.endswith(TEXT_SUFFIXES) and not path.startswith(NEVER) and path not in TEXT_SKIP
-            and not path.startswith("glm_tpu/models/glm_moe_dsa/hf_config/"))
+    return (
+        path.endswith(TEXT_SUFFIXES)
+        and not path.startswith(NEVER)
+        and path not in TEXT_SKIP
+        and not path.startswith("glm_tpu/models/glm_moe_dsa/hf_config/")
+    )
 
 
 def dotted(node: cst.BaseExpression) -> str:
@@ -126,6 +144,7 @@ def defined_names(statement: cst.BaseStatement) -> list[str]:
 
 def module_imports(tree: cst.Module) -> Iterable[cst.Import | cst.ImportFrom]:
     """Import statements of the module scope (also inside top-level ``if``/``try`` blocks)."""
+
     def walk(statements: Iterable[cst.CSTNode]) -> Iterable[cst.Import | cst.ImportFrom]:
         for statement in statements:
             if isinstance(statement, cst.SimpleStatementLine):
@@ -136,6 +155,7 @@ def module_imports(tree: cst.Module) -> Iterable[cst.Import | cst.ImportFrom]:
                     value = getattr(statement, extra, None)
                     if value is not None:
                         yield from walk(value if isinstance(value, (list, tuple)) else [value])
+
     yield from walk(tree.body)
 
 
@@ -167,7 +187,7 @@ class Module:
             for name in defined_names(statement):
                 self.defs.setdefault(name, statement)
         self.imports: dict[str, Imported] = {}
-        self.import_text: dict[str, str] = {}   # bound name -> a statement that binds it the same way
+        self.import_text: dict[str, str] = {}  # bound name -> a statement that binds it the same way
         self.future = False
         for node in module_imports(self.tree):
             if is_future(node):
@@ -216,23 +236,30 @@ def binding_statement(target: Imported, bound: str) -> str:
 @dataclass
 class Plan:
     stage: str
-    kind: str                     # "symbols" (S4.1, S4.3) or "renames" (S4.2)
+    kind: str  # "symbols" (S4.1, S4.3) or "renames" (S4.2)
     base: str
     path: Path
     moves: dict[tuple[str, str], tuple[str, str]] = field(default_factory=dict)  # (src path, name) -> (dest path, name)
-    renames: dict[tuple[str, str], str] = field(default_factory=dict)            # (path, name) -> new name
-    create: dict[str, str] = field(default_factory=dict)                         # new module path -> docstring
+    renames: dict[tuple[str, str], str] = field(default_factory=dict)  # (path, name) -> new name
+    create: dict[str, str] = field(default_factory=dict)  # new module path -> docstring
     dissolve: list[str] = field(default_factory=list)
-    added: dict[str, str] = field(default_factory=dict)                          # closure_map [added] entries
-    allow_stale: dict[str, list[str]] = field(default_factory=dict)              # path -> spellings kept on purpose
+    added: dict[str, str] = field(default_factory=dict)  # closure_map [added] entries
+    allow_stale: dict[str, list[str]] = field(default_factory=dict)  # path -> spellings kept on purpose
 
     @classmethod
     def load(cls, path: Path) -> Plan:
         value = tomllib.loads(path.read_text())
         stage = value["stage"]
-        plan = cls(stage=stage["name"], kind=stage["kind"], base=stage["base"], path=path,
-                   create=value.get("create", {}), dissolve=value.get("dissolve", {}).get("modules", []),
-                   added=value.get("closure_added", {}), allow_stale=value.get("baseline_references", {}))
+        plan = cls(
+            stage=stage["name"],
+            kind=stage["kind"],
+            base=stage["base"],
+            path=path,
+            create=value.get("create", {}),
+            dissolve=value.get("dissolve", {}).get("modules", []),
+            added=value.get("closure_added", {}),
+            allow_stale=value.get("baseline_references", {}),
+        )
         for source, table in value.get("moves", {}).items():
             for name, spec in table.items():
                 dest, new = (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
@@ -257,8 +284,9 @@ class Plan:
 class Resolver:
     """Final homes of names, answered from the index of the tree before the run."""
 
-    def __init__(self, modules: dict[str, Module], mapping: dict[tuple[str, str], tuple[str, str]],
-                 dissolved: set[str]):
+    def __init__(
+        self, modules: dict[str, Module], mapping: dict[tuple[str, str], tuple[str, str]], dissolved: set[str]
+    ):
         self.modules, self.mapping, self.dissolved = modules, mapping, dissolved
         self.changed_modules = {m for m, _ in mapping} | dissolved
 
@@ -316,8 +344,11 @@ def annotations_of(node: ast.AST) -> list[ast.AST]:
     out: list[ast.AST] = []
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         args = node.args
-        out += [a.annotation for a in (*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg)
-                if a is not None and a.annotation is not None]
+        out += [
+            a.annotation
+            for a in (*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg)
+            if a is not None and a.annotation is not None
+        ]
         if node.returns is not None:
             out.append(node.returns)
     elif isinstance(node, ast.AnnAssign):
@@ -365,14 +396,18 @@ def _leading(statement: cst.BaseStatement, blank: int) -> cst.BaseStatement:
 
 
 def _is_docstring(statement: cst.BaseStatement) -> bool:
-    return (isinstance(statement, cst.SimpleStatementLine) and len(statement.body) == 1
-            and isinstance(statement.body[0], cst.Expr)
-            and isinstance(statement.body[0].value, (cst.SimpleString, cst.ConcatenatedString)))
+    return (
+        isinstance(statement, cst.SimpleStatementLine)
+        and len(statement.body) == 1
+        and isinstance(statement.body[0], cst.Expr)
+        and isinstance(statement.body[0].value, (cst.SimpleString, cst.ConcatenatedString))
+    )
 
 
 def _is_import_line(statement: cst.BaseStatement) -> bool:
     return isinstance(statement, cst.SimpleStatementLine) and all(
-        isinstance(s, (cst.Import, cst.ImportFrom)) for s in statement.body)
+        isinstance(s, (cst.Import, cst.ImportFrom)) for s in statement.body
+    )
 
 
 def _import_block_end(body: list[cst.BaseStatement]) -> int:
@@ -383,7 +418,7 @@ def _import_block_end(body: list[cst.BaseStatement]) -> int:
         if _is_import_line(body[position]):
             end = position + 1
         elif isinstance(body[position], cst.If) and all(_is_import_line(s) for s in body[position].body.body):
-            end = position + 1   # e.g. ``if TYPE_CHECKING:`` imports
+            end = position + 1  # e.g. ``if TYPE_CHECKING:`` imports
         else:
             break
     return end
@@ -403,7 +438,7 @@ def move_definitions(plan: Plan, modules: dict[str, Module], resolver: Resolver)
         if module is None or name not in module.defs:
             done = by_path.get(dest)
             if done is not None and new in done.defs:
-                continue   # applied before (idempotent)
+                continue  # applied before (idempotent)
             raise PlanError(f"{source}: no top-level definition {name}")
         blocks[dest].append((module, module.defs[name], name, new))
     for path in plan.dissolve:
@@ -424,8 +459,14 @@ def move_definitions(plan: Plan, modules: dict[str, Module], resolver: Resolver)
     return texts
 
 
-def _paste(plan: Plan, dest: str, items: list[tuple[Module, cst.BaseStatement, str, str]],
-           by_path: dict[str, Module], resolver: Resolver, current: str | None) -> str:
+def _paste(
+    plan: Plan,
+    dest: str,
+    items: list[tuple[Module, cst.BaseStatement, str, str]],
+    by_path: dict[str, Module],
+    resolver: Resolver,
+    current: str | None,
+) -> str:
     dest_name = module_name(dest)
     if current is not None:
         target = Module(dest, current)
@@ -524,8 +565,13 @@ def _is_constant(statement: cst.BaseStatement) -> bool:
     return isinstance(statement, cst.SimpleStatementLine) and bool(defined_names(statement))
 
 
-def _assemble(target: Module, statements: list[cst.BaseStatement], needed: dict[str, str], add_future: bool,
-              lazy_annotations: bool) -> str:
+def _assemble(
+    target: Module,
+    statements: list[cst.BaseStatement],
+    needed: dict[str, str],
+    add_future: bool,
+    lazy_annotations: bool,
+) -> str:
     """The destination with its new imports (merged into its statements of the same module, else
     in their group of its import block) and its new definitions: constants after the module's own
     leading constants, functions and classes at the end -- each before the first module statement
@@ -560,8 +606,10 @@ def _assemble(target: Module, statements: list[cst.BaseStatement], needed: dict[
             position = len(rest)
         position = min(position, first_user)
         if position < last_provider:
-            raise PlanError(f"{target.path}: new definitions {sorted(names)} are needed at import time before "
-                            "module statements they need")
+            raise PlanError(
+                f"{target.path}: new definitions {sorted(names)} are needed at import time before "
+                "module statements they need"
+            )
         block = list(group)
         if group is constants:
             block[0] = _leading(block[0], 1 if position and _is_constant(rest[position - 1]) else 2)
@@ -572,8 +620,12 @@ def _assemble(target: Module, statements: list[cst.BaseStatement], needed: dict[
         rest[0] = _leading(rest[0], 2)
     body = [*head, *rest, *trailer]
     if add_future:
-        body.insert(doc, cst.parse_statement("from __future__ import annotations\n").with_changes(
-            leading_lines=[cst.EmptyLine()] if doc else []))
+        body.insert(
+            doc,
+            cst.parse_statement("from __future__ import annotations\n").with_changes(
+                leading_lines=[cst.EmptyLine()] if doc else []
+            ),
+        )
         if doc + 1 < len(body):
             body[doc + 1] = _leading(body[doc + 1], 1)
     return _squeeze(tree.with_changes(body=body).code)
@@ -594,13 +646,14 @@ def _place_imports(head: list[cst.BaseStatement], new: list[cst.BaseStatement], 
         if position is None:
             position = doc
             while position < len(head) and _statement_group(head[position]) == -1:
-                position += 1   # after ``from __future__``
+                position += 1  # after ``from __future__``
         before = _statement_group(head[position - 1]) if position > doc else None
         blank = 1 if position > 0 and (before is None or before != group) else 0
         statement = statement.with_changes(leading_lines=[cst.EmptyLine()] * blank)
         if position < len(head) and _statement_group(head[position]) not in (None, group):
-            head[position] = head[position].with_changes(leading_lines=[cst.EmptyLine(),
-                             *[l for l in head[position].leading_lines if l.comment is not None]])
+            head[position] = head[position].with_changes(
+                leading_lines=[cst.EmptyLine(), *[l for l in head[position].leading_lines if l.comment is not None]]
+            )
         head.insert(position, statement)
     return head
 
@@ -628,8 +681,9 @@ def _import_group(module: str) -> int:
     return 2 if top in _FIRST_PARTY else 0 if top in sys.stdlib_module_names or top == "__future__" else 1
 
 
-def _merge_imports(body: list[cst.BaseStatement], end: int, texts: list[str]) -> tuple[list[cst.BaseStatement],
-                                                                                        list[cst.BaseStatement]]:
+def _merge_imports(
+    body: list[cst.BaseStatement], end: int, texts: list[str]
+) -> tuple[list[cst.BaseStatement], list[cst.BaseStatement]]:
     """Names imported ``from`` a module the module already imports from join that statement; the
     rest become new statements (stdlib, third-party, first-party; sorted by module)."""
     body = list(body)
@@ -644,8 +698,13 @@ def _merge_imports(body: list[cst.BaseStatement], end: int, texts: list[str]) ->
                 if not isinstance(statement, cst.SimpleStatementLine) or len(statement.body) != 1:
                     continue
                 small = statement.body[0]
-                if (isinstance(small, cst.ImportFrom) and not small.relative and small.module is not None
-                        and not isinstance(small.names, cst.ImportStar) and dotted(small.module) == module):
+                if (
+                    isinstance(small, cst.ImportFrom)
+                    and not small.relative
+                    and small.module is not None
+                    and not isinstance(small.names, cst.ImportStar)
+                    and dotted(small.module) == module
+                ):
                     names = [*small.names, cst.parse_statement(f"from x import {spelled}\n").body[0].names[0]]
                     body[index] = statement.with_changes(body=[small.with_changes(names=_commas(names))])
                     break
@@ -654,6 +713,7 @@ def _merge_imports(body: list[cst.BaseStatement], end: int, texts: list[str]) ->
         else:
             pending.setdefault(("import", text), [])
     statements = []
+
     def order(item: tuple[tuple[str, str], list[str]]) -> tuple[int, str]:
         (kind, module), _ = item
         name = module.split()[1] if kind == "import" else module
@@ -681,8 +741,14 @@ def merge_duplicate_imports(text: str, modules: set[str]) -> str:
         if not (isinstance(statement, cst.SimpleStatementLine) and len(statement.body) == 1):
             continue
         small = statement.body[0]
-        if not isinstance(small, cst.ImportFrom) or small.relative or small.module is None or is_future(small) \
-                or isinstance(small.names, cst.ImportStar) or statement.trailing_whitespace.comment is not None:
+        if (
+            not isinstance(small, cst.ImportFrom)
+            or small.relative
+            or small.module is None
+            or is_future(small)
+            or isinstance(small.names, cst.ImportStar)
+            or statement.trailing_whitespace.comment is not None
+        ):
             continue
         module = dotted(small.module)
         if module not in modules or any(a.asname is not None for a in small.names):
@@ -698,8 +764,15 @@ def merge_duplicate_imports(text: str, modules: set[str]) -> str:
                 names.append(alias)
         target_small = target.body[0]
         many = len(names) > 1
-        body[first[module]] = target.with_changes(body=[target_small.with_changes(
-            names=_commas(names), lpar=target_small.lpar if many else None, rpar=target_small.rpar if many else None)])
+        body[first[module]] = target.with_changes(
+            body=[
+                target_small.with_changes(
+                    names=_commas(names),
+                    lpar=target_small.lpar if many else None,
+                    rpar=target_small.rpar if many else None,
+                )
+            ]
+        )
         drop.add(index)
     if not drop:
         return text
@@ -760,23 +833,25 @@ class ReferenceRewriter(cst.CSTTransformer):
         self.module = module_name(path)
         self.package = path.endswith("__init__.py")
         self.moved_away = moved_away
-        self.names: dict[int, str] = {}                     # id(Name) -> new identifier
+        self.names: dict[int, str] = {}  # id(Name) -> new identifier
         self.attributes: dict[int, tuple[str | None, str]] = {}  # id(Attribute) -> (alias | None: bare, attr)
-        self.strings: dict[int, str] = {}                   # id(SimpleString) -> new literal
-        self.from_edits: dict[int, tuple[str, str, str]] = {}    # id(ImportAlias) -> (module, name, bound)
-        self.drop: set[int] = set()                         # id(ImportAlias) removed
+        self.strings: dict[int, str] = {}  # id(SimpleString) -> new literal
+        self.from_edits: dict[int, tuple[str, str, str]] = {}  # id(ImportAlias) -> (module, name, bound)
+        self.drop: set[int] = set()  # id(ImportAlias) removed
         self.after_line: dict[int, list[str]] = defaultdict(list)  # id(statement line) -> imports added after it
-        self.module_imports: list[str] = []                 # added after the module's import block
-        self.aliases: dict[tuple[int, str], str] = {}       # (id(scope), module) -> alias bound in that scope
-        self._alias_module: dict[int, str] = {}             # id(assignment) -> the module its alias names
+        self.module_imports: list[str] = []  # added after the module's import block
+        self.aliases: dict[tuple[int, str], str] = {}  # (id(scope), module) -> alias bound in that scope
+        self._alias_module: dict[int, str] = {}  # id(assignment) -> the module its alias names
 
     # ------------------------------------------------------------------ analysis
     def analyze(self, wrapper: MetadataWrapper) -> None:
         scopes = [s for s in set(wrapper.resolve(ScopeProvider).values()) if s is not None]
         self.parents = wrapper.resolve(ParentNodeProvider)
-        self.used = {n.value for n in _walk(wrapper.module) if isinstance(n, cst.Name) and not _is_label(n, self.parents)}
+        self.used = {
+            n.value for n in _walk(wrapper.module) if isinstance(n, cst.Name) and not _is_label(n, self.parents)
+        }
         imports = []
-        self.bare: dict[tuple[str, str], str] = {}   # (module, name) imported at module level -> bound name
+        self.bare: dict[tuple[str, str], str] = {}  # (module, name) imported at module level -> bound name
         for scope in scopes:
             for assignment in scope.assignments:
                 if isinstance(assignment, ImportAssignment) and isinstance(scope, GlobalScope):
@@ -861,49 +936,59 @@ class ReferenceRewriter(cst.CSTTransformer):
                     continue
                 if home == (module, attr):
                     still_used = True
-                elif home[0] == module:        # a rename: the attribute follows
+                elif home[0] == module:  # a rename: the attribute follows
                     self.attributes[id(parent)] = (assignment.name, home[1])
                     still_used = True
                 elif _is_store(parent, self.parents) and not dissolved:
                     # a patch of the surviving module's own binding (it re-imports what it uses)
-                    self.notes.append(f"{self.path}: assignment to {assignment.name}.{attr}: {attr} moved to "
-                                      f"{home[0]} ({home[1]}); the target is kept: review")
+                    self.notes.append(
+                        f"{self.path}: assignment to {assignment.name}.{attr}: {attr} moved to "
+                        f"{home[0]} ({home[1]}); the target is kept: review"
+                    )
                     still_used = True
                 else:
                     if _is_store(parent, self.parents):
-                        self.notes.append(f"{self.path}: assignment to {assignment.name}.{attr} of the dissolved "
-                                          f"{module} now targets {home[0]}: review")
+                        self.notes.append(
+                            f"{self.path}: assignment to {assignment.name}.{attr} of the dissolved "
+                            f"{module} now targets {home[0]}: review"
+                        )
                     if home[0] == self.module:
                         self.attributes[id(parent)] = (None, home[1])
                     else:
-                        self.attributes[id(parent)] = self._reference(scope, assignment, home,
-                                                                      bare=not _is_store(parent, self.parents))
+                        self.attributes[id(parent)] = self._reference(
+                            scope, assignment, home, bare=not _is_store(parent, self.parents)
+                        )
                     rewritten = True
                 continue
             patch = self._patch_attribute(node)
             if patch is None:
                 still_used = True
                 if dissolved:
-                    self.notes.append(f"{self.path}: {assignment.name} (the dissolved {module}) is used as a "
-                                      "value: rewrite by hand")
+                    self.notes.append(
+                        f"{self.path}: {assignment.name} (the dissolved {module}) is used as a value: rewrite by hand"
+                    )
                 continue
             attr, string = patch
             home = self.resolver.home(module, attr)
             if home == (module, attr):
                 still_used = True
-            elif home[0] == module:            # a rename: the string follows
+            elif home[0] == module:  # a rename: the string follows
                 self.strings[id(string)] = _string_like(string, home[1])
                 still_used = True
-            elif dissolved:                    # the dissolved module's successor is the target
+            elif dissolved:  # the dissolved module's successor is the target
                 self.names[id(node)] = self._alias(scope, assignment, home[0])
                 if home[1] != attr:
                     self.strings[id(string)] = _string_like(string, home[1])
-                self.notes.append(f"{self.path}: patch target ({assignment.name}, {attr!r}) of the dissolved "
-                                  f"{module} now names {home[0]}:{home[1]}: review")
+                self.notes.append(
+                    f"{self.path}: patch target ({assignment.name}, {attr!r}) of the dissolved "
+                    f"{module} now names {home[0]}:{home[1]}: review"
+                )
                 rewritten = True
             else:
-                self.notes.append(f"{self.path}: patch target ({assignment.name}, {attr!r}): {attr} moved "
-                                  f"to {home[0]} ({home[1]}); kept: review")
+                self.notes.append(
+                    f"{self.path}: patch target ({assignment.name}, {attr!r}): {attr} moved "
+                    f"to {home[0]} ({home[1]}); kept: review"
+                )
                 still_used = True
         if not still_used and (dissolved or rewritten):
             self.drop.add(id(alias))
@@ -923,8 +1008,9 @@ class ReferenceRewriter(cst.CSTTransformer):
             return second.evaluated_value, second
         return None
 
-    def _reference(self, scope: Any, assignment: ImportAssignment, home: tuple[str, str],
-                   bare: bool = True) -> tuple[str | None, str]:
+    def _reference(
+        self, scope: Any, assignment: ImportAssignment, home: tuple[str, str], bare: bool = True
+    ) -> tuple[str | None, str]:
         """How this file spells ``home`` where ``assignment`` bound the old alias: a name it
         already imports; an alias of the module it already binds; a new alias named after the
         module; else the name itself, imported next to the old import."""
@@ -956,11 +1042,15 @@ class ReferenceRewriter(cst.CSTTransformer):
         claimed = {v for (sid, mod), v in self.aliases.items() if sid == id(scope) and mod != old_module}
         candidates = [parts[-1]]
         if old_module in self.resolver.dissolved and assignment.name not in claimed:
-            candidates.append(assignment.name)   # the dissolved module's alias may name its successor
+            candidates.append(assignment.name)  # the dissolved module's alias may name its successor
         candidates += ["_".join(parts[-2:]), "_".join(parts[1:]), "_".join(parts) + "_module"]
         for candidate in [c for c in candidates if c]:
-            if name is None and (candidate not in self.used or candidate == assignment.name == parts[-1]
-                                 and old_module in self.resolver.dissolved and candidate not in claimed):
+            if name is None and (
+                candidate not in self.used
+                or candidate == assignment.name == parts[-1]
+                and old_module in self.resolver.dissolved
+                and candidate not in claimed
+            ):
                 name = candidate
         if name is None:
             raise PlanError(f"{self.path}: no free alias for {module}")
@@ -1007,8 +1097,7 @@ class ReferenceRewriter(cst.CSTTransformer):
             return cst.Name(attr, lpar=updated.lpar, rpar=updated.rpar)
         return updated.with_changes(value=cst.Name(alias), attr=cst.Name(attr))
 
-    def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine,
-                                  updated: cst.SimpleStatementLine) -> Any:
+    def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine, updated: cst.SimpleStatementLine) -> Any:
         body: list[cst.BaseSmallStatement] = []
         changed = False
         for before, small in zip(original.body, updated.body):
@@ -1033,9 +1122,10 @@ class ReferenceRewriter(cst.CSTTransformer):
         lines += extra
         if not lines:
             return _vanish(updated)
-        lines[0] = lines[0].with_changes(leading_lines=updated.leading_lines,
-                                         trailing_whitespace=updated.trailing_whitespace if len(lines) == 1
-                                         else cst.TrailingWhitespace())
+        lines[0] = lines[0].with_changes(
+            leading_lines=updated.leading_lines,
+            trailing_whitespace=updated.trailing_whitespace if len(lines) == 1 else cst.TrailingWhitespace(),
+        )
         return cst.FlattenSentinel(lines)
 
     def _import_from(self, before: cst.ImportFrom, updated: cst.ImportFrom) -> list[cst.ImportFrom] | None:
@@ -1048,29 +1138,41 @@ class ReferenceRewriter(cst.CSTTransformer):
                 continue
             if id(old) in self.from_edits:
                 module, name, bound = self.from_edits[id(old)]
-                alias = cst.ImportAlias(name=cst.Name(name),
-                                        asname=cst.AsName(cst.Name(bound)) if bound != name else None)
+                alias = cst.ImportAlias(
+                    name=cst.Name(name), asname=cst.AsName(cst.Name(bound)) if bound != name else None
+                )
                 groups.setdefault(module, []).append(alias)
             else:
                 groups.setdefault(keep_key, []).append(new)
         out = []
         for key, names in groups.items():
             if key == keep_key:
-                out.append(updated.with_changes(names=_commas(names), lpar=None if len(names) == 1 else updated.lpar,
-                                                rpar=None if len(names) == 1 else updated.rpar))
+                out.append(
+                    updated.with_changes(
+                        names=_commas(names),
+                        lpar=None if len(names) == 1 else updated.lpar,
+                        rpar=None if len(names) == 1 else updated.rpar,
+                    )
+                )
             else:
                 out.append(cst.ImportFrom(module=cst.parse_expression(key), names=_commas(names)))
         return out
 
 
 def _string_like(node: cst.SimpleString, value: str) -> str:
-    quote = node.value[len(node.prefix):][0]
+    quote = node.value[len(node.prefix) :][0]
     return f"{node.prefix}{quote}{value}{quote}"
 
 
 def _commas(names: list[cst.ImportAlias]) -> list[cst.ImportAlias]:
-    return [a.with_changes(comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" ")) if i < len(names) - 1
-                           else cst.MaybeSentinel.DEFAULT) for i, a in enumerate(names)]
+    return [
+        a.with_changes(
+            comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" "))
+            if i < len(names) - 1
+            else cst.MaybeSentinel.DEFAULT
+        )
+        for i, a in enumerate(names)
+    ]
 
 
 def _alias_node(node: cst.CSTNode, bound: str) -> cst.ImportAlias | None:
@@ -1091,8 +1193,9 @@ def _alias_node(node: cst.CSTNode, bound: str) -> cst.ImportAlias | None:
 def _is_label(node: cst.Name, parents: Any) -> bool:
     """A name that binds or reads nothing in its scope: an attribute name, a keyword."""
     parent = parents.get(node)
-    return ((isinstance(parent, cst.Attribute) and parent.attr is node)
-            or (isinstance(parent, cst.Arg) and parent.keyword is node))
+    return (isinstance(parent, cst.Attribute) and parent.attr is node) or (
+        isinstance(parent, cst.Arg) and parent.keyword is node
+    )
 
 
 def _scope_chain(scope: Any) -> list[Any]:
@@ -1105,8 +1208,12 @@ def _scope_chain(scope: Any) -> list[Any]:
 
 def _is_store(attribute: cst.Attribute, parents: Any) -> bool:
     parent = parents.get(attribute)
-    return (isinstance(parent, cst.AssignTarget) or (isinstance(parent, cst.AugAssign) and parent.target is attribute)
-            or (isinstance(parent, cst.AnnAssign) and parent.target is attribute) or isinstance(parent, cst.Del))
+    return (
+        isinstance(parent, cst.AssignTarget)
+        or (isinstance(parent, cst.AugAssign) and parent.target is attribute)
+        or (isinstance(parent, cst.AnnAssign) and parent.target is attribute)
+        or isinstance(parent, cst.Del)
+    )
 
 
 def _walk(node: cst.CSTNode) -> Iterable[cst.CSTNode]:
@@ -1125,13 +1232,19 @@ def _vanish(line: cst.SimpleStatementLine) -> cst.BaseStatement:
     its leading blank lines to the next statement."""
     if not line.leading_lines:
         return cst.RemoveFromParent()
-    return cst.SimpleStatementLine(body=[cst.Pass()], leading_lines=line.leading_lines,
-                                   trailing_whitespace=cst.TrailingWhitespace(comment=cst.Comment(_VANISHED)))
+    return cst.SimpleStatementLine(
+        body=[cst.Pass()],
+        leading_lines=line.leading_lines,
+        trailing_whitespace=cst.TrailingWhitespace(comment=cst.Comment(_VANISHED)),
+    )
 
 
 def _is_vanished(statement: cst.BaseStatement) -> bool:
-    return (isinstance(statement, cst.SimpleStatementLine) and statement.trailing_whitespace.comment is not None
-            and statement.trailing_whitespace.comment.value == _VANISHED)
+    return (
+        isinstance(statement, cst.SimpleStatementLine)
+        and statement.trailing_whitespace.comment is not None
+        and statement.trailing_whitespace.comment.value == _VANISHED
+    )
 
 
 def _carry(body: Iterable[cst.BaseStatement]) -> list[cst.BaseStatement]:
@@ -1152,8 +1265,9 @@ def _carry(body: Iterable[cst.BaseStatement]) -> list[cst.BaseStatement]:
             leading = 0
             while leading < len(own) and own[leading].comment is None:
                 leading += 1
-            statement = statement.with_changes(leading_lines=[cst.EmptyLine()] * min(2, max(blank, leading))
-                                               + own[leading:])
+            statement = statement.with_changes(
+                leading_lines=[cst.EmptyLine()] * min(2, max(blank, leading)) + own[leading:]
+            )
             blank = 0
         out.append(statement)
     return out
@@ -1177,9 +1291,9 @@ class _CodeStrings(cst.CSTTransformer):
 
     def leave_SimpleString(self, original: cst.SimpleString, updated: cst.SimpleString) -> cst.SimpleString:
         prefix = updated.prefix
-        body = updated.value[len(prefix):]
-        quote = body[:3] if body[:3] in ('"""', "\'\'\'") else body[:1]
-        inner = body[len(quote):len(body) - len(quote)]
+        body = updated.value[len(prefix) :]
+        quote = body[:3] if body[:3] in ('"""', "'''") else body[:1]
+        inner = body[len(quote) : len(body) - len(quote)]
         if "b" in prefix.lower() or "import " not in inner:
             return updated
         if not any(m in inner for m in self.resolver.changed_modules):
@@ -1195,8 +1309,14 @@ class _CodeStrings(cst.CSTTransformer):
         return updated.with_changes(value=prefix + quote + new + quote)
 
 
-def rewrite_python(path: str, text: str, resolver: Resolver, moved_away: dict[str, tuple[str, str]],
-                   notes: list[str], strings: bool = True) -> str:
+def rewrite_python(
+    path: str,
+    text: str,
+    resolver: Resolver,
+    moved_away: dict[str, tuple[str, str]],
+    notes: list[str],
+    strings: bool = True,
+) -> str:
     if strings:
         text = cst.parse_module(text).visit(_CodeStrings(path, resolver, notes)).code
     wrapper = MetadataWrapper(cst.parse_module(text))
@@ -1231,8 +1351,11 @@ def rewrite_strings(text: str, resolver: Resolver) -> str:
 def _pattern(resolver: Resolver) -> re.Pattern[str] | None:
     if not hasattr(resolver, "_pattern"):
         modules = sorted(resolver.changed_modules, key=len, reverse=True)
-        resolver._pattern = (re.compile(r"(?<![\w.])(" + "|".join(re.escape(m) for m in modules)
-                                        + r")([.:])([A-Za-z_]\w*)") if modules else None)
+        resolver._pattern = (
+            re.compile(r"(?<![\w.])(" + "|".join(re.escape(m) for m in modules) + r")([.:])([A-Za-z_]\w*)")
+            if modules
+            else None
+        )
     return resolver._pattern
 
 
@@ -1242,8 +1365,13 @@ def stale_mentions(text: str, resolver: Resolver, allowed: Iterable[str] = ()) -
     if not names:
         return []
     paths = [n.replace(".", "/") + ".py" for n in names]
-    pattern = re.compile(r"(?<![\w.])(" + "|".join(re.escape(n) for n in names) + r")(?![\w])|(?<![\w/.-])("
-                         + "|".join(re.escape(p) for p in paths) + r")")
+    pattern = re.compile(
+        r"(?<![\w.])("
+        + "|".join(re.escape(n) for n in names)
+        + r")(?![\w])|(?<![\w/.-])("
+        + "|".join(re.escape(p) for p in paths)
+        + r")"
+    )
     out = []
     for number, line in enumerate(text.splitlines(), 1):
         stripped = line
@@ -1279,8 +1407,7 @@ def drop_unused_imports(text: str, keep: set[str]) -> str:
                 unused.add(id(alias))
 
     class Drop(cst.CSTTransformer):
-        def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine,
-                                      updated: cst.SimpleStatementLine) -> Any:
+        def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine, updated: cst.SimpleStatementLine) -> Any:
             body, changed = [], False
             for before, small in zip(original.body, updated.body):
                 if isinstance(before, (cst.Import, cst.ImportFrom)) and not isinstance(before.names, cst.ImportStar):
@@ -1289,8 +1416,9 @@ def drop_unused_imports(text: str, keep: set[str]) -> str:
                         changed = True
                         if names:
                             one = len(names) == 1 and isinstance(small, cst.ImportFrom)
-                            body.append(small.with_changes(names=_commas(names), **(
-                                dict(lpar=None, rpar=None) if one else {})))
+                            body.append(
+                                small.with_changes(names=_commas(names), **(dict(lpar=None, rpar=None) if one else {}))
+                            )
                         continue
                 body.append(small)
             if not changed:
@@ -1419,8 +1547,9 @@ def run(plan: Plan) -> Result:
         if path in texts and path not in plan.dissolve:
             original = (REPO / path).read_text() if (REPO / path).is_file() else ""
             moved_names = {n for (s, n) in plan.moves if s == path}
-            texts[path] = drop_unused_imports(texts[path], (keep.get(module_name(path), set()) - moved_names)
-                                              | unused_bindings(original))
+            texts[path] = drop_unused_imports(
+                texts[path], (keep.get(module_name(path), set()) - moved_names) | unused_bindings(original)
+            )
     destinations = {module_name(d) for d, _ in plan.moves.values()}
     for path in list(texts):
         if path.endswith(".py"):
@@ -1432,8 +1561,10 @@ def run(plan: Plan) -> Result:
             continue
         leftover = [s for s in cst.parse_module(text).body if not (_is_docstring(s) or _is_import_line(s))]
         if leftover:
-            raise PlanError(f"{path}: statements left after the moves: "
-                            + "; ".join(cst.Module([]).code_for_node(s).strip()[:60] for s in leftover))
+            raise PlanError(
+                f"{path}: statements left after the moves: "
+                + "; ".join(cst.Module([]).code_for_node(s).strip()[:60] for s in leftover)
+            )
         removed.append(path)
         del texts[path]
     return Result(texts, removed, notes, closure_entries(plan, modules))
@@ -1452,8 +1583,10 @@ def closure_entries(plan: Plan, modules: dict[str, Module]) -> dict[str, dict[st
         statement = by_path[source].defs.get(name) if source in by_path else None
         if isinstance(statement, (cst.FunctionDef, cst.ClassDef)):
             key = f"{module_name(dest)}:{new}"
-            if key in functions:   # an identical definition kept once: the other one stops executing
-                removed[f"{module_name(source)}:{name}"] = f"{plan.stage}: identical to {functions[key]}, kept once in {module_name(dest)}"
+            if key in functions:  # an identical definition kept once: the other one stops executing
+                removed[f"{module_name(source)}:{name}"] = (
+                    f"{plan.stage}: identical to {functions[key]}, kept once in {module_name(dest)}"
+                )
             else:
                 functions[key] = f"{module_name(source)}:{name}"
     for (path, name), new in plan.renames.items():
@@ -1487,8 +1620,9 @@ def _was_module(name: str, rev: str | None) -> bool:
     if rev is None:
         return False
     if rev not in _BASE_MODULES:
-        _BASE_MODULES[rev] = {module_name(p) for p in git("ls-tree", "-r", "--name-only", rev).split()
-                              if p.endswith(".py")}
+        _BASE_MODULES[rev] = {
+            module_name(p) for p in git("ls-tree", "-r", "--name-only", rev).split() if p.endswith(".py")
+        }
     return name in _BASE_MODULES[rev]
 
 
@@ -1641,7 +1775,9 @@ def write_closure_entries(stage: str, table_name: str, entries: dict[str, dict[s
         start = lines.index(f"[{table}]\n") + 1
         while start < len(lines) and lines[start].startswith("#"):
             start += 1
-        block = [f"# {stage} ({table_name}): {'moved or renamed definitions, current = recorded' if table == 'functions' else 'reviewed'}\n"]
+        block = [
+            f"# {stage} ({table_name}): {'moved or renamed definitions, current = recorded' if table == 'functions' else 'reviewed'}\n"
+        ]
         block += [f"{json.dumps(k)} = {json.dumps(v)}\n" for k, v in new.items()]
         lines[start:start] = block
         added += len(new)

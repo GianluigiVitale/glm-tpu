@@ -25,10 +25,16 @@ from glm_tpu.utils.json_utils import _fingerprint
 
 _TOPOLOGY_CAPTURE_KEYS = frozenset(
     {
-        "captured_utc", "contract", "contract_hash", "fleet_contract_hashes",
+        "captured_utc",
+        "contract",
+        "contract_hash",
+        "fleet_contract_hashes",
         "fleet_local_device_ids_in_runtime_order",
         "hostname",
-        "jax_device_count", "jax_local_device_count", "jax_process_count", "jax_process_index",
+        "jax_device_count",
+        "jax_local_device_count",
+        "jax_process_count",
+        "jax_process_index",
         "jax_version",
         "launch_process_id",
         "local_device_ids",
@@ -47,8 +53,7 @@ def validate_topology_fleet(
     """Authenticate the sealed launch-host to JAX-process permutation."""
 
     if len(captures) != 8 or any(
-        not isinstance(item, Mapping) or set(item) != _TOPOLOGY_CAPTURE_KEYS
-        for item in captures
+        not isinstance(item, Mapping) or set(item) != _TOPOLOGY_CAPTURE_KEYS for item in captures
     ):
         raise ValueError("WS32 topology fleet schema drifted")
     ordered = tuple(sorted(captures, key=lambda item: item["launch_process_id"]))
@@ -85,33 +90,23 @@ def validate_topology_fleet(
         raise ValueError("WS32 topology hostnames are not unique")
 
     topology = PhysicalTopology.from_dict(contract["topology"])
-    if topology.slice_name != slice_name or (
-        topology.topology_hash != expected_topology_sha256
-    ):
+    if topology.slice_name != slice_name or (topology.topology_hash != expected_topology_sha256):
         raise ValueError("WS32 topology identity drifted")
     runtime_order = [
         [
             device.device_id
             for device in sorted(
-                (
-                    value
-                    for value in topology.devices
-                    if value.process_index == process_index
-                ),
+                (value for value in topology.devices if value.process_index == process_index),
                 key=lambda value: value.local_device_id,
             )
         ]
         for process_index in range(8)
     ]
-    if runtime_order != [
-        [process_index * 4 + offset for offset in range(4)]
-        for process_index in range(8)
-    ]:
+    if runtime_order != [[process_index * 4 + offset for offset in range(4)] for process_index in range(8)]:
         raise ValueError("WS32 topology runtime device order drifted")
     if any(
         item["fleet_local_device_ids_in_runtime_order"] != runtime_order
-        or item["local_device_ids"]
-        != runtime_order[item["jax_process_index"]]
+        or item["local_device_ids"] != runtime_order[item["jax_process_index"]]
         for item in ordered
     ):
         raise ValueError("WS32 topology local ownership drifted")
@@ -160,61 +155,79 @@ def _device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
     }
 
 
-def load_topology_binding(root: Path, pin: str, *, expected_topology: str,
-                          expected_mesh: str, original_fleet: str,
-                          slice_name: str) -> dict:
+def load_topology_binding(
+    root: Path, pin: str, *, expected_topology: str, expected_mesh: str, original_fleet: str, slice_name: str
+) -> dict:
     from glm_tpu.distributed.mesh import build_physical_mesh
 
-    raw = (root / 'topology_rebinding.json').read_bytes()
+    raw = (root / "topology_rebinding.json").read_bytes()
     if not isinstance(pin, str) or len(pin) != 64 or sha256(raw).hexdigest() != pin:
-        raise ValueError('topology rebinding hash differs')
+        raise ValueError("topology rebinding hash differs")
     binding = json.loads(raw)
-    if (binding.get('schema') != 'glm_perf_topology_rebinding_v1'
-            or binding.get('physical_devices_identical') is not True
-            or binding.get('all_hosts_idle_after') is not True
-            or binding.get('original_topology_sha256') != expected_topology
-            or binding.get('mesh_sha256') != expected_mesh
-            or binding.get('original_fleet_sha256') != original_fleet):
-        raise ValueError('topology rebinding changes the sealed physical identity')
-    names = [f'topology.rank{i}.json' for i in range(8)]
-    if set(binding.get('capture_sha256', {})) != set(names):
-        raise ValueError('topology rebinding requires exactly eight captures')
+    if (
+        binding.get("schema") != "glm_perf_topology_rebinding_v1"
+        or binding.get("physical_devices_identical") is not True
+        or binding.get("all_hosts_idle_after") is not True
+        or binding.get("original_topology_sha256") != expected_topology
+        or binding.get("mesh_sha256") != expected_mesh
+        or binding.get("original_fleet_sha256") != original_fleet
+    ):
+        raise ValueError("topology rebinding changes the sealed physical identity")
+    names = [f"topology.rank{i}.json" for i in range(8)]
+    if set(binding.get("capture_sha256", {})) != set(names):
+        raise ValueError("topology rebinding requires exactly eight captures")
     captures = []
     for name in names:
-        payload = (root / 'topology_capture' / name).read_bytes()
-        if sha256(payload).hexdigest() != binding['capture_sha256'][name]:
-            raise ValueError('topology capture hash differs: ' + name)
+        payload = (root / "topology_capture" / name).read_bytes()
+        if sha256(payload).hexdigest() != binding["capture_sha256"][name]:
+            raise ValueError("topology capture hash differs: " + name)
         captures.append(json.loads(payload))
-    topology, ordered, fleet = validate_topology_fleet(tuple(captures),
+    topology, ordered, fleet = validate_topology_fleet(
+        tuple(captures),
         expected_topology_sha256=expected_topology,
-        expected_fleet_sha256=binding['fleet_sha256'], slice_name=slice_name)
+        expected_fleet_sha256=binding["fleet_sha256"],
+        slice_name=slice_name,
+    )
     physical = build_physical_mesh(topology)
     if physical.mesh_hash != expected_mesh:
-        raise ValueError('topology rebinding physical mesh differs')
-    slots = {str(i): [s for s, device in enumerate(physical.flattened_device_ids)
-                     if device in capture['local_device_ids']]
-             for i, capture in enumerate(ordered)}
-    if binding.get('host_to_slots') != slots:
-        raise ValueError('topology rebinding slot ownership differs')
-    if any(not capture['hostname'].endswith('-w-' + str(i))
-           or capture['contract'].get('code_hash') != binding.get('code_hash')
-           for i, capture in enumerate(ordered)):
-        raise ValueError('topology rebinding host/source identity differs')
-    return dict(sha256=pin, mesh_sha256=expected_mesh,
-        topology_sha256=expected_topology, fleet_sha256=fleet,
-        host_to_slots=slots, hosts=[capture['hostname'] for capture in ordered],
-        jax_process_indices=[capture['jax_process_index'] for capture in ordered])
+        raise ValueError("topology rebinding physical mesh differs")
+    slots = {
+        str(i): [s for s, device in enumerate(physical.flattened_device_ids) if device in capture["local_device_ids"]]
+        for i, capture in enumerate(ordered)
+    }
+    if binding.get("host_to_slots") != slots:
+        raise ValueError("topology rebinding slot ownership differs")
+    if any(
+        not capture["hostname"].endswith("-w-" + str(i))
+        or capture["contract"].get("code_hash") != binding.get("code_hash")
+        for i, capture in enumerate(ordered)
+    ):
+        raise ValueError("topology rebinding host/source identity differs")
+    return dict(
+        sha256=pin,
+        mesh_sha256=expected_mesh,
+        topology_sha256=expected_topology,
+        fleet_sha256=fleet,
+        host_to_slots=slots,
+        hosts=[capture["hostname"] for capture in ordered],
+        jax_process_indices=[capture["jax_process_index"] for capture in ordered],
+    )
 
 
 def apply_topology_binding(args, root: Path, pin: str | None) -> dict | None:
     """Override only the capture location and fleet mapping after authentication."""
     if pin is None:
         return None
-    identity = load_topology_binding(root, pin,
-        expected_topology=args.topology_sha256, expected_mesh=args.mesh_sha256,
-        original_fleet=args.topology_fleet_sha256, slice_name=args.slice_name)
-    args.topology_capture_root = root / 'topology_capture'
-    args.topology_fleet_sha256 = identity['fleet_sha256']
+    identity = load_topology_binding(
+        root,
+        pin,
+        expected_topology=args.topology_sha256,
+        expected_mesh=args.mesh_sha256,
+        original_fleet=args.topology_fleet_sha256,
+        slice_name=args.slice_name,
+    )
+    args.topology_capture_root = root / "topology_capture"
+    args.topology_fleet_sha256 = identity["fleet_sha256"]
     return identity
 
 
@@ -243,12 +256,8 @@ class PhysicalDevice:
             "core_on_chip",
         ):
             _nonnegative_int(getattr(self, field), field, TopologyValidationError)
-        if not self.coordinates or any(
-            not _is_int(v) or v < 0 for v in self.coordinates
-        ):
-            raise TopologyValidationError(
-                "coordinates must be a non-empty tuple of non-negative integers"
-            )
+        if not self.coordinates or any(not _is_int(v) or v < 0 for v in self.coordinates):
+            raise TopologyValidationError("coordinates must be a non-empty tuple of non-negative integers")
         _nonempty(self.platform, "platform", TopologyValidationError)
         _nonempty(self.device_kind, "device_kind", TopologyValidationError)
 
@@ -284,31 +293,21 @@ class PhysicalTopology:
             tuple(sorted(self.devices, key=lambda device: device.device_id)),
         )
         _nonempty(self.slice_name, "slice_name", TopologyValidationError)
-        if not self.topology_shape or any(
-            not _is_int(v) or v <= 0 for v in self.topology_shape
-        ):
-            raise TopologyValidationError(
-                "topology_shape must contain positive integer dimensions"
-            )
+        if not self.topology_shape or any(not _is_int(v) or v <= 0 for v in self.topology_shape):
+            raise TopologyValidationError("topology_shape must contain positive integer dimensions")
         if not self.devices:
             raise TopologyValidationError("devices must not be empty")
         if _product(self.topology_shape) != len(self.devices):
-            raise TopologyValidationError(
-                "topology_shape product must equal the number of devices"
-            )
+            raise TopologyValidationError("topology_shape product must equal the number of devices")
         dimensions = len(self.topology_shape)
         if any(len(device.coordinates) != dimensions for device in self.devices):
-            raise TopologyValidationError(
-                "every device coordinate must match topology dimensionality"
-            )
+            raise TopologyValidationError("every device coordinate must match topology dimensionality")
         if any(
             coordinate >= self.topology_shape[axis]
             for device in self.devices
             for axis, coordinate in enumerate(device.coordinates)
         ):
-            raise TopologyValidationError(
-                "device coordinate lies outside topology_shape"
-            )
+            raise TopologyValidationError("device coordinate lies outside topology_shape")
         self._require_unique("device_id", [d.device_id for d in self.devices])
         self._require_unique("coordinates", [d.coordinates for d in self.devices])
         self._require_unique(
@@ -318,19 +317,13 @@ class PhysicalTopology:
         platforms = {device.platform for device in self.devices}
         kinds = {device.device_kind for device in self.devices}
         if len(platforms) != 1 or len(kinds) != 1:
-            raise TopologyValidationError(
-                "all devices must report one platform and one device_kind"
-            )
+            raise TopologyValidationError("all devices must report one platform and one device_kind")
         local_ids: dict[int, list[int]] = {}
         for device in self.devices:
-            local_ids.setdefault(device.process_index, []).append(
-                device.local_device_id
-            )
+            local_ids.setdefault(device.process_index, []).append(device.local_device_id)
         for process, ids in local_ids.items():
             if sorted(ids) != list(range(len(ids))):
-                raise TopologyValidationError(
-                    f"process {process} local_device_id values must be contiguous from zero"
-                )
+                raise TopologyValidationError(f"process {process} local_device_id values must be contiguous from zero")
 
     @staticmethod
     def _require_unique(field: str, values: Sequence[object]) -> None:
@@ -357,7 +350,5 @@ class PhysicalTopology:
         return cls(
             slice_name=value["slice_name"],
             topology_shape=tuple(value["topology_shape"]),
-            devices=tuple(
-                PhysicalDevice.from_dict(device) for device in value["devices"]
-            ),
+            devices=tuple(PhysicalDevice.from_dict(device) for device in value["devices"]),
         )

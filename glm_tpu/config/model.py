@@ -24,21 +24,21 @@ from glm_tpu.utils.io_utils import read_bounded
 from glm_tpu.utils.json_utils import _fingerprint
 
 
-MODEL_ID = 'zai-org/GLM-5.3'
-REVISION = 'aca966e4e02791568aa6a4ced368624b3d897f42'
+MODEL_ID = "zai-org/GLM-5.3"
+REVISION = "aca966e4e02791568aa6a4ced368624b3d897f42"
 # The source bucket URI and the tokenizer/model directory are site values
 # (storage.source_uri, paths.model_path in the site file; glm_tpu.config.site).
 # The pinned GLM-5.3 assets (config, generation config, tokenizer config, chat template) are
 # package data: hf_config/ of this package, read with importlib.resources.
-HF_CONFIG_PACKAGE = 'glm_tpu.models.glm_moe_dsa'
-TEMPLATE_PATH = Path(*HF_CONFIG_PACKAGE.split('.'), 'hf_config', 'chat_template.jinja')  # in a source root
-TEMPLATE_SHA = '3740abcea51c45830cb3ca562084ad5fb2ef53589376f73332e9886f93ade41c'
-CONFIG_SHA = '3ac72612095574542f7fff847ada8e59d9199dd8af44bdf625d7e02615572e69'
-INDEX_SHA = 'e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf'
-GENERATION_SHA = 'ac76b43d8683d3b930126870fc8be73d8679308fe752fa1f381096d8354f6a55'
+HF_CONFIG_PACKAGE = "glm_tpu.models.glm_moe_dsa"
+TEMPLATE_PATH = Path(*HF_CONFIG_PACKAGE.split("."), "hf_config", "chat_template.jinja")  # in a source root
+TEMPLATE_SHA = "3740abcea51c45830cb3ca562084ad5fb2ef53589376f73332e9886f93ade41c"
+CONFIG_SHA = "3ac72612095574542f7fff847ada8e59d9199dd8af44bdf625d7e02615572e69"
+INDEX_SHA = "e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf"
+GENERATION_SHA = "ac76b43d8683d3b930126870fc8be73d8679308fe752fa1f381096d8354f6a55"
 TOKENIZER_FILES = {
-    'tokenizer.json': '19e773648cb4e65de8660ea6365e10acca112d42a854923df93db4a6f333a82d',
-    'tokenizer_config.json': '98b1271574f41abf89427ae2dda030d94dc9478f0edc5a8bd240db213c6fd5fc',
+    "tokenizer.json": "19e773648cb4e65de8660ea6365e10acca112d42a854923df93db4a6f333a82d",
+    "tokenizer_config.json": "98b1271574f41abf89427ae2dda030d94dc9478f0edc5a8bd240db213c6fd5fc",
 }
 
 
@@ -52,9 +52,7 @@ def _positive_int(value: object, field: str, error: type[ValueError]) -> int:
     return value
 
 
-def _nonnegative_int(
-    value: object, field: str, error: type[ValueError]
-) -> int:
+def _nonnegative_int(value: object, field: str, error: type[ValueError]) -> int:
     if not _is_int(value) or value < 0:
         raise error(f"{field} must be a non-negative integer, got {value!r}")
     return value
@@ -141,78 +139,44 @@ class ModelGeometry:
         )
 
         if self.first_dense_layers > self.num_layers:
-            raise GeometryValidationError(
-                "first_dense_layers cannot exceed num_layers"
-            )
+            raise GeometryValidationError("first_dense_layers cannot exceed num_layers")
         if self.routed_top_k > self.num_routed_experts:
-            raise GeometryValidationError(
-                "routed_top_k cannot exceed num_routed_experts"
-            )
+            raise GeometryValidationError("routed_top_k cannot exceed num_routed_experts")
         if self.dsa_top_k > self.max_position_embeddings:
-            raise GeometryValidationError(
-                "dsa_top_k cannot exceed max_position_embeddings"
-            )
+            raise GeometryValidationError("dsa_top_k cannot exceed max_position_embeddings")
         if self.num_nextn_predict_layers != 1:
-            raise GeometryValidationError(
-                "the exact GLM-5.2 target requires one MTP layer"
-            )
+            raise GeometryValidationError("the exact GLM-5.2 target requires one MTP layer")
         if self.hidden_size % self.attention_heads:
-            raise GeometryValidationError(
-                "hidden_size must be divisible by attention_heads"
-            )
+            raise GeometryValidationError("hidden_size must be divisible by attention_heads")
         if self.attention_heads % self.kv_heads:
-            raise GeometryValidationError(
-                "attention_heads must be divisible by kv_heads"
-            )
-        if len(self.fp8_block_shape) != 2 or any(
-            not _is_int(v) or v <= 0 for v in self.fp8_block_shape
-        ):
-            raise GeometryValidationError(
-                "fp8_block_shape must contain exactly two positive integers"
-            )
+            raise GeometryValidationError("attention_heads must be divisible by kv_heads")
+        if len(self.fp8_block_shape) != 2 or any(not _is_int(v) or v <= 0 for v in self.fp8_block_shape):
+            raise GeometryValidationError("fp8_block_shape must contain exactly two positive integers")
         if len(self.mlp_layer_types) != self.num_layers:
-            raise GeometryValidationError(
-                "mlp_layer_types must contain one entry per transformer layer"
-            )
+            raise GeometryValidationError("mlp_layer_types must contain one entry per transformer layer")
         if len(self.indexer_types) != self.num_layers:
-            raise GeometryValidationError(
-                "indexer_types must contain one entry per transformer layer"
-            )
+            raise GeometryValidationError("indexer_types must contain one entry per transformer layer")
         if set(self.mlp_layer_types) - {"dense", "sparse"}:
-            raise GeometryValidationError(
-                "mlp_layer_types entries must be 'dense' or 'sparse'"
-            )
+            raise GeometryValidationError("mlp_layer_types entries must be 'dense' or 'sparse'")
         if set(self.indexer_types) - {"full", "shared"}:
-            raise GeometryValidationError(
-                "indexer_types entries must be 'full' or 'shared'"
-            )
-        expected_mlp = (
-            ("dense",) * self.first_dense_layers
-            + ("sparse",) * (self.num_layers - self.first_dense_layers)
-        )
+            raise GeometryValidationError("indexer_types entries must be 'full' or 'shared'")
+        expected_mlp = ("dense",) * self.first_dense_layers + ("sparse",) * (self.num_layers - self.first_dense_layers)
         if self.mlp_layer_types != expected_mlp:
-            raise GeometryValidationError(
-                "mlp_layer_types does not match first_dense_layers"
-            )
+            raise GeometryValidationError("mlp_layer_types does not match first_dense_layers")
 
     @classmethod
     def from_hf_config(cls, config: Mapping[str, Any]) -> "ModelGeometry":
         """Build the exact geometry from the checked-in HF configuration."""
 
         if config.get("model_type") != "glm_moe_dsa":
-            raise GeometryValidationError(
-                "expected model_type='glm_moe_dsa', got "
-                f"{config.get('model_type')!r}"
-            )
+            raise GeometryValidationError(f"expected model_type='glm_moe_dsa', got {config.get('model_type')!r}")
         quant = config.get("quantization_config")
         if not isinstance(quant, Mapping) or quant.get("quant_method") != "fp8":
             raise GeometryValidationError("the greenfield target requires FP8 weights")
         fmt = _nonempty(quant.get("fmt"), "quantization_config.fmt", GeometryValidationError)
         block_shape = quant.get("weight_block_size")
         if not isinstance(block_shape, Sequence) or isinstance(block_shape, str):
-            raise GeometryValidationError(
-                "quantization_config.weight_block_size must be a sequence"
-            )
+            raise GeometryValidationError("quantization_config.weight_block_size must be a sequence")
         try:
             return cls(
                 model_id="zai-org/GLM-5.2-FP8",
@@ -245,9 +209,7 @@ class ModelGeometry:
                 indexer_types=tuple(config["indexer_types"]),
             )
         except KeyError as exc:
-            raise GeometryValidationError(
-                f"missing required HF config field {exc.args[0]!r}"
-            ) from exc
+            raise GeometryValidationError(f"missing required HF config field {exc.args[0]!r}") from exc
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -295,9 +257,9 @@ def hf_config(repo=None):
     (importlib.resources), or the copy in the source root ``repo`` (a checkout or a staged source)."""
     if repo is not None:
         return Path(repo) / TEMPLATE_PATH.parent
-    directory = resources.files(HF_CONFIG_PACKAGE).joinpath('hf_config')
+    directory = resources.files(HF_CONFIG_PACKAGE).joinpath("hf_config")
     if not isinstance(directory, Path):
-        raise ValueError('glm_tpu must be installed as files on disk to read its model assets')
+        raise ValueError("glm_tpu must be installed as files on disk to read its model assets")
     return directory
 
 
@@ -307,21 +269,25 @@ def verified_template(repo, tokenizer_root):
     assets = hf_config(repo)
     template = read_bounded(assets / TEMPLATE_PATH.name, 64 << 10)
     if sha256(template).hexdigest() != TEMPLATE_SHA:
-        raise ValueError('chat template differs from pinned GLM-5.3')
-    for name, digest in (('config.json', CONFIG_SHA), ('generation_config.json', GENERATION_SHA)):
+        raise ValueError("chat template differs from pinned GLM-5.3")
+    for name, digest in (("config.json", CONFIG_SHA), ("generation_config.json", GENERATION_SHA)):
         if sha256(read_bounded(assets / name, 64 << 10)).hexdigest() != digest:
-            raise ValueError('configuration differs from pinned GLM-5.3')
+            raise ValueError("configuration differs from pinned GLM-5.3")
     for name, digest in TOKENIZER_FILES.items():
         if sha256(read_bounded(tokenizer_root / name, 32 << 20)).hexdigest() != digest:
-            raise ValueError('tokenizer differs from pinned GLM-5.3')
+            raise ValueError("tokenizer differs from pinned GLM-5.3")
     return template.decode()
 
 
 def require_inventory(inventory):
     """A valid historical inventory is insufficient for the new weights."""
-    if (inventory.model_id != MODEL_ID or inventory.source_revision != REVISION
-            or inventory.config_sha256 != CONFIG_SHA or inventory.index_sha256 != INDEX_SHA):
-        raise ValueError('runtime inventory differs from pinned GLM-5.3 source')
+    if (
+        inventory.model_id != MODEL_ID
+        or inventory.source_revision != REVISION
+        or inventory.config_sha256 != CONFIG_SHA
+        or inventory.index_sha256 != INDEX_SHA
+    ):
+        raise ValueError("runtime inventory differs from pinned GLM-5.3 source")
 
 
 def geometry(repo=None):
@@ -332,7 +298,8 @@ def geometry(repo=None):
     """
     from dataclasses import replace
     from glm_tpu.config.model import ModelGeometry
-    raw = read_bounded(hf_config(repo) / 'config.json', 64 << 10)
+
+    raw = read_bounded(hf_config(repo) / "config.json", 64 << 10)
     if sha256(raw).hexdigest() != CONFIG_SHA:
-        raise ValueError('geometry configuration differs from pinned GLM-5.3')
+        raise ValueError("geometry configuration differs from pinned GLM-5.3")
     return replace(ModelGeometry.from_hf_config(json.loads(raw)), model_id=MODEL_ID)

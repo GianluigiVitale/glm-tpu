@@ -1,4 +1,5 @@
 """Remote helpers are self-contained stdlib programs; the command builder never templates them."""
+
 from __future__ import annotations
 
 import ast
@@ -20,8 +21,20 @@ from tests.fixtures.site import example_site
 
 REMOTE_DIR = Path(remote.__file__).resolve().parent / "remote"
 # Standard-library modules that exist on Python 3.10 (the hosts' system python3).
-STDLIB_310 = {"base64", "hashlib", "io", "json", "os", "pathlib", "re", "signal", "socket", "subprocess", "sys",
-              "tarfile"}
+STDLIB_310 = {
+    "base64",
+    "hashlib",
+    "io",
+    "json",
+    "os",
+    "pathlib",
+    "re",
+    "signal",
+    "socket",
+    "subprocess",
+    "sys",
+    "tarfile",
+}
 
 
 def _tree(name: str) -> ast.Module:
@@ -55,14 +68,19 @@ def test_helpers_compile_under_the_helper_interpreter():
     python = envs.GLM_TPU_TEST_HELPER_PYTHON
     for name in HELPERS:
         path = REMOTE_DIR / f"{name}.py"
-        result = subprocess.run([python, "-c", "import sys; compile(open(sys.argv[1]).read(), sys.argv[1], 'exec')",
-                                 str(path)], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            [python, "-c", "import sys; compile(open(sys.argv[1]).read(), sys.argv[1], 'exec')", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         assert result.returncode == 0, (name, result.stderr[-2000:])
 
 
 # ----------------------------------------------------------------------------- command builder
-@pytest.mark.parametrize("root", ["/runs/run_20260923T000000000000Z", "/runs/with space/it's \"quoted\"",
-                                  "/runs/ünïcödé/日本"])
+@pytest.mark.parametrize(
+    "root", ["/runs/run_20260923T000000000000Z", '/runs/with space/it\'s "quoted"', "/runs/ünïcödé/日本"]
+)
 def test_remote_command_carries_the_file_text_and_one_json_argument(root):
     args = dict(root=root, hosts=["example-w-0", "example-w-1"])
     command = remote.remote_command("idle_probe", args, interpreter="python3")
@@ -97,9 +115,14 @@ def test_helpers_record_names_each_helper_digest_and_role():
 
 
 # ----------------------------------------------------------------------------- the run's helper snapshot
-GIT_ENV = dict(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="fixture",
-               GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_NAME="fixture",
-               GIT_COMMITTER_EMAIL="fixture@example.invalid")
+GIT_ENV = dict(
+    GIT_CONFIG_GLOBAL="/dev/null",
+    GIT_CONFIG_NOSYSTEM="1",
+    GIT_AUTHOR_NAME="fixture",
+    GIT_AUTHOR_EMAIL="fixture@example.invalid",
+    GIT_COMMITTER_NAME="fixture",
+    GIT_COMMITTER_EMAIL="fixture@example.invalid",
+)
 
 
 def _commit(repo: Path, files: dict[str, str]) -> str:
@@ -114,8 +137,9 @@ def _commit(repo: Path, files: dict[str, str]) -> str:
         (repo / path).write_text(text)
     for command in (["git", "add", "-A"], ["git", "commit", "-q", "--allow-empty", "-m", "fixture"]):
         subprocess.run(command, cwd=repo, check=True, capture_output=True, env=env)
-    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True,
-                          env=env).stdout.strip()
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True, env=env
+    ).stdout.strip()
 
 
 @pytest.fixture
@@ -179,11 +203,14 @@ def test_commands_built_from_a_snapshot_ignore_later_edits_of_the_package(tmp_pa
 def test_preflight_command_is_the_181c013e_form(tmp_path):
     fleet = example_site(tmp_path).fleet
     root = Path("/runs/run x")
-    command = remote.preflight_command(fleet, root, [fleet.worker_python, "-m", protocol.WORKER_MODULE, "--output",
-                                                     str(root)])
-    assert command == (f"cd '/runs/run x/source' && env JAX_PLATFORMS=cpu {protocol.WORKER_ENV_FLAG}=1 "
-                       f"'PYTHONPATH=/runs/run x/source:{fleet.worker_pythonpath[0]}' {fleet.worker_python} "
-                       f"-m {protocol.WORKER_MODULE} --output '/runs/run x' --preflight-only")
+    command = remote.preflight_command(
+        fleet, root, [fleet.worker_python, "-m", protocol.WORKER_MODULE, "--output", str(root)]
+    )
+    assert command == (
+        f"cd '/runs/run x/source' && env JAX_PLATFORMS=cpu {protocol.WORKER_ENV_FLAG}=1 "
+        f"'PYTHONPATH=/runs/run x/source:{fleet.worker_pythonpath[0]}' {fleet.worker_python} "
+        f"-m {protocol.WORKER_MODULE} --output '/runs/run x' --preflight-only"
+    )
 
 
 # ----------------------------------------------------------------------------- helper mains in-process
@@ -198,9 +225,12 @@ def _run(name: str, args: object, monkeypatch, capsys, *, hostname: str = "examp
 def test_fetch_derives_names_from_the_rank_in_the_authenticated_list(tmp_path, monkeypatch, capsys):
     (tmp_path / "runner.rank2.json").write_bytes(b'{"rank": 2}\n')
     hosts = [f"example-w-{r}" for r in range(8)]
-    code, out = _run("fetch", dict(dir=str(tmp_path), hosts=hosts,
-                                   names=["runner.rank{rank}.json", "worker_started.rank{rank}.json"]),
-                     monkeypatch, capsys)
+    code, out = _run(
+        "fetch",
+        dict(dir=str(tmp_path), hosts=hosts, names=["runner.rank{rank}.json", "worker_started.rank{rank}.json"]),
+        monkeypatch,
+        capsys,
+    )
     assert code == 0
     assert {k: base64.b64decode(v) for k, v in json.loads(out).items()} == {"runner.rank2.json": b'{"rank": 2}\n'}
 
@@ -213,11 +243,20 @@ def test_fetch_refuses_path_like_names(tmp_path, monkeypatch, capsys, names):
 
 @pytest.mark.parametrize("name", ["stage_bundle", "start_worker", "cleanup", "fetch"])
 def test_post_idle_helpers_refuse_a_host_outside_the_authenticated_list(tmp_path, monkeypatch, capsys, name):
-    keys = dict(stage_bundle=dict(root=str(tmp_path), digest="0" * 64),
-                start_worker=dict(root=str(tmp_path), pin="a" * 40, worker_python="/usr/bin/python3",
-                                  pythonpath=[], module="stub", env={}, argv=[]),
-                cleanup=dict(root=str(tmp_path), pin="a" * 40, module="stub"),
-                fetch=dict(dir=str(tmp_path), names=["x"]))[name]
+    keys = dict(
+        stage_bundle=dict(root=str(tmp_path), digest="0" * 64),
+        start_worker=dict(
+            root=str(tmp_path),
+            pin="a" * 40,
+            worker_python="/usr/bin/python3",
+            pythonpath=[],
+            module="stub",
+            env={},
+            argv=[],
+        ),
+        cleanup=dict(root=str(tmp_path), pin="a" * 40, module="stub"),
+        fetch=dict(dir=str(tmp_path), names=["x"]),
+    )[name]
     with pytest.raises(RuntimeError, match="not in the authenticated fleet"):
         _run(name, dict(keys, hosts=["example-w-0", "example-w-1"]), monkeypatch, capsys)
 

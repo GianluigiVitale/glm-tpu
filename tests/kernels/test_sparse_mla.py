@@ -25,18 +25,11 @@ CONFIG = SparseMlaConfig(segment_block=4)
 def _fixture(dtype: jnp.dtype) -> tuple[jnp.ndarray, ...]:
     rng = np.random.default_rng(771)
     global_cache = rng.normal(size=(8, 8, 8)).astype(np.float32)
-    local_caches = np.stack(
-        [
-            global_cache[:, owner * 2 : (owner + 1) * 2, :]
-            for owner in range(4)
-        ]
-    )
+    local_caches = np.stack([global_cache[:, owner * 2 : (owner + 1) * 2, :] for owner in range(4)])
     query_nope = jnp.asarray(rng.normal(size=(1, 4, 4)), dtype)
     query_rope = jnp.asarray(rng.normal(size=(1, 4, 2)), dtype)
     block_tables = jnp.asarray([[6, 1, 7, 2]], dtype=jnp.int32)
-    positions = jnp.asarray(
-        [[27, 2, 9, 7, 18, 30, 15, 1]], dtype=jnp.int32
-    )
+    positions = jnp.asarray([[27, 2, 9, 7, 18, 30, 15, 1]], dtype=jnp.int32)
     counts = jnp.asarray([8], dtype=jnp.int32)
     lengths = jnp.asarray([31], dtype=jnp.int32)
     return (
@@ -51,9 +44,7 @@ def _fixture(dtype: jnp.dtype) -> tuple[jnp.ndarray, ...]:
 
 
 def test_pregathered_attention_interpret_matches_full_segment_reference() -> None:
-    q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(
-        jnp.bfloat16
-    )
+    q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(jnp.bfloat16)
     global_cache = jnp.concatenate(tuple(caches[owner] for owner in range(4)), axis=1)
     segment = gather_paged_selected_kv(
         global_cache,
@@ -61,9 +52,7 @@ def test_pregathered_attention_interpret_matches_full_segment_reference() -> Non
         SelectedPositions(positions, counts),
         lengths,
     )
-    expected = sparse_mla_attention(
-        q_nope, q_rope, segment, contract=CONTRACT
-    )
+    expected = sparse_mla_attention(q_nope, q_rope, segment, contract=CONTRACT)
     actual = pregathered_sparse_mla_pallas(
         q_nope,
         q_rope,
@@ -82,9 +71,7 @@ def test_pregathered_attention_interpret_matches_full_segment_reference() -> Non
 
 
 def test_pregathered_attention_rejects_shape_and_dtype_drift() -> None:
-    q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(
-        jnp.bfloat16
-    )
+    q_nope, q_rope, caches, tables, positions, counts, lengths = _fixture(jnp.bfloat16)
     global_cache = jnp.concatenate(tuple(caches[owner] for owner in range(4)), axis=1)
     segment = gather_paged_selected_kv(
         global_cache,

@@ -3,6 +3,7 @@
 Bounded input reads (``read_bounded``, ``glm_tpu/utils/io_utils.py``): a regular file within its
 byte cap, never through a symlink.
 """
+
 from __future__ import annotations
 
 import json

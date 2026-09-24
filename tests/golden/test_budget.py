@@ -1,4 +1,5 @@
 """D25 live-run detection is fail-closed about the site file (read-only; nothing is signalled)."""
+
 from __future__ import annotations
 
 import fcntl
@@ -28,8 +29,10 @@ def test_an_unresolvable_site_location_makes_detection_indeterminate(monkeypatch
 def test_a_held_workload_lock_of_a_valid_site_is_seen(monkeypatch, tmp_path):
     locks = [tmp_path / "locks" / f"lock{i}" for i in range(4)]
     locks[0].parent.mkdir()
-    path = write_example_site(tmp_path / "site.toml", example_mapping(
-        tmp_path, locks=dict(workload=[str(p) for p in locks[:2]], sync=[str(p) for p in locks[2:]])))
+    path = write_example_site(
+        tmp_path / "site.toml",
+        example_mapping(tmp_path, locks=dict(workload=[str(p) for p in locks[:2]], sync=[str(p) for p in locks[2:]])),
+    )
     monkeypatch.setenv("GLM_TPU_SITE_CONFIG", str(path))
     assert not budget.indeterminate() and budget.held_workload_locks() == []
     with open(locks[1], "a") as stream:

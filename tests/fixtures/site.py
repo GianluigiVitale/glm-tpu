@@ -1,6 +1,7 @@
 """Example site configurations for tests (neutral placeholders: example names, RFC 5737 addresses,
 ``gs://example-bucket/``). The values are the equivalence harness's synthetic site
 (``tools.equivalence.site_fixture``), so tests and gates exercise one example."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -10,8 +11,14 @@ from typing import Any, Iterator
 from glm_tpu.config.site import SiteConfig, set_current_site
 from tools.equivalence.site_fixture import EXAMPLE_BUCKET, EXAMPLE_COORDINATOR, site_mapping, write_site
 
-__all__ = ["EXAMPLE_BUCKET", "EXAMPLE_COORDINATOR", "example_mapping", "example_site", "installed_site",
-           "write_example_site"]
+__all__ = [
+    "EXAMPLE_BUCKET",
+    "EXAMPLE_COORDINATOR",
+    "example_mapping",
+    "example_site",
+    "installed_site",
+    "write_example_site",
+]
 
 
 def example_mapping(base: Path, **overrides: dict[str, Any]) -> dict[str, Any]:

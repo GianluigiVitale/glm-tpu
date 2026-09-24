@@ -32,8 +32,10 @@ MODULES = (
 )
 LIBTPU_LOCK = "/tmp/libtpu_lockfile"
 REFUSAL = "a TPU run is live on this host; run heavy gates elsewhere or later"
-INDETERMINATE = ("live-run detection is indeterminate: the site file exists but cannot be loaded, so its "
-                 "workload locks are unknown; fix the site file or run heavy gates elsewhere")
+INDETERMINATE = (
+    "live-run detection is indeterminate: the site file exists but cannot be loaded, so its "
+    "workload locks are unknown; fix the site file or run heavy gates elsewhere"
+)
 
 
 def _workload_locks() -> list[str] | None:
@@ -124,5 +126,10 @@ def light_mode() -> None:
 
 
 def report() -> dict[str, object]:
-    return dict(live=live_tpu_run(), indeterminate=indeterminate(), processes=len(live_processes()),
-                libtpu_holders=len(libtpu_holders()), workload_locks=len(held_workload_locks()))
+    return dict(
+        live=live_tpu_run(),
+        indeterminate=indeterminate(),
+        processes=len(live_processes()),
+        libtpu_holders=len(libtpu_holders()),
+        workload_locks=len(held_workload_locks()),
+    )

@@ -30,11 +30,11 @@ def fixture(mesh: Any, *, panel_geometry: bool = False) -> tuple[Any, Any, tuple
 
 
 class EngineInputs(NamedTuple):
-    config: Any    # the decoder config ``_load`` builds (fixture geometry)
-    raw: Any       # checkpoint-form weights (FP8 bits + scales)
-    weights: Any   # BF16-resident weight tree (``bf16_resident_weights``)
-    wk: tuple      # promoted FP32 indexer ``wk`` tables, one per full index slot
-    rope: Any      # main RoPE table, replicated
+    config: Any  # the decoder config ``_load`` builds (fixture geometry)
+    raw: Any  # checkpoint-form weights (FP8 bits + scales)
+    weights: Any  # BF16-resident weight tree (``bf16_resident_weights``)
+    wk: tuple  # promoted FP32 indexer ``wk`` tables, one per full index slot
+    rope: Any  # main RoPE table, replicated
 
 
 def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
@@ -74,6 +74,7 @@ def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -
 
     state = programs.cache_init.fn(put(np.int32(len(prompt))))
     tokens = put(np.asarray(list(prompt) + [-1] * (rows - len(prompt)), np.int32))
-    result = programs.prefill[rows].fn(tokens, put(np.int32(len(prompt))), state, inputs.weights, inputs.wk,
-                                       inputs.rope)
+    result = programs.prefill[rows].fn(
+        tokens, put(np.int32(len(prompt))), state, inputs.weights, inputs.wk, inputs.rope
+    )
     return finish_batched_prefill(jax.block_until_ready(result))

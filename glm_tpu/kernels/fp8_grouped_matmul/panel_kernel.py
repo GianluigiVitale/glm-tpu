@@ -85,9 +85,7 @@ def prefill_panel_fp8_matmul(
                 for stripe, acc in ((0, acc0), (1, acc1)):
                     bits = w_ref[pl.ds(stripe * 128, 128), pl.ds(ki * 128, 128)]
                     decoded = (
-                        lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(
-                            jnp.float32
-                        )
+                        lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32)
                         * _full_panel_scale(s_ref[...], ki, ni * 2 + stripe)
                     ).astype(jnp.bfloat16)
                     acc[...] += lax.dot_general(
@@ -137,9 +135,7 @@ def prefill_panel_fp8_matmul(
                 ),
             ),
             input_output_aliases={4: 0},
-            compiler_params=pltpu.CompilerParams(
-                dimension_semantics=("parallel", "arbitrary")
-            ),
+            compiler_params=pltpu.CompilerParams(dimension_semantics=("parallel", "arbitrary")),
             interpret=interpret,
             name=KERNEL_NAMES["fp8_expert_panel_matmul"],
         )

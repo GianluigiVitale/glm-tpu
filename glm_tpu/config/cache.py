@@ -8,7 +8,12 @@ from dataclasses import dataclass
 
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.layers.contracts import DsaNumericalContract, GlmMoeNumericalContract, MlaNumericalContract, StageLocalKvLayout
+from glm_tpu.layers.contracts import (
+    DsaNumericalContract,
+    GlmMoeNumericalContract,
+    MlaNumericalContract,
+    StageLocalKvLayout,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,45 +32,39 @@ class CacheConfig:
         geometry = self.geometry
         if geometry.num_layers <= 0:
             raise PlanValidationError("WS32 decoder requires transformer layers")
-        if not isinstance(self.context_capacity, int) or isinstance(
-            self.context_capacity, bool
-        ) or not (0 < self.context_capacity <= geometry.max_position_embeddings):
+        if (
+            not isinstance(self.context_capacity, int)
+            or isinstance(self.context_capacity, bool)
+            or not (0 < self.context_capacity <= geometry.max_position_embeddings)
+        ):
             raise PlanValidationError("WS32 decoder context capacity is invalid")
         if self.logical_page_size <= 0 or self.logical_page_size % 8:
             raise PlanValidationError("WS32 decoder page must divide over expert-8")
-        if self.packed_cache_width != (
-            geometry.kv_lora_rank + geometry.qk_rope_head_dim + 64
-        ):
+        if self.packed_cache_width != (geometry.kv_lora_rank + geometry.qk_rope_head_dim + 64):
             raise PlanValidationError("WS32 packed cache width contract drifted")
-        if self.sparse_segment_block <= 0 or (
-            geometry.dsa_top_k % self.sparse_segment_block
-        ):
+        if self.sparse_segment_block <= 0 or (geometry.dsa_top_k % self.sparse_segment_block):
             raise PlanValidationError("WS32 sparse segment does not divide DSA top-k")
         if self.sparse_segment_block % 128:
             raise PlanValidationError("WS32 compiled sparse segment must divide into 128")
-        if not isinstance(self.rms_norm_epsilon, (int, float)) or isinstance(
-            self.rms_norm_epsilon, bool
-        ) or self.rms_norm_epsilon <= 0:
+        if (
+            not isinstance(self.rms_norm_epsilon, (int, float))
+            or isinstance(self.rms_norm_epsilon, bool)
+            or self.rms_norm_epsilon <= 0
+        ):
             raise PlanValidationError("WS32 RMS epsilon must be positive")
         if not isinstance(self.exact_dsa, bool):
             raise PlanValidationError("WS32 exact DSA flag must be boolean")
         if not isinstance(self.strategy_nd_dense, bool):
-            raise PlanValidationError(
-                "WS32 StrategyND dense flag must be boolean"
-            )
+            raise PlanValidationError("WS32 StrategyND dense flag must be boolean")
         if not isinstance(self.host_main_rope_table, bool):
-            raise PlanValidationError(
-                "WS32 host main-rotary table flag must be boolean"
-            )
+            raise PlanValidationError("WS32 host main-rotary table flag must be boolean")
         if self.strategy_nd_dense and (
             geometry.hidden_size != 6144
             or geometry.dense_intermediate_size != 12288
             or geometry.first_dense_layers != 3
             or geometry.fp8_block_shape != (128, 128)
         ):
-            raise PlanValidationError(
-                "WS32 StrategyND dense path requires exact GLM-5.2 geometry"
-            )
+            raise PlanValidationError("WS32 StrategyND dense path requires exact GLM-5.2 geometry")
         if not self.full_index_slots or self.full_index_slots[0] != 0:
             raise PlanValidationError("WS32 layer zero must seed IndexShare state")
         producer: int | None = None
@@ -82,9 +81,7 @@ class CacheConfig:
 
     @property
     def page_count(self) -> int:
-        return (
-            self.context_capacity + self.logical_page_size - 1
-        ) // self.logical_page_size
+        return (self.context_capacity + self.logical_page_size - 1) // self.logical_page_size
 
     @property
     def local_rows_per_page(self) -> int:
@@ -92,11 +89,7 @@ class CacheConfig:
 
     @property
     def full_index_slots(self) -> tuple[int, ...]:
-        return tuple(
-            layer_id
-            for layer_id, kind in enumerate(self.geometry.indexer_types)
-            if kind == "full"
-        )
+        return tuple(layer_id for layer_id, kind in enumerate(self.geometry.indexer_types) if kind == "full")
 
     @property
     def full_index_slot_by_layer(self) -> tuple[int | None, ...]:
@@ -146,10 +139,7 @@ class CacheConfig:
             kv_lora_rank=self.geometry.kv_lora_rank,
             qk_nope_head_dim=self.geometry.qk_nope_head_dim,
             qk_rope_head_dim=self.geometry.qk_rope_head_dim,
-            qk_head_dim=(
-                self.geometry.qk_nope_head_dim
-                + self.geometry.qk_rope_head_dim
-            ),
+            qk_head_dim=(self.geometry.qk_nope_head_dim + self.geometry.qk_rope_head_dim),
             v_head_dim=self.geometry.v_head_dim,
             packed_cache_width=self.packed_cache_width,
             top_k=self.geometry.dsa_top_k,

@@ -1,4 +1,5 @@
 """G14: the normalizer's mutation self-test (invariance and sensitivity cases)."""
+
 import pytest
 
 from tools.equivalence.common import run_child

@@ -1,4 +1,5 @@
 """The site file is fail-closed: exact keys, owner-only regular file, validated values."""
+
 from __future__ import annotations
 
 import json
@@ -10,8 +11,16 @@ import tomllib
 import pytest
 
 from glm_tpu.config import site as site_module
-from glm_tpu.config.site import (SiteConfig, SiteConfigError, approved_source_uri, get_current_site, host_rank,
-                                 rank_matches, set_current_site, to_toml)
+from glm_tpu.config.site import (
+    SiteConfig,
+    SiteConfigError,
+    approved_source_uri,
+    get_current_site,
+    host_rank,
+    rank_matches,
+    set_current_site,
+    to_toml,
+)
 from tests.fixtures.site import EXAMPLE_BUCKET, example_mapping, installed_site, write_example_site
 
 REPO = Path(__file__).resolve().parents[2]
@@ -33,15 +42,20 @@ def test_example_file_is_a_complete_valid_site_once_placeholders_are_filled(tmp_
     text = EXAMPLE.read_text()
     placeholders = set(re.findall(r"<([a-z0-9-]+)>", text))
     assert placeholders, "the example documents its placeholders"
-    values = {"64-hex": "0" * 64, "host0-internal-address": "203.0.113.10", "bucket": "example-bucket",
-              "prefix": "models"}
+    values = {
+        "64-hex": "0" * 64,
+        "host0-internal-address": "203.0.113.10",
+        "bucket": "example-bucket",
+        "prefix": "models",
+    }
     filled = re.sub(r"<([a-z0-9-]+)>", lambda m: values.get(m.group(1), "example-" + m.group(1)), text)
     site = SiteConfig.from_mapping(tomllib.loads(filled))
     assert site.fleet.num_hosts == 8 and site.fleet.chips_per_host == 4
     assert site.launch.allowed_branches == ("main", "release/*") and site.launch.expected_origin is None
     documented = tomllib.loads(filled)
     assert {k: set(v) for k, v in documented.items() if isinstance(v, dict)} == {
-        name: set(spec) for name, spec in site_module._TABLES.items()}, "the example lists every key"
+        name: set(spec) for name, spec in site_module._TABLES.items()
+    }, "the example lists every key"
 
 
 def test_example_file_has_only_neutral_values():
@@ -52,8 +66,13 @@ def test_example_file_has_only_neutral_values():
 # ----------------------------------------------------------------------------- loading
 def test_load_validates_and_applies_defaults(tmp_path):
     mapping = example_mapping(tmp_path)
-    for table, key in (("fleet", "project"), ("fleet", "helper_python"), ("fleet", "known_hosts"),
-                       ("paths", "repo"), ("paths", "hlo_dump_root")):
+    for table, key in (
+        ("fleet", "project"),
+        ("fleet", "helper_python"),
+        ("fleet", "known_hosts"),
+        ("paths", "repo"),
+        ("paths", "hlo_dump_root"),
+    ):
         del mapping[table][key]
     del mapping["launch"]
     site = SiteConfig.load(_write(tmp_path, mapping))
@@ -124,39 +143,42 @@ def _refused(tmp_path, match: str, **changes):
         SiteConfig.from_mapping(mapping)
 
 
-@pytest.mark.parametrize("changes,match", [
-    (dict(schema="glm_tpu_site_v0"), "schema"),
-    (dict(fleet__tpu_name=KeyError), "missing site key fleet.tpu_name"),
-    (dict(paths__run_root=KeyError), "missing site key paths.run_root"),
-    (dict(checkpoint__manifest_sha256=KeyError), "missing site key checkpoint.manifest_sha256"),
-    (dict(fleet__unknown="x"), "unknown site key fleet.unknown"),
-    (dict(extra={}), "unknown site key 'extra'"),
-    (dict(fleet__num_hosts=4), "fleet.num_hosts must be 8"),
-    (dict(fleet__num_hosts=True), "fleet.num_hosts must be 8"),
-    (dict(fleet__chips_per_host=8), "fleet.chips_per_host must be 4"),
-    (dict(fleet__coordinator_address="203.0.113.10:8477"), "port must be 8476"),
-    (dict(fleet__coordinator_address="host0.example.invalid:8476"), "IPv4 address"),
-    (dict(fleet__host_rank_regex="-w-\\d+$"), "exactly one group"),
-    (dict(fleet__host_rank_regex="-w-(\\d+"), "not a regular expression"),
-    (dict(fleet__helper_python="python3 -S"), "bare command"),
-    (dict(fleet__helper_python="../python3"), "bare command"),
-    (dict(fleet__worker_python="bin/python3.12"), "absolute path"),
-    (dict(fleet__worker_pythonpath="/opt/example/site-packages"), "list of strings"),
-    (dict(fleet__tpu_name="bad name"), "invalid form"),
-    (dict(paths__run_root="runs"), "absolute path"),
-    (dict(paths__run_root="/opt/example/../runs"), "absolute path without '..'"),
-    (dict(checkpoint__root="/elsewhere/pack"), "checkpoint.root must lie strictly inside"),
-    (dict(checkpoint__manifest_sha256="A" * 64), "64-hex"),
-    (dict(checkpoint__success_sha256="0" * 63), "64-hex"),
-    (dict(topology__mesh_sha256="x"), "64-hex"),
-    (dict(storage__source_uri="gs://other-bucket/models/x"), "under storage.allowed_source_uri_prefixes"),
-    (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket"]), "gs://<bucket>/"),
-    (dict(storage__allowed_source_uri_prefixes=[]), "non-empty list"),
-    (dict(locks__workload=[]), "non-empty list"),
-    (dict(launch__allowed_branches=[]), "non-empty list"),
-    (dict(launch__require_clean="yes"), "true or false"),
-    (dict(launch__expected_origin=7), "string"),
-])
+@pytest.mark.parametrize(
+    "changes,match",
+    [
+        (dict(schema="glm_tpu_site_v0"), "schema"),
+        (dict(fleet__tpu_name=KeyError), "missing site key fleet.tpu_name"),
+        (dict(paths__run_root=KeyError), "missing site key paths.run_root"),
+        (dict(checkpoint__manifest_sha256=KeyError), "missing site key checkpoint.manifest_sha256"),
+        (dict(fleet__unknown="x"), "unknown site key fleet.unknown"),
+        (dict(extra={}), "unknown site key 'extra'"),
+        (dict(fleet__num_hosts=4), "fleet.num_hosts must be 8"),
+        (dict(fleet__num_hosts=True), "fleet.num_hosts must be 8"),
+        (dict(fleet__chips_per_host=8), "fleet.chips_per_host must be 4"),
+        (dict(fleet__coordinator_address="203.0.113.10:8477"), "port must be 8476"),
+        (dict(fleet__coordinator_address="host0.example.invalid:8476"), "IPv4 address"),
+        (dict(fleet__host_rank_regex="-w-\\d+$"), "exactly one group"),
+        (dict(fleet__host_rank_regex="-w-(\\d+"), "not a regular expression"),
+        (dict(fleet__helper_python="python3 -S"), "bare command"),
+        (dict(fleet__helper_python="../python3"), "bare command"),
+        (dict(fleet__worker_python="bin/python3.12"), "absolute path"),
+        (dict(fleet__worker_pythonpath="/opt/example/site-packages"), "list of strings"),
+        (dict(fleet__tpu_name="bad name"), "invalid form"),
+        (dict(paths__run_root="runs"), "absolute path"),
+        (dict(paths__run_root="/opt/example/../runs"), "absolute path without '..'"),
+        (dict(checkpoint__root="/elsewhere/pack"), "checkpoint.root must lie strictly inside"),
+        (dict(checkpoint__manifest_sha256="A" * 64), "64-hex"),
+        (dict(checkpoint__success_sha256="0" * 63), "64-hex"),
+        (dict(topology__mesh_sha256="x"), "64-hex"),
+        (dict(storage__source_uri="gs://other-bucket/models/x"), "under storage.allowed_source_uri_prefixes"),
+        (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket"]), "gs://<bucket>/"),
+        (dict(storage__allowed_source_uri_prefixes=[]), "non-empty list"),
+        (dict(locks__workload=[]), "non-empty list"),
+        (dict(launch__allowed_branches=[]), "non-empty list"),
+        (dict(launch__require_clean="yes"), "true or false"),
+        (dict(launch__expected_origin=7), "string"),
+    ],
+)
 def test_invalid_values_are_refused_naming_the_key(tmp_path, changes, match):
     _refused(tmp_path, match, **changes)
 
@@ -214,8 +236,10 @@ def test_resolved_json_is_validated_like_the_file(tmp_path):
     value = json.loads(site.resolved_json())
     with pytest.raises(SiteConfigError, match="canonical"):
         SiteConfig.from_resolved_json(json.dumps(value, indent=1).encode())
-    for table, key, match in (("fleet", "known_hosts", "unknown site key fleet.known_hosts"),
-                              ("paths", "repo", "unknown site key paths.repo")):
+    for table, key, match in (
+        ("fleet", "known_hosts", "unknown site key fleet.known_hosts"),
+        ("paths", "repo", "unknown site key paths.repo"),
+    ):
         changed = json.loads(site.resolved_json())
         changed[table][key] = "/x"
         with pytest.raises(SiteConfigError, match=match):
@@ -273,25 +297,28 @@ def test_host_rank_follows_the_fleet_convention():
     assert host_rank("node7", r"node(\d+)$") == 7
 
 
-@pytest.mark.parametrize("changes,match", [
-    (dict(paths__run_root="/runs/with space"), "plain path"),
-    (dict(paths__run_root="/runs/it's"), "plain path"),
-    (dict(paths__run_root='/runs/"quoted"'), "plain path"),
-    (dict(paths__model_path="/models/ünïcode"), "plain path"),
-    (dict(paths__hlo_dump_root="/dev/shm/line\nbreak"), "plain path"),
-    (dict(checkpoint__namespace="/dev/shm/tab\tname"), "plain path"),
-    (dict(locks__workload=["/locks/a lock", "/locks/b"]), "plain path"),
-    (dict(fleet__worker_pythonpath=["/opt/site packages"]), "plain path"),
-    (dict(fleet__known_hosts="/opt/example/known hosts"), "plain path"),
-    (dict(fleet__coordinator_address="::1:8476"), "IPv4"),
-    (dict(fleet__coordinator_address="[::1]:8476"), "IPv4"),
-    (dict(fleet__coordinator_address="203.0.113.010:8476"), "IPv4"),
-    (dict(fleet__worker_pythonpath=[]), "non-empty list"),
-    (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/../"]), "segments"),
-    (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/./"]), "segments"),
-    (dict(storage__source_uri="gs://example-bucket/models/../other"), "segments"),
-    (dict(storage__source_uri="gs://example-bucket/models/with space"), "spaces"),
-])
+@pytest.mark.parametrize(
+    "changes,match",
+    [
+        (dict(paths__run_root="/runs/with space"), "plain path"),
+        (dict(paths__run_root="/runs/it's"), "plain path"),
+        (dict(paths__run_root='/runs/"quoted"'), "plain path"),
+        (dict(paths__model_path="/models/ünïcode"), "plain path"),
+        (dict(paths__hlo_dump_root="/dev/shm/line\nbreak"), "plain path"),
+        (dict(checkpoint__namespace="/dev/shm/tab\tname"), "plain path"),
+        (dict(locks__workload=["/locks/a lock", "/locks/b"]), "plain path"),
+        (dict(fleet__worker_pythonpath=["/opt/site packages"]), "plain path"),
+        (dict(fleet__known_hosts="/opt/example/known hosts"), "plain path"),
+        (dict(fleet__coordinator_address="::1:8476"), "IPv4"),
+        (dict(fleet__coordinator_address="[::1]:8476"), "IPv4"),
+        (dict(fleet__coordinator_address="203.0.113.010:8476"), "IPv4"),
+        (dict(fleet__worker_pythonpath=[]), "non-empty list"),
+        (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/../"]), "segments"),
+        (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/./"]), "segments"),
+        (dict(storage__source_uri="gs://example-bucket/models/../other"), "segments"),
+        (dict(storage__source_uri="gs://example-bucket/models/with space"), "spaces"),
+    ],
+)
 def test_unsafe_path_address_and_uri_values_are_refused(tmp_path, changes, match):
     _refused(tmp_path, match, **changes)
 

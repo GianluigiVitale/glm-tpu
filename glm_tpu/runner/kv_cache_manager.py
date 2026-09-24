@@ -28,15 +28,16 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
         _require_config,
     )
     from glm_tpu.models.glm_moe_dsa.state import DecoderState
+
     _require_config(config)
-    if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
-        raise ValueError('native cache initializer requires the original expert8/feature4 mesh')
+    if tuple(mesh.axis_names) != ("expert", "feature") or mesh.devices.shape != (8, 4):
+        raise ValueError("native cache initializer requires the original expert8/feature4 mesh")
     specs = batched_prefill_state_specs()
     shardings = jax.tree.map(lambda spec: NamedSharding(mesh, spec), specs)
 
     def initialize(prompt_length: Any) -> Any:
         if prompt_length.shape != () or prompt_length.dtype != jnp.int32:
-            raise ValueError('native cache initializer requires scalar int32 prompt length')
+            raise ValueError("native cache initializer requires scalar int32 prompt length")
         healthy = (prompt_length > 0) & (prompt_length < config.context_capacity)
         decoder = DecoderState(
             jnp.zeros(config.kv_cache_shape, jnp.bfloat16),
@@ -46,9 +47,11 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
             jnp.full((1, config.geometry.dsa_top_k), -jnp.inf, jnp.float32),
             jnp.zeros((1,), jnp.int32),
             jnp.arange(config.page_count, dtype=jnp.int32)[None, :],
-            jnp.ones((1,), jnp.int32), healthy[None])
-        return BatchedPrefillState(decoder,
-            jnp.zeros(config.index_cache_shape, jnp.bfloat16), prompt_length, jnp.bool_(False))
+            jnp.ones((1,), jnp.int32),
+            healthy[None],
+        )
+        return BatchedPrefillState(
+            decoder, jnp.zeros(config.index_cache_shape, jnp.bfloat16), prompt_length, jnp.bool_(False)
+        )
 
-    return jax.jit(initialize, in_shardings=(NamedSharding(mesh, P()),),
-                   out_shardings=shardings)
+    return jax.jit(initialize, in_shardings=(NamedSharding(mesh, P()),), out_shardings=shardings)

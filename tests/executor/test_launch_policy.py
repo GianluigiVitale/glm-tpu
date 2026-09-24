@@ -1,4 +1,5 @@
 """The site launch policy on real git checkouts (a local bare repository is the origin; no network)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,9 +12,14 @@ from glm_tpu.executor import launch_policy
 from glm_tpu.executor.launch_policy import LaunchPolicyError, normalize_origin, resolve_repo, source_identity
 from tests.fixtures.site import example_site
 
-GIT_ENV = dict(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="fixture",
-               GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_NAME="fixture",
-               GIT_COMMITTER_EMAIL="fixture@example.invalid")
+GIT_ENV = dict(
+    GIT_CONFIG_GLOBAL="/dev/null",
+    GIT_CONFIG_NOSYSTEM="1",
+    GIT_AUTHOR_NAME="fixture",
+    GIT_AUTHOR_EMAIL="fixture@example.invalid",
+    GIT_COMMITTER_NAME="fixture",
+    GIT_COMMITTER_EMAIL="fixture@example.invalid",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -122,27 +128,33 @@ def test_no_policy_is_a_refusal(checkout):
         source_identity(checkout, None)
 
 
-@pytest.mark.parametrize("url", [
-    "git@github.com:Example/repo.git",
-    "ssh://git@github.com/Example/repo",
-    "ssh://git@github.com:22/Example/repo.git",
-    "https://github.com/Example/repo.git",
-    "https://GitHub.com/Example/repo/",
-    "https://user:secret-token@github.com:443/Example/repo.git",
-    "git+ssh://git@github.com/Example/repo.git",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@github.com:Example/repo.git",
+        "ssh://git@github.com/Example/repo",
+        "ssh://git@github.com:22/Example/repo.git",
+        "https://github.com/Example/repo.git",
+        "https://GitHub.com/Example/repo/",
+        "https://user:secret-token@github.com:443/Example/repo.git",
+        "git+ssh://git@github.com/Example/repo.git",
+    ],
+)
 def test_https_and_ssh_spellings_of_one_origin_are_equal(url):
     assert normalize_origin(url) == "github.com/Example/repo"
     assert "secret-token" not in normalize_origin(url)
 
 
-@pytest.mark.parametrize("url", [
-    "git@github.com:Example/other.git",
-    "git@github.com:example/repo.git",          # path case is kept
-    "https://gitlab.example.invalid/Example/repo.git",
-    "ssh://git@github.com:2222/Example/repo.git",  # a non-default port is another service
-    "/srv/git/Example/repo.git",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@github.com:Example/other.git",
+        "git@github.com:example/repo.git",  # path case is kept
+        "https://gitlab.example.invalid/Example/repo.git",
+        "ssh://git@github.com:2222/Example/repo.git",  # a non-default port is another service
+        "/srv/git/Example/repo.git",
+    ],
+)
 def test_different_origins_stay_different(url):
     assert normalize_origin(url) != "github.com/Example/repo"
 
@@ -151,8 +163,9 @@ def test_local_paths_normalize_as_paths():
     assert normalize_origin("/srv/git/repo.git/") == normalize_origin("file:///srv/git/repo.git") == "/srv/git/repo.git"
 
 
-@pytest.mark.parametrize("url", ["example.invalid/owner/repo", "./example.invalid/owner/repo",
-                                 "example.invalid/owner/repo/"])
+@pytest.mark.parametrize(
+    "url", ["example.invalid/owner/repo", "./example.invalid/owner/repo", "example.invalid/owner/repo/"]
+)
 def test_a_relative_local_path_never_takes_the_spelling_of_a_remote_origin(tmp_path, url):
     # git reads a URL without a scheme and without the scp form as a local path, relative to the
     # checkout: it is resolved there, so it can never equal the <host>/<path> of a remote URL.
@@ -171,8 +184,11 @@ def test_a_local_repository_inside_the_checkout_does_not_pass_for_the_expected_r
     git(checkout, "remote", "set-url", "origin", "example.invalid/owner/repo")
     git(checkout, "push", "-q", "origin", "main")
     identity = source_identity(checkout, POLICY)  # clean and pushed: the local repository is real
-    for expected in ("git@example.invalid:owner/repo.git", "https://example.invalid/owner/repo",
-                     "ssh://git@example.invalid/owner/repo.git"):
+    for expected in (
+        "git@example.invalid:owner/repo.git",
+        "https://example.invalid/owner/repo",
+        "ssh://git@example.invalid/owner/repo.git",
+    ):
         with pytest.raises(LaunchPolicyError, match="origin differs from launch.expected_origin"):
             source_identity(checkout, LaunchPolicy(expected_origin=expected))
     assert identity.origin == str(local)
@@ -270,8 +286,9 @@ def test_only_the_controllers_own_checkout_may_be_staged(tmp_path, checkout):
 
 
 @pytest.mark.parametrize("via", ["--repo", "paths.repo"])
-def test_the_launcher_refuses_another_checkout_before_any_git_run_directory_or_host(tmp_path, checkout,
-                                                                                   monkeypatch, via):
+def test_the_launcher_refuses_another_checkout_before_any_git_run_directory_or_host(
+    tmp_path, checkout, monkeypatch, via
+):
     # --repo / paths.repo may name only the controller's own checkout: the launcher and the
     # glm_tpu package (whose remote helper texts are sent) come from it, not from ``checkout``.
     import os

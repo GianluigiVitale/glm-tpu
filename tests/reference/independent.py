@@ -46,9 +46,7 @@ from typing import Any, NamedTuple
 import ml_dtypes
 import numpy as np
 
-INDEX_KEY_NORM_EPSILON = (
-    1e-6  # nn.LayerNorm(index_head_dim, eps=1e-6) in GlmMoeDsaIndexer
-)
+INDEX_KEY_NORM_EPSILON = 1e-6  # nn.LayerNorm(index_head_dim, eps=1e-6) in GlmMoeDsaIndexer
 
 
 class Trace(NamedTuple):
@@ -89,9 +87,7 @@ def dequantize(bits: Any, scale_inv: Any, block_shape: tuple[int, int]) -> np.nd
     return product.astype(ml_dtypes.bfloat16).astype(np.float64)
 
 
-def load(
-    arrays: Mapping[str, Any], block_shape: tuple[int, int]
-) -> dict[str, np.ndarray]:
+def load(arrays: Mapping[str, Any], block_shape: tuple[int, int]) -> dict[str, np.ndarray]:
     """FP64 weights keyed by checkpoint name; an FP8 pair ``X.weight_bits``/``X.scale_inv`` becomes ``X``."""
     weights: dict[str, np.ndarray] = {}
     for name, value in arrays.items():
@@ -99,9 +95,7 @@ def load(
             continue
         if name.endswith(".weight_bits"):
             prefix = name[: -len(".weight_bits")]
-            weights[prefix] = dequantize(
-                value, arrays[prefix + ".scale_inv"], tuple(block_shape)
-            )
+            weights[prefix] = dequantize(value, arrays[prefix + ".scale_inv"], tuple(block_shape))
         else:
             weights[name] = np.asarray(value).astype(np.float64)
     return weights
@@ -111,9 +105,7 @@ def rms_norm(x: np.ndarray, weight: np.ndarray, eps: float) -> np.ndarray:
     return weight * (x / np.sqrt(np.mean(x * x, axis=-1, keepdims=True) + eps))
 
 
-def layer_norm(
-    x: np.ndarray, weight: np.ndarray, bias: np.ndarray, eps: float
-) -> np.ndarray:
+def layer_norm(x: np.ndarray, weight: np.ndarray, bias: np.ndarray, eps: float) -> np.ndarray:
     mean = np.mean(x, axis=-1, keepdims=True)
     variance = np.mean((x - mean) ** 2, axis=-1, keepdims=True)
     return (x - mean) / np.sqrt(variance + eps) * weight + bias
@@ -147,9 +139,7 @@ def swiglu(x: np.ndarray, weights: Mapping[str, np.ndarray], prefix: str) -> np.
     return (gate * sigmoid(gate) * up) @ weights[prefix + ".down_proj"].T
 
 
-def top_k_margin(
-    values: np.ndarray, order: np.ndarray, k: int, live: np.ndarray
-) -> np.ndarray:
+def top_k_margin(values: np.ndarray, order: np.ndarray, k: int, live: np.ndarray) -> np.ndarray:
     """Per row, the k-th minus the (k+1)-th of ``values`` in ``order``; +inf where ``live <= k``."""
     if values.shape[1] <= k:
         return np.full(values.shape[0], np.inf)
@@ -223,9 +213,7 @@ class AttentionInputs(NamedTuple):
     key_rope: np.ndarray
 
 
-def attention_inputs(
-    x: np.ndarray, weights: Mapping[str, np.ndarray], prefix: str, config: Any
-) -> AttentionInputs:
+def attention_inputs(x: np.ndarray, weights: Mapping[str, np.ndarray], prefix: str, config: Any) -> AttentionInputs:
     """``GlmMoeDsaAttention.forward`` up to the key/value expansion (``x`` is normalized)."""
     c, rows = config, x.shape[0]
     eps, nope, lora = float(c.rms_norm_epsilon), c.qk_nope_head_dim, c.kv_lora_rank
@@ -235,16 +223,10 @@ def attention_inputs(
         weights[prefix + ".q_a_layernorm.weight"],
         eps,
     )
-    q = (q_resid @ weights[prefix + ".q_b_proj"].T).reshape(
-        rows, c.attention_heads, nope + c.qk_rope_head_dim
-    )
-    q = np.concatenate(
-        (q[..., :nope], rope(q[..., nope:], positions, c.rope_theta)), -1
-    )
+    q = (q_resid @ weights[prefix + ".q_b_proj"].T).reshape(rows, c.attention_heads, nope + c.qk_rope_head_dim)
+    q = np.concatenate((q[..., :nope], rope(q[..., nope:], positions, c.rope_theta)), -1)
     compressed = x @ weights[prefix + ".kv_a_proj_with_mqa"].T
-    latent = rms_norm(
-        compressed[:, :lora], weights[prefix + ".kv_a_layernorm.weight"], eps
-    )
+    latent = rms_norm(compressed[:, :lora], weights[prefix + ".kv_a_layernorm.weight"], eps)
     key_rope = rope(compressed[:, lora:], positions, c.rope_theta)
     return AttentionInputs(q_resid, q, latent, key_rope)
 
@@ -259,9 +241,7 @@ def attention(
     """Softmax attention of every row over its ``selected`` positions, then ``o_proj``."""
     c, rows = config, inputs.q.shape[0]
     nope, v_dim = c.qk_nope_head_dim, c.v_head_dim
-    kv = (inputs.latent @ weights[prefix + ".kv_b_proj"].T).reshape(
-        rows, c.attention_heads, nope + v_dim
-    )
+    kv = (inputs.latent @ weights[prefix + ".kv_b_proj"].T).reshape(rows, c.attention_heads, nope + v_dim)
     key_nope, values = kv[..., :nope], kv[..., nope:]
     logits = (
         np.einsum("shd,thd->hst", inputs.q[..., :nope], key_nope)
@@ -271,10 +251,7 @@ def attention(
     probabilities = np.exp(logits - logits.max(axis=-1, keepdims=True))
     probabilities /= probabilities.sum(axis=-1, keepdims=True)
     attended = np.einsum("hst,thv->shv", probabilities, values)
-    return (
-        attended.reshape(rows, c.attention_heads * v_dim)
-        @ weights[prefix + ".o_proj"].T
-    )
+    return attended.reshape(rows, c.attention_heads * v_dim) @ weights[prefix + ".o_proj"].T
 
 
 def sparse_moe(
@@ -345,9 +322,7 @@ def forward(
         latents.append(inputs.latent)
         key_ropes.append(inputs.key_rope)
         if c.indexer_types[i] == "full":
-            index_keys[i], index_scores[i] = indexer(
-                x, inputs.q_resid, weights, a + ".indexer", c
-            )
+            index_keys[i], index_scores[i] = indexer(x, inputs.q_resid, weights, a + ".indexer", c)
             own, dsa_margin[i] = top_k_selection(index_scores[i], c.index_top_k)
             attended = np.asarray(selected.get(i, own), bool)
         elif attended is None:
@@ -359,13 +334,9 @@ def forward(
         if c.mlp_layer_types[i] == "dense":
             update = swiglu(x, weights, p + ".mlp")
         else:
-            update, choice, routed[i] = sparse_moe(
-                x, weights, p + ".mlp", c, expert_ids.get(i)
-            )
+            update, choice, routed[i] = sparse_moe(x, weights, p + ".mlp", c, expert_ids.get(i))
             order = np.argsort(-choice, axis=-1, kind="stable")
-            router_margin[i] = top_k_margin(
-                choice, order, c.routed_top_k, np.full(rows, choice.shape[1])
-            )
+            router_margin[i] = top_k_margin(choice, order, c.routed_top_k, np.full(rows, choice.shape[1]))
             router_choice[i] = choice
         hidden = hidden + update
 

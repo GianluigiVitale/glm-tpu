@@ -77,28 +77,35 @@ environment_variables: dict[str, EnvVar] = {
     "GLM_TPU_CONFIG_ROOT": EnvVar(
         _config_root,
         "Directory of site.toml and the untracked equivalence records, absolute "
-        "(default $XDG_CONFIG_HOME/glm-tpu when that is absolute, else ~/.config/glm-tpu)."),
+        "(default $XDG_CONFIG_HOME/glm-tpu when that is absolute, else ~/.config/glm-tpu).",
+    ),
     "GLM_TPU_SITE_CONFIG": EnvVar(
         lambda: _absolute_path("GLM_TPU_SITE_CONFIG") or _config_root() / "site.toml",
-        "Explicit site file, absolute (default $GLM_TPU_CONFIG_ROOT/site.toml)."),
+        "Explicit site file, absolute (default $GLM_TPU_CONFIG_ROOT/site.toml).",
+    ),
     "GLM_TPU_RUN_ROOT": EnvVar(
         lambda: _optional_path("GLM_TPU_RUN_ROOT"),
-        "Controller-side override of the site's paths.run_root (resolved into the staged site.json)."),
+        "Controller-side override of the site's paths.run_root (resolved into the staged site.json).",
+    ),
     "GLM_TPU_MODEL_PATH": EnvVar(
         lambda: _optional_path("GLM_TPU_MODEL_PATH"),
-        "Controller-side override of paths.model_path (tokenizer files and SOURCE_COMPLETE.json)."),
+        "Controller-side override of paths.model_path (tokenizer files and SOURCE_COMPLETE.json).",
+    ),
     "GLM_TPU_HLO_DUMP_ROOT": EnvVar(
         lambda: _optional_path("GLM_TPU_HLO_DUMP_ROOT"),
-        "Controller-side override of paths.hlo_dump_root (per-run compiler originals)."),
+        "Controller-side override of paths.hlo_dump_root (per-run compiler originals).",
+    ),
     "GLM_TPU_TEST_SITE": EnvVar(
-        lambda: _optional_path("GLM_TPU_TEST_SITE"),
-        "Tests: path of a real site file; enables the site-bound tests."),
+        lambda: _optional_path("GLM_TPU_TEST_SITE"), "Tests: path of a real site file; enables the site-bound tests."
+    ),
     "GLM_TPU_TEST_TIMEOUT_SCALE": EnvVar(
         lambda: _positive_float("GLM_TPU_TEST_TIMEOUT_SCALE", 1.0),
-        "Tests: multiplier for subprocess timeouts (slow CI runners)."),
+        "Tests: multiplier for subprocess timeouts (slow CI runners).",
+    ),
     "GLM_TPU_TEST_HELPER_PYTHON": EnvVar(
         lambda: os.environ.get("GLM_TPU_TEST_HELPER_PYTHON") or "python3",
-        "Tests: interpreter for the remote-helper loopback test (CI sets python3.10)."),
+        "Tests: interpreter for the remote-helper loopback test (CI sets python3.10).",
+    ),
 }
 # --8<-- [end:env-vars-definition]
 

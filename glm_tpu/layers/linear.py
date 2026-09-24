@@ -48,14 +48,17 @@ def resident_q_absorb(query, weight, scale=None, *, interpret=False):
     key = table[:, :qwidth]
     if interpret:
         query, key = query.astype(jnp.float32), key.astype(jnp.float32)
-    return jnp.einsum('rhq,hqk->rhk', query, key,
-                      preferred_element_type=jnp.float32).astype(jnp.bfloat16)
+    return jnp.einsum("rhq,hqk->rhk", query, key, preferred_element_type=jnp.float32).astype(jnp.bfloat16)
 
 
 def resident_value(latent, weight, scale=None, *, qk_nope_head_dim=192, interpret=False):
     _require_table(weight, scale)
-    if (latent.ndim != 3 or latent.dtype != jnp.bfloat16 or
-            weight.shape[0] % latent.shape[1] or weight.shape[1] != latent.shape[2]):
+    if (
+        latent.ndim != 3
+        or latent.dtype != jnp.bfloat16
+        or weight.shape[0] % latent.shape[1]
+        or weight.shape[1] != latent.shape[2]
+    ):
         raise ValueError("D8 prefill structured value geometry drifted")
     table = weight.reshape(latent.shape[1], -1, latent.shape[2])
     if not 0 < qk_nope_head_dim < table.shape[1]:
@@ -63,8 +66,7 @@ def resident_value(latent, weight, scale=None, *, qk_nope_head_dim=192, interpre
     value = table[:, qk_nope_head_dim:]
     if interpret:
         latent, value = latent.astype(jnp.float32), value.astype(jnp.float32)
-    return jnp.einsum('rhk,hvk->rhv', latent, value,
-                      preferred_element_type=jnp.float32).astype(jnp.bfloat16)
+    return jnp.einsum("rhk,hvk->rhv", latent, value, preferred_element_type=jnp.float32).astype(jnp.bfloat16)
 
 
 def residual_add(residual: jax.Array, update: jax.Array) -> jax.Array:
@@ -129,6 +131,8 @@ def _expert_linear(x: Any, weight_local: Any, expert_axis: str) -> Any:
 # ----------------------------------------------------------------------------- attention bodies
 def _head_weight_partial(normalized: Any, weights: Bf16DsaWeights) -> Any:
     return lax.dot_general(
-        normalized.astype(jnp.float32), weights.head_weight_local.astype(jnp.float32),
-        dimension_numbers=(((1,), (1,)), ((), ())), preferred_element_type=jnp.float32,
+        normalized.astype(jnp.float32),
+        weights.head_weight_local.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
     )

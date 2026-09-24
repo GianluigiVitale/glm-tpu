@@ -20,9 +20,7 @@ from glm_tpu.layers.rope import (
 
 def test_rotary_tables_use_glm_frequency_formula() -> None:
     positions = jnp.asarray([0, 1, 3], dtype=jnp.int32)
-    cos, sin = rotary_cos_sin(
-        positions, rotary_dim=4, theta=100.0, dtype=jnp.float32
-    )
+    cos, sin = rotary_cos_sin(positions, rotary_dim=4, theta=100.0, dtype=jnp.float32)
     frequencies = np.asarray([1.0, 0.1], dtype=np.float32)
     angles = np.asarray([0.0, 1.0, 3.0], dtype=np.float32)[:, None] * frequencies
     np.testing.assert_allclose(np.asarray(cos), np.cos(angles), rtol=1e-6, atol=1e-6)
@@ -30,16 +28,12 @@ def test_rotary_tables_use_glm_frequency_formula() -> None:
 
 
 def test_host_rotary_table_matches_protected_accepted_row() -> None:
-    table = build_rotary_table_host(
-        8192, rotary_dim=64, theta=8_000_000.0
-    )
+    table = build_rotary_table_host(8192, rotary_dim=64, theta=8_000_000.0)
     assert table.shape == (8192, 64)
     assert table.dtype.name == "bfloat16"
     assert table.flags.c_contiguous
     row_bits = np.ascontiguousarray(table[8155]).view(np.uint16)
-    assert rotary_table_sha256(table) == (
-        "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
-    )
+    assert rotary_table_sha256(table) == ("6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701")
     assert rotary_table_sha256(table) == rotary_table_sha256(table.copy())
     assert sha256(row_bits.tobytes()).hexdigest() == (
         "67b01e3cab682d5ffd04ac9c8043e7e6825ee1275023428c41f9a1ae412dea1d"
@@ -100,18 +94,12 @@ def test_rotary_fp32_final_round_matches_accepted_layer0_cache_row() -> None:
         dtype="<u2",
     ).reshape(1, 64)
 
-    got = apply_rotary_fp32_final_round(
-        pre_rope, cos, sin, interleaved=True
-    )
-    got_bits = np.asarray(
-        jax.lax.bitcast_convert_type(got, jnp.uint16)
-    )
+    got = apply_rotary_fp32_final_round(pre_rope, cos, sin, interleaved=True)
+    got_bits = np.asarray(jax.lax.bitcast_convert_type(got, jnp.uint16))
     np.testing.assert_array_equal(got_bits, expected)
 
     rounded_products = apply_rotary(pre_rope, cos, sin, interleaved=True)
-    rounded_bits = np.asarray(
-        jax.lax.bitcast_convert_type(rounded_products, jnp.uint16)
-    )
+    rounded_bits = np.asarray(jax.lax.bitcast_convert_type(rounded_products, jnp.uint16))
     assert int(np.count_nonzero(rounded_bits != expected)) == 16
 
 
@@ -129,9 +117,7 @@ def test_rotary_refuses_odd_width_and_noninteger_positions() -> None:
     with pytest.raises(ValueError, match="integer"):
         rotary_cos_sin(jnp.asarray([0.0]), rotary_dim=4, theta=10.0)
     with pytest.raises(ValueError, match="pair dimension"):
-        apply_rotary(
-            jnp.ones((1, 4)), jnp.ones((1, 1)), jnp.ones((1, 1)), interleaved=True
-        )
+        apply_rotary(jnp.ones((1, 4)), jnp.ones((1, 1)), jnp.ones((1, 1)), interleaved=True)
     with pytest.raises(ValueError, match="inexact"):
         apply_rotary_fp32_final_round(
             jnp.ones((1, 4), dtype=jnp.int32),

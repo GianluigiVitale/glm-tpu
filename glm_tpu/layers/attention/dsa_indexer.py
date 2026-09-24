@@ -8,7 +8,11 @@ from jax import lax
 import jax.numpy as jnp
 import jax
 
-from glm_tpu.layers.attention.kv_cache import _require_decode_metadata, canonicalize_selected_positions, write_prefill_cache_block
+from glm_tpu.layers.attention.kv_cache import (
+    _require_decode_metadata,
+    canonicalize_selected_positions,
+    write_prefill_cache_block,
+)
 from glm_tpu.layers.attention.mla import PreparedAttention
 from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, StageLocalKvLayout, _require_shape
 from glm_tpu.layers.linear import _dot_f32, _head_weight_partial, resident_matmul_f32
@@ -23,9 +27,15 @@ _NEGATIVE_INFINITY = float("-inf")
 
 
 def two_stage_topk(
-    scores: Any, positions: Any, valid_lengths: Any, *, top_k: int,
-    global_context_size: int, candidates_per_owner: int = 512,
-    expert_axis: str = "expert", positions_in_order: bool = False,
+    scores: Any,
+    positions: Any,
+    valid_lengths: Any,
+    *,
+    top_k: int,
+    global_context_size: int,
+    candidates_per_owner: int = 512,
+    expert_axis: str = "expert",
+    positions_in_order: bool = False,
 ):
     """Return frozen score/position pairs and whether the exact fallback ran.
 
@@ -54,7 +64,7 @@ def two_stage_topk(
         # Cache-page scoring below emits ascending logical positions. Invalid
         # pages may occur anywhere; they are masked before top-k's index tie rule.
         masked = jnp.where((positions[None] >= 0) & (positions[None] < valid_lengths[:, None]), scores, -jnp.inf)
-        pad = max(0, k-scores.shape[1])
+        pad = max(0, k - scores.shape[1])
         masked = jnp.pad(masked, ((0, 0), (0, pad)), constant_values=-jnp.inf)
         pos = jnp.pad(positions, ((0, pad),), constant_values=-1)
         values, index = lax.top_k(masked, k)
@@ -64,25 +74,32 @@ def two_stage_topk(
         values = lax.all_gather(values, expert_axis, axis=0, tiled=False)
         indices = lax.all_gather(indices, expert_axis, axis=0, tiled=False)
         return merge_topk_candidates_with_scores(
-            values, indices, valid_lengths, top_k=top_k,
-            global_context_size=global_context_size, paired_position_sort=True,
+            values,
+            indices,
+            valid_lengths,
+            top_k=top_k,
+            global_context_size=global_context_size,
+            paired_position_sort=True,
         )
 
     def full(_):
         values, indices = local(top_k)
         return merge(values, indices)
 
-    values, indices = local(width+1)
+    values, indices = local(width + 1)
     # Pad the union locally if L*owners<K, so a short configuration remains
     # correct through fallback rather than assuming a particular mesh size.
     union_width = width * lax.axis_size(expert_axis)
-    pad = max(0, (top_k + lax.axis_size(expert_axis)-1)//lax.axis_size(expert_axis)-width)
-    short = merge(jnp.pad(values[:, :width], ((0, 0), (0, pad)), constant_values=-jnp.inf),
-                  jnp.pad(indices[:, :width], ((0, 0), (0, pad)), constant_values=-1))
+    pad = max(0, (top_k + lax.axis_size(expert_axis) - 1) // lax.axis_size(expert_axis) - width)
+    short = merge(
+        jnp.pad(values[:, :width], ((0, 0), (0, pad)), constant_values=-jnp.inf),
+        jnp.pad(indices[:, :width], ((0, 0), (0, pad)), constant_values=-1),
+    )
     cutoff_score = short.scores[:, -1]
     cutoff_position = short.positions[:, -1]
     omitted_score, omitted_position = values[:, width], indices[:, width]
     omitted_live = omitted_position >= 0
+
     # lax.top_k has a total FP32 order: +0 outranks -0. Float comparisons
     # alone collapse those keys and can incorrectly accept an incomplete cut.
     def score_key(value):
@@ -90,12 +107,16 @@ def two_stage_topk(
         return jnp.where(bits < 0, bits ^ jnp.int32(0x7FFFFFFF), bits)
 
     omitted_key, cutoff_key = score_key(omitted_score), score_key(cutoff_score)
-    outranks = omitted_live & ((omitted_key > cutoff_key) |
-        ((omitted_key == cutoff_key) & ((cutoff_position < 0) | (omitted_position < cutoff_position))))
+    outranks = omitted_live & (
+        (omitted_key > cutoff_key)
+        | ((omitted_key == cutoff_key) & ((cutoff_position < 0) | (omitted_position < cutoff_position)))
+    )
     # Nonfinite input scores use the frozen path without relying on comparisons
     # involving NaN. Negative infinities are already the frozen masked sentinel.
     uncertain = jnp.any(jnp.isnan(scores) | jnp.isposinf(scores))
-    fallback = lax.pmax((jnp.any(outranks) | uncertain | (union_width < top_k)).astype(jnp.int32), expert_axis).astype(jnp.bool_)
+    fallback = lax.pmax((jnp.any(outranks) | uncertain | (union_width < top_k)).astype(jnp.int32), expert_axis).astype(
+        jnp.bool_
+    )
     return lax.cond(fallback, full, lambda _: short, operand=None), fallback
 
 
@@ -110,19 +131,31 @@ def score_cache_pages(query, cache, head_weights, block_tables, *, layout, owner
     physical_scores = dsa_scores(query, cache.reshape(-1, cache.shape[-1]), head_weights, precision="highest")
     pages = block_tables[0]
     page_ok = (pages >= 0) & (pages < cache.shape[0])
-    safe_pages = jnp.clip(pages, 0, cache.shape[0]-1)
+    safe_pages = jnp.clip(pages, 0, cache.shape[0] - 1)
     local_rows = jnp.arange(layout.local_rows_per_page, dtype=jnp.int32)
     indices = safe_pages[:, None] * layout.local_rows_per_page + local_rows[None]
     scores = jnp.take(physical_scores, indices.reshape(-1), axis=1)
-    positions = (jnp.arange(pages.shape[0], dtype=jnp.int32)[:, None] * layout.logical_page_size
-                 + owner * layout.local_rows_per_page + local_rows[None])
+    positions = (
+        jnp.arange(pages.shape[0], dtype=jnp.int32)[:, None] * layout.logical_page_size
+        + owner * layout.local_rows_per_page
+        + local_rows[None]
+    )
     positions = jnp.where(page_ok[:, None], positions, -1).reshape(-1)
     return scores, positions
 
 
-def prefill_dsa_one_pass(query, keys, head_weights, positions, valid_lengths, *,
-                                 global_context_size, top_k=2048, precision="highest",
-                                 candidates_per_owner=512):
+def prefill_dsa_one_pass(
+    query,
+    keys,
+    head_weights,
+    positions,
+    valid_lengths,
+    *,
+    global_context_size,
+    top_k=2048,
+    precision="highest",
+    candidates_per_owner=512,
+):
     """P2: one score row and one shortlist per prefill tile, with frozen health.
 
     Removes the repeated score/top-k/merge chain over 512-key blocks. Temporary
@@ -148,18 +181,33 @@ def prefill_dsa_one_pass(query, keys, head_weights, positions, valid_lengths, *,
         raise ValueError("prefill DSA context must fit positive int32")
     seen = lax.associative_scan(jnp.maximum, positions)
     previous = jnp.concatenate((jnp.full((1,), -1, jnp.int32), seen[:-1]))
-    metadata_ok = (jnp.all((positions >= -1) & (positions < global_context_size))
+    metadata_ok = (
+        jnp.all((positions >= -1) & (positions < global_context_size))
         & jnp.all((positions == -1) | (positions > previous))
-        & jnp.all((valid_lengths >= 0) & (valid_lengths <= global_context_size)))
+        & jnp.all((valid_lengths >= 0) & (valid_lengths <= global_context_size))
+    )
     scores = dsa_scores(query, keys, head_weights, precision=precision)
     visible = (positions[None] >= 0) & (positions[None] < valid_lengths[:, None])
-    healthy = metadata_ok & jnp.all(jnp.isfinite(query)) & jnp.all(jnp.isfinite(head_weights)) & jnp.all(jnp.isfinite(scores) | ~visible)
-    selected, _ = two_stage_topk(scores, positions, valid_lengths, top_k=top_k,
-        global_context_size=global_context_size, candidates_per_owner=candidates_per_owner, positions_in_order=True)
+    healthy = (
+        metadata_ok
+        & jnp.all(jnp.isfinite(query))
+        & jnp.all(jnp.isfinite(head_weights))
+        & jnp.all(jnp.isfinite(scores) | ~visible)
+    )
+    selected, _ = two_stage_topk(
+        scores,
+        positions,
+        valid_lengths,
+        top_k=top_k,
+        global_context_size=global_context_size,
+        candidates_per_owner=candidates_per_owner,
+        positions_in_order=True,
+    )
     canonical = canonicalize_selected_positions(SelectedPositions(selected.positions, selected.valid_counts))
     live = jnp.arange(top_k)[None] < selected.valid_counts[:, None]
-    selected_ok = jnp.all(canonical.contract_valid) & jnp.all(jnp.where(live,
-        jnp.isfinite(selected.scores) & (selected.positions < valid_lengths[:, None]), True))
+    selected_ok = jnp.all(canonical.contract_valid) & jnp.all(
+        jnp.where(live, jnp.isfinite(selected.scores) & (selected.positions < valid_lengths[:, None]), True)
+    )
     return selected, healthy & selected_ok
 
 
@@ -182,36 +230,22 @@ def prompt_index_key_chunk(
     partitions.  Recurrent ``decode_batch1`` remains one row.
     """
 
-    if (
-        not isinstance(physical_rows, int)
-        or isinstance(physical_rows, bool)
-        or physical_rows <= 0
-    ):
+    if not isinstance(physical_rows, int) or isinstance(physical_rows, bool) or physical_rows <= 0:
         raise ValueError("physical prompt-key rows must be positive")
-    if normalized_chunk.ndim != 2 or normalized_chunk.shape[1] != (
-        contract.hidden_size
-    ):
+    if normalized_chunk.ndim != 2 or normalized_chunk.shape[1] != (contract.hidden_size):
         raise ValueError("prompt-key normalized chunk has an invalid shape")
     chunk_rows = normalized_chunk.shape[0]
     if chunk_rows <= 0 or chunk_rows % physical_rows:
         raise ValueError("prompt-key chunk must divide into physical rows")
-    if positions.shape != (chunk_rows,) or not jnp.issubdtype(
-        positions.dtype, jnp.integer
-    ):
+    if positions.shape != (chunk_rows,) or not jnp.issubdtype(positions.dtype, jnp.integer):
         raise ValueError("prompt-key positions must be one integer row per token")
     if normalized_chunk.dtype != jnp.bfloat16:
         raise ValueError("prompt-key normalized chunk must remain BF16")
-    if wk_weight.shape != (contract.head_dim, contract.hidden_size) or (
-        wk_weight.dtype != jnp.float32
-    ):
+    if wk_weight.shape != (contract.head_dim, contract.hidden_size) or (wk_weight.dtype != jnp.float32):
         raise ValueError("prompt-key wk must be the adapted FP32 owner weight")
-    if key_norm_weight.shape != (contract.head_dim,) or (
-        key_norm_bias.shape != key_norm_weight.shape
-    ):
+    if key_norm_weight.shape != (contract.head_dim,) or (key_norm_bias.shape != key_norm_weight.shape):
         raise ValueError("prompt-key affine norm shapes are invalid")
-    if key_norm_weight.dtype != jnp.bfloat16 or (
-        key_norm_bias.dtype != jnp.bfloat16
-    ):
+    if key_norm_weight.dtype != jnp.bfloat16 or (key_norm_bias.dtype != jnp.bfloat16):
         raise ValueError("prompt-key affine norm parameters must remain BF16")
 
     partitions = normalized_chunk.reshape(
@@ -237,9 +271,7 @@ def prompt_index_key_chunk(
             mode="divide_sqrt",
         )
 
-    keys = lax.map(project_and_normalize, partitions).reshape(
-        chunk_rows, contract.head_dim
-    )
+    keys = lax.map(project_and_normalize, partitions).reshape(chunk_rows, contract.head_dim)
     if rope_table_rows is None:
         cos, sin = rotary_cos_sin(
             positions,
@@ -250,18 +282,14 @@ def prompt_index_key_chunk(
     else:
         # Host FP32 cos|sin rows gathered by position: on-device cos/sin at
         # large rotary angles are inaccurate on TPU (protected V2/V3 replays).
-        cos, sin = rotary_cos_sin_from_rows(
-            rope_table_rows, positions, rotary_dim=contract.rotary_dim
-        )
+        cos, sin = rotary_cos_sin_from_rows(rope_table_rows, positions, rotary_dim=contract.rotary_dim)
     rotated = apply_rotary(
         keys[:, : contract.rotary_dim],
         cos,
         sin,
         interleaved=contract.interleaved_rotary,
     )
-    return jnp.concatenate(
-        (rotated, keys[:, contract.rotary_dim :]), axis=-1
-    ).astype(jnp.float32)
+    return jnp.concatenate((rotated, keys[:, contract.rotary_dim :]), axis=-1).astype(jnp.float32)
 
 
 class ScoredSelectedPositions(NamedTuple):
@@ -279,9 +307,7 @@ def dsa_index_keys_from_projection(
     positions: jax.Array,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
-    key_norm_mode: Literal[
-        "divide_sqrt", "multiply_rsqrt"
-    ] = "multiply_rsqrt",
+    key_norm_mode: Literal["divide_sqrt", "multiply_rsqrt"] = "multiply_rsqrt",
 ) -> jax.Array:
     """Normalize and rotate an already-computed FP32 DSA key projection."""
 
@@ -388,10 +414,7 @@ def local_topk_candidates(
     position_order = jnp.argsort(global_positions, stable=True)
     ordered_positions = global_positions.astype(jnp.int32)[position_order]
     ordered_scores = jnp.take(local_scores.astype(jnp.float32), position_order, axis=1)
-    valid = (
-        (ordered_positions[None, :] >= 0)
-        & (ordered_positions[None, :] < valid_lengths[:, None])
-    )
+    valid = (ordered_positions[None, :] >= 0) & (ordered_positions[None, :] < valid_lengths[:, None])
     masked = jnp.where(valid, ordered_scores, _NEGATIVE_INFINITY)
     padded_width = max(local_context, top_k)
     if padded_width != local_context:
@@ -405,9 +428,7 @@ def local_topk_candidates(
     if local_context == 0:
         positions = jnp.full((rows, top_k), -1, dtype=jnp.int32)
     else:
-        positions = jnp.take(
-            ordered_positions, safe_indices, axis=0
-        )
+        positions = jnp.take(ordered_positions, safe_indices, axis=0)
     positions = jnp.where(values == _NEGATIVE_INFINITY, jnp.int32(-1), positions)
     return values.astype(jnp.float32), positions.astype(jnp.int32)
 
@@ -439,21 +460,15 @@ def _merge_topk_candidates_scored(
     if groups * candidates < top_k:
         raise ValueError("candidate union is narrower than top_k")
 
-    scores = jnp.transpose(candidate_scores, (1, 0, 2)).reshape(
-        rows, groups * candidates
-    )
-    positions = jnp.transpose(candidate_positions, (1, 0, 2)).reshape(
-        rows, groups * candidates
-    )
+    scores = jnp.transpose(candidate_scores, (1, 0, 2)).reshape(rows, groups * candidates)
+    positions = jnp.transpose(candidate_positions, (1, 0, 2)).reshape(rows, groups * candidates)
     if type(paired_position_sort) is not bool:
         raise ValueError("paired_position_sort must be a static bool")
     if paired_position_sort:
         # Position is the ONLY key. Scores are bit-preserving payloads, so equal
         # positions retain input order exactly as in the reference argsort.
         # Avoid two row-wise permutation gathers (DB595's dominant prefix cost).
-        sorted_positions, sorted_scores = lax.sort(
-            (positions, scores), dimension=1, is_stable=True, num_keys=1
-        )
+        sorted_positions, sorted_scores = lax.sort((positions, scores), dimension=1, is_stable=True, num_keys=1)
     else:
         position_order = jnp.argsort(positions, axis=1, stable=True)
         sorted_scores = jnp.take_along_axis(scores, position_order, axis=1)
@@ -554,16 +569,9 @@ def prefill_dsa_inputs(
     ):
         raise ValueError("prefill DSA normalized/contract geometry drifted")
     rows, hidden = normalized.shape
-    if (
-        prepared.q_residual.shape != (rows, contract.q_lora_rank)
-        or prepared.q_residual.dtype != jnp.bfloat16
-    ):
+    if prepared.q_residual.shape != (rows, contract.q_lora_rank) or prepared.q_residual.dtype != jnp.bfloat16:
         raise ValueError("prefill DSA q residual geometry drifted")
-    if (
-        positions.shape != (rows,)
-        or positions.dtype != jnp.int32
-        or (live.shape != (rows,) or live.dtype != jnp.bool_)
-    ):
+    if positions.shape != (rows,) or positions.dtype != jnp.int32 or (live.shape != (rows,) or live.dtype != jnp.bool_):
         raise ValueError("prefill DSA requires int32 positions and boolean live rows")
     heads = contract.num_heads // 8
     if weights.wq_b_local.shape != (
@@ -586,7 +594,9 @@ def prefill_dsa_inputs(
     normalized = jnp.where(live[:, None], normalized, 0)
     q_input = jnp.where(live[:, None], prepared.q_residual, 0)
     positions = jnp.where(live, positions, 0)
-    projected_q = resident_matmul_f32(q_input, weights.wq_b_local, interpret=linear_interpret).reshape(rows, heads, contract.head_dim)
+    projected_q = resident_matmul_f32(q_input, weights.wq_b_local, interpret=linear_interpret).reshape(
+        rows, heads, contract.head_dim
+    )
     head_partial = lax.dot_general(
         normalized.astype(jnp.float32),
         weights.head_weight_local.astype(jnp.float32),
@@ -613,14 +623,8 @@ def prefill_dsa_inputs(
     with jax.named_scope("greenfield_ws32_prefill_dsa/query_expert_gather"):
         gathered = lax.all_gather(packed, "expert", axis=0, tiled=False)
     query_width = heads * contract.head_dim
-    query = (
-        gathered[..., :query_width]
-        .transpose(1, 0, 2)
-        .reshape(rows, contract.num_heads, contract.head_dim)
-    )
-    head = (
-        gathered[..., query_width:].transpose(1, 0, 2).reshape(rows, contract.num_heads)
-    )
+    query = gathered[..., :query_width].transpose(1, 0, 2).reshape(rows, contract.num_heads, contract.head_dim)
+    head = gathered[..., query_width:].transpose(1, 0, 2).reshape(rows, contract.num_heads)
     key_partial = resident_matmul_f32(normalized, weights.wk_local, interpret=linear_interpret)
     with jax.named_scope("greenfield_ws32_prefill_dsa/key_feature_reduce"):
         projected_key = lax.psum(key_partial, "feature")
@@ -632,9 +636,7 @@ def prefill_dsa_inputs(
         contract=contract,
         key_norm_mode="divide_sqrt",
     ).astype(jnp.bfloat16)
-    with jax.named_scope(
-        "greenfield_ws32_prefill_dsa/repair_normalized_feature_gather"
-    ):
+    with jax.named_scope("greenfield_ws32_prefill_dsa/repair_normalized_feature_gather"):
         normalized_full = lax.all_gather(normalized, "feature", axis=1, tiled=True)
     valid = ~live | (
         (positions >= 0)
@@ -673,22 +675,16 @@ def prefill_dsa(
         raise ValueError("prefill dual index caches must share owner geometry")
     if block_table.ndim != 2 or block_table.shape[0] != 1 or block_table.shape[1] <= 0:
         raise ValueError("prefill DSA requires one nonempty shared page table")
-    if any(
-        v.shape != () or v.dtype != jnp.int32 for v in (position_offset, valid_rows)
-    ):
+    if any(v.shape != () or v.dtype != jnp.int32 for v in (position_offset, valid_rows)):
         raise ValueError("prefill DSA offset/count must be int32 scalars")
     rows = prepared.normalized_local.shape[0]
-    layout = StageLocalKvLayout(
-        local_parallel_size=8, packed_cache_width=contract.head_dim
-    )
+    layout = StageLocalKvLayout(local_parallel_size=8, packed_cache_width=contract.head_dim)
     capacity = block_table.shape[1] * layout.logical_page_size
     if capacity >= 2147483647:
         raise ValueError("prefill DSA capacity must fit positive int32")
     live = jnp.arange(rows, dtype=jnp.int32) < jnp.clip(valid_rows, 0, rows)
     safe_start = jnp.clip(position_offset, 0, capacity - 1)
-    positions = safe_start + jnp.minimum(
-        jnp.arange(rows, dtype=jnp.int32), capacity - 1 - safe_start
-    )
+    positions = safe_start + jnp.minimum(jnp.arange(rows, dtype=jnp.int32), capacity - 1 - safe_start)
     inputs = prefill_dsa_inputs(
         prepared,
         positions,
@@ -736,8 +732,7 @@ def prefill_dsa(
     safe_pages = jnp.clip(page_ids, 0, unrepaired_index_cache.shape[0] - 1)
     keys = write.cache[safe_pages].reshape(-1, contract.head_dim)
     logical_positions = (
-        jnp.arange(block_table.shape[1], dtype=jnp.int32)[:, None]
-        * layout.logical_page_size
+        jnp.arange(block_table.shape[1], dtype=jnp.int32)[:, None] * layout.logical_page_size
         + owner * layout.local_rows_per_page
         + jnp.arange(layout.local_rows_per_page, dtype=jnp.int32)[None]
     ).reshape(-1)
@@ -775,16 +770,30 @@ class DsaResult(NamedTuple):
     contract_valid: Any
 
 
-def dsa_bf16(prepared: PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
-             context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
-             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout) -> DsaResult:
+def dsa_bf16(
+    prepared: PreparedAttention,
+    index_cache_local: Any,
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    weights: Bf16DsaWeights,
+    *,
+    expert_axis: str,
+    feature_axis: str,
+    contract: DsaNumericalContract,
+    cache_layout: StageLocalKvLayout,
+) -> DsaResult:
     """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables and the two-stage selection."""
 
     normalized = prepared.normalized_local
     local_heads = contract.num_heads // cache_layout.local_parallel_size
     owner = lax.axis_index(expert_axis)
     physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
-        position, block_tables, context_lengths, owner, layout=cache_layout,
+        position,
+        block_tables,
+        context_lengths,
+        owner,
+        layout=cache_layout,
         physical_page_count=index_cache_local.shape[0],
     )
     projected_query = _dot_f32(prepared.q_residual, weights.wq_b_local)
@@ -793,39 +802,58 @@ def dsa_bf16(prepared: PreparedAttention, index_cache_local: Any, position: Any,
         reduced_head = lax.psum(_head_weight_partial(normalized, weights), axis_name=feature_axis)
     local_head_weights = reduced_head * jnp.float32(contract.num_heads**-0.5)
     cos, sin = rotary_cos_sin(position, rotary_dim=contract.rotary_dim, theta=contract.theta, dtype=jnp.float32)
-    rotated = apply_rotary(query[..., : contract.rotary_dim], cos[:, None, :], sin[:, None, :],
-                           interleaved=contract.interleaved_rotary)
-    local_query = jnp.concatenate((rotated, query[..., contract.rotary_dim:]), axis=-1).astype(jnp.float32)
+    rotated = apply_rotary(
+        query[..., : contract.rotary_dim], cos[:, None, :], sin[:, None, :], interleaved=contract.interleaved_rotary
+    )
+    local_query = jnp.concatenate((rotated, query[..., contract.rotary_dim :]), axis=-1).astype(jnp.float32)
     packed_query = jnp.concatenate((local_query.reshape(1, -1), local_head_weights), axis=-1)
     local_query_width = local_heads * contract.head_dim
     with jax.named_scope("glm_perf_bf16_dsa/query_expert_gather"):
         gathered_query = lax.all_gather(packed_query, axis_name=expert_axis, axis=0, tiled=False)
-    query = jnp.transpose(gathered_query[..., :local_query_width], (1, 0, 2)).reshape(1, contract.num_heads, contract.head_dim)
+    query = jnp.transpose(gathered_query[..., :local_query_width], (1, 0, 2)).reshape(
+        1, contract.num_heads, contract.head_dim
+    )
     head_weights = jnp.transpose(gathered_query[..., local_query_width:], (1, 0, 2)).reshape(1, contract.num_heads)
     key_partial = _dot_f32(normalized, weights.wk_local)
     with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
         projected_key = lax.psum(key_partial, axis_name=feature_axis)
     current_key_f32 = dsa_index_keys_from_projection(
-        projected_key, weights.key_norm_weight, weights.key_norm_bias, position, contract=contract,
+        projected_key,
+        weights.key_norm_weight,
+        weights.key_norm_bias,
+        position,
+        contract=contract,
     ).astype(jnp.float32)
     current_key = current_key_f32.astype(index_cache_local.dtype)
 
     def write_current(value: Any) -> Any:
         return value.at[physical_page, local_row].set(current_key[0])
 
-    index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
+    index_cache_local = lax.cond(
+        metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local
+    )
     from glm_tpu.layers.attention.dsa_indexer import score_cache_pages, two_stage_topk
 
     local_scores, global_positions = score_cache_pages(
-        query, index_cache_local, head_weights, block_tables, layout=cache_layout, owner=owner,
+        query,
+        index_cache_local,
+        head_weights,
+        block_tables,
+        layout=cache_layout,
+        owner=owner,
     )
     selected, _ = two_stage_topk(
-        local_scores, global_positions, context_lengths, top_k=contract.top_k,
+        local_scores,
+        global_positions,
+        context_lengths,
+        top_k=contract.top_k,
         global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
-        positions_in_order=True, expert_axis=expert_axis,
+        positions_in_order=True,
+        expert_axis=expert_axis,
     )
     selection_valid = canonicalize_selected_positions(
         SelectedPositions(selected.positions, selected.valid_counts)
     ).contract_valid
-    return DsaResult(index_cache_local, selected.positions, selected.valid_counts, selected.scores,
-                         metadata_valid & selection_valid)
+    return DsaResult(
+        index_cache_local, selected.positions, selected.valid_counts, selected.scores, metadata_valid & selection_valid
+    )

@@ -25,7 +25,13 @@ from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
 from glm_tpu.layers.sampler import split_final_sample
 from glm_tpu.models.glm_moe_dsa.state import (
-    BatchedPrefillResult, BatchedPrefillState, _require_config, batched_prefill_state_specs, DecoderState, _validate_local_state)
+    BatchedPrefillResult,
+    BatchedPrefillState,
+    _require_config,
+    batched_prefill_state_specs,
+    DecoderState,
+    _validate_local_state,
+)
 from glm_tpu.layers.embed import prefill_embed_tokens
 from glm_tpu.config.cache import CacheConfig
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DecoderWeights, bf16_weight_specs
@@ -63,11 +69,7 @@ def batched_prefill(
     _validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("batched prefill requires expert8/feature4")
-    if (
-        token_ids.ndim != 1
-        or not 1 <= token_ids.shape[0] <= 128
-        or token_ids.dtype != jnp.int32
-    ):
+    if token_ids.ndim != 1 or not 1 <= token_ids.shape[0] <= 128 or token_ids.dtype != jnp.int32:
         raise ValueError("batched prefill row count/dtype exceeds selected mode")
     if token_ids.shape[0] not in (114, 128):
         raise ValueError("canonical dense requires physical B114/B128")
@@ -83,33 +85,18 @@ def batched_prefill(
         or state.repaired_index_local.dtype != jnp.bfloat16
     ):
         raise ValueError("batched repaired buffer geometry drifted")
-    if (
-        main_rope_table.shape != config.main_rope_table_shape
-        or main_rope_table.dtype != jnp.bfloat16
-    ):
+    if main_rope_table.shape != config.main_rope_table_shape or main_rope_table.dtype != jnp.bfloat16:
         raise ValueError("batched main rotary table geometry drifted")
-    if len(weights.layers) != config.geometry.num_layers or len(materialized_wk) != len(
-        config.full_index_slots
-    ):
+    if len(weights.layers) != config.geometry.num_layers or len(materialized_wk) != len(config.full_index_slots):
         raise ValueError("batched layer/repair owner cardinality drifted")
     for layer_id, layer in enumerate(weights.layers):
         full = config.full_index_slot_by_layer[layer_id] is not None
         dense = config.geometry.mlp_layer_types[layer_id] == "dense"
-        if (
-            (layer.dsa is not None) != full
-            or (layer.dense is not None) != dense
-            or (layer.moe is not None) == dense
-        ):
+        if (layer.dsa is not None) != full or (layer.dense is not None) != dense or (layer.moe is not None) == dense:
             raise ValueError("batched weights disagree with model layer schedule")
     for wk in materialized_wk:
-        if (
-            wk.shape
-            != (config.geometry.dsa_indexer_head_dim, config.geometry.hidden_size)
-            or wk.dtype != jnp.float32
-        ):
-            raise ValueError(
-                "batched repair requires completed full FP32 wk per producer"
-            )
+        if wk.shape != (config.geometry.dsa_indexer_head_dim, config.geometry.hidden_size) or wk.dtype != jnp.float32:
+            raise ValueError("batched repair requires completed full FP32 wk per producer")
 
     rows = token_ids.shape[0]
     decoder = state.decoder
@@ -132,9 +119,7 @@ def batched_prefill(
         & jnp.all(decoder.contract_valid)
     )
     live = jnp.arange(rows, dtype=jnp.int32) < count
-    positions = jnp.minimum(
-        start + jnp.arange(rows, dtype=jnp.int32), config.context_capacity - 1
-    )
+    positions = jnp.minimum(start + jnp.arange(rows, dtype=jnp.int32), config.context_capacity - 1)
     rope = jnp.take(main_rope_table, positions, axis=0, mode="clip")
     embedded = prefill_embed_tokens(
         token_ids,
@@ -226,9 +211,7 @@ def batched_prefill(
     healthy = _all_owners_healthy(span_valid & jnp.all(~live | health) & head_health)
 
     def commit(_: Any) -> BatchedPrefillState:
-        active_index = lax.cond(
-            final, lambda _: repaired, lambda _: unrepaired, operand=None
-        )
+        active_index = lax.cond(final, lambda _: repaired, lambda _: unrepaired, operand=None)
         next_decoder = DecoderState(
             kv,
             active_index,
@@ -240,14 +223,10 @@ def batched_prefill(
             (end + 1)[None],
             healthy[None],
         )
-        return BatchedPrefillState(
-            next_decoder, repaired, state.prompt_length, final
-        )
+        return BatchedPrefillState(next_decoder, repaired, state.prompt_length, final)
 
     def refuse(_: Any) -> BatchedPrefillState:
-        return state._replace(
-            decoder=decoder._replace(contract_valid=jnp.zeros((1,), jnp.bool_))
-        )
+        return state._replace(decoder=decoder._replace(contract_valid=jnp.zeros((1,), jnp.bool_)))
 
     return BatchedPrefillResult(
         lax.cond(healthy, commit, refuse, operand=None),
@@ -267,20 +246,12 @@ def build_prefill_program(
     import numpy as np
 
     _require_config(config)
-    if (
-        isinstance(block_rows, bool)
-        or not isinstance(block_rows, int)
-        or not 1 <= block_rows <= 128
-    ):
+    if isinstance(block_rows, bool) or not isinstance(block_rows, int) or not 1 <= block_rows <= 128:
         raise PlanValidationError("batched prefill block rows exceed selected mode")
     if block_rows not in (114, 128):
         raise PlanValidationError("canonical dense requires physical B114/B128")
-    if tuple(mesh.axis_names) != ("expert", "feature") or np.asarray(
-        mesh.devices
-    ).shape != (8, 4):
-        raise PlanValidationError(
-            "batched prefill requires exact expert8/feature4 mesh"
-        )
+    if tuple(mesh.axis_names) != ("expert", "feature") or np.asarray(mesh.devices).shape != (8, 4):
+        raise PlanValidationError("batched prefill requires exact expert8/feature4 mesh")
 
     def body(
         tokens: Any,

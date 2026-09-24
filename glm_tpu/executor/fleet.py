@@ -94,8 +94,13 @@ class HelperTexts:
         texts = {}
         for name in HELPERS:
             try:
-                result = subprocess.run(["git", "cat-file", "blob", f"{pin}:{helper_path(name)}"], cwd=repo,
-                                        capture_output=True, timeout=GIT_TIMEOUT_SECONDS, check=False)
+                result = subprocess.run(
+                    ["git", "cat-file", "blob", f"{pin}:{helper_path(name)}"],
+                    cwd=repo,
+                    capture_output=True,
+                    timeout=GIT_TIMEOUT_SECONDS,
+                    check=False,
+                )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 raise ValueError(f"remote helper {name}: git cat-file could not run ({type(exc).__name__})") from None
             if result.returncode != 0:
@@ -105,8 +110,10 @@ class HelperTexts:
             except UnicodeDecodeError:
                 raise ValueError(f"remote helper {name} in the pinned commit is not UTF-8") from None
             if text != _package_text(name):
-                raise ValueError(f"remote helper {name} differs from the pinned commit: the controller's "
-                                 "checkout must hold the committed helper files")
+                raise ValueError(
+                    f"remote helper {name} differs from the pinned commit: the controller's "
+                    "checkout must hold the committed helper files"
+                )
             texts[name] = text
         return cls(texts)
 
@@ -118,9 +125,10 @@ class HelperTexts:
 
     def record(self) -> dict[str, Any]:
         """``helpers.json``: each helper's SHA-256 and interpreter role (no host values)."""
-        return dict(schema="glm_tpu_remote_helpers_v1",
-                    helpers={name: dict(sha256=self.sha256(name), interpreter=interpreter_role(name))
-                             for name in HELPERS})
+        return dict(
+            schema="glm_tpu_remote_helpers_v1",
+            helpers={name: dict(sha256=self.sha256(name), interpreter=interpreter_role(name)) for name in HELPERS},
+        )
 
 
 def _snapshot(helpers: HelperTexts | None) -> HelperTexts:
@@ -148,8 +156,7 @@ def encode_arguments(args: dict[str, Any]) -> str:
     return json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
 
 
-def remote_command(helper: str, args: dict[str, Any], *, interpreter: str,
-                   helpers: HelperTexts | None = None) -> str:
+def remote_command(helper: str, args: dict[str, Any], *, interpreter: str, helpers: HelperTexts | None = None) -> str:
     """``<interpreter> -c <helper text> <json>`` as one shell string (what follows the SSH prefix);
     the text comes from ``helpers`` (a controller's run snapshot), else from this package now."""
     command = shlex.join([interpreter, "-c", _snapshot(helpers).text(helper), encode_arguments(args)])
@@ -170,37 +177,83 @@ def preflight_command(fleet: Any, root: Path, worker_command: list[str]) -> str:
     """The CPU-only worker preflight: ``cd <root>/source && env JAX_PLATFORMS=cpu <flag>=1
     PYTHONPATH=<root>/source:<pythonpath> <worker_command> --preflight-only``."""
     source = str(Path(root) / "source")
-    return "cd " + shlex.quote(source) + " && " + shlex.join([
-        "env", "JAX_PLATFORMS=cpu", WORKER_ENV_FLAG + "=1",
-        "PYTHONPATH=" + ":".join([source, *fleet.worker_pythonpath]), *worker_command, "--preflight-only"])
+    return (
+        "cd "
+        + shlex.quote(source)
+        + " && "
+        + shlex.join(
+            [
+                "env",
+                "JAX_PLATFORMS=cpu",
+                WORKER_ENV_FLAG + "=1",
+                "PYTHONPATH=" + ":".join([source, *fleet.worker_pythonpath]),
+                *worker_command,
+                "--preflight-only",
+            ]
+        )
+    )
 
 
-def require(value,message):
-    if not value:raise ValueError(message)
+def require(value, message):
+    if not value:
+        raise ValueError(message)
 
 
 def ssh_commands(fleet):
-    project=['--project='+fleet.project] if fleet.project else []
-    result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh',fleet.tpu_name,
-        '--zone='+fleet.zone,*project,'--worker=all','--dry-run','--command=true'],capture_output=True,text=True,check=True)
-    commands=[shlex.split(line) for line in result.stdout.splitlines() if line.startswith('/usr/bin/ssh ')]
-    require(len(commands)==fleet.num_hosts,'SSH discovery must return eight hosts')
+    project = ["--project=" + fleet.project] if fleet.project else []
+    result = subprocess.run(
+        [
+            "gcloud",
+            "compute",
+            "tpus",
+            "tpu-vm",
+            "ssh",
+            fleet.tpu_name,
+            "--zone=" + fleet.zone,
+            *project,
+            "--worker=all",
+            "--dry-run",
+            "--command=true",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    commands = [shlex.split(line) for line in result.stdout.splitlines() if line.startswith("/usr/bin/ssh ")]
+    require(len(commands) == fleet.num_hosts, "SSH discovery must return eight hosts")
     for command in commands:
-        require(command[-2:]==['--','true'],'SSH discovery command differs')
-        command[:]=[s.replace('StrictHostKeyChecking=no','StrictHostKeyChecking=yes') for s in command if s!='-t']
-        command[1:1]=['-o','BatchMode=yes','-o','ConnectionAttempts=1','-o','ConnectTimeout=30',
-                      '-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3']
-        alias=next(s.split('=',1)[1] for s in command if s.startswith('HostKeyAlias='))
-        require(subprocess.run(['ssh-keygen','-F',alias,'-f',str(fleet.known_hosts)],
-            capture_output=True).returncode==0,'SSH host key is unknown')
+        require(command[-2:] == ["--", "true"], "SSH discovery command differs")
+        command[:] = [s.replace("StrictHostKeyChecking=no", "StrictHostKeyChecking=yes") for s in command if s != "-t"]
+        command[1:1] = [
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectionAttempts=1",
+            "-o",
+            "ConnectTimeout=30",
+            "-o",
+            "ServerAliveInterval=30",
+            "-o",
+            "ServerAliveCountMax=3",
+        ]
+        alias = next(s.split("=", 1)[1] for s in command if s.startswith("HostKeyAlias="))
+        require(
+            subprocess.run(["ssh-keygen", "-F", alias, "-f", str(fleet.known_hosts)], capture_output=True).returncode
+            == 0,
+            "SSH host key is unknown",
+        )
     return commands
 
 
-def remote_all(commands,command,root,label,*,payload=None,check=True):
+def remote_all(commands, command, root, label, *, payload=None, check=True):
     def one(rank):
-        with (root/f'{label}.rank{rank}.log').open('xb') as stream:
-            return subprocess.run(commands[rank][:-1]+[command],input=payload,
-                stdout=stream,stderr=subprocess.STDOUT).returncode
-    with ThreadPoolExecutor(max_workers=8) as pool:codes=list(pool.map(one,range(8)))
-    if check:require(not any(codes),label+' failed on one or more hosts; see private originals')
+        with (root / f"{label}.rank{rank}.log").open("xb") as stream:
+            return subprocess.run(
+                commands[rank][:-1] + [command], input=payload, stdout=stream, stderr=subprocess.STDOUT
+            ).returncode
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        codes = list(pool.map(one, range(8)))
+    if check:
+        require(not any(codes), label + " failed on one or more hosts; see private originals")
     return codes

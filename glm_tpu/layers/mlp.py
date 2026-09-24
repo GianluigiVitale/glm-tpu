@@ -36,10 +36,7 @@ def prefill_dense(
     """
 
     _require_rows(hidden_local)
-    if gate_local.ndim != 2 or (
-        gate_local.shape != up_local.shape
-        or gate_local.shape[1] != hidden_local.shape[1]
-    ):
+    if gate_local.ndim != 2 or (gate_local.shape != up_local.shape or gate_local.shape[1] != hidden_local.shape[1]):
         raise ValueError("WS32 prefill gate/up geometry drifted")
     local_intermediate, local_hidden = gate_local.shape
     if down_local.shape != (local_hidden, local_intermediate):
@@ -47,12 +44,8 @@ def prefill_dense(
     gate_partial = resident_matmul_f32(hidden_local, gate_local, interpret=interpret)
     up_partial = resident_matmul_f32(hidden_local, up_local, interpret=interpret)
     with jax.named_scope("greenfield_ws32_prefill_dense/feature_gate_up_reduce"):
-        gate_up = lax.psum(
-            jnp.stack((gate_partial, up_partial)), axis_name="feature"
-        ).astype(jnp.bfloat16)
-    activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(
-        jnp.bfloat16
-    )
+        gate_up = lax.psum(jnp.stack((gate_partial, up_partial)), axis_name="feature").astype(jnp.bfloat16)
+    activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(jnp.bfloat16)
     down_partial = resident_matmul_f32(activated, down_local, interpret=interpret)
     with jax.named_scope("greenfield_ws32_prefill_dense/expert_down_reduce"):
         return lax.psum(down_partial, axis_name="expert").astype(jnp.bfloat16)

@@ -48,8 +48,7 @@ def write_prefill_cache_block(
     if (
         cache_local.ndim != 3
         or min(cache_local.shape) <= 0
-        or cache_local.shape[1:]
-        != (layout.local_rows_per_page, layout.packed_cache_width)
+        or cache_local.shape[1:] != (layout.local_rows_per_page, layout.packed_cache_width)
         or cache_local.dtype != jnp.bfloat16
     ):
         raise ValueError("prefill cache must match BF16 striped owner layout")
@@ -81,14 +80,10 @@ def write_prefill_cache_block(
     span_ok = (position_offset >= 0) & (position_offset <= capacity - count)
     safe_count = jnp.minimum(count, capacity - safe_start)
     end = safe_start + safe_count
-    required_pages = end // layout.logical_page_size + (
-        end % layout.logical_page_size != 0
-    ).astype(jnp.int32)
+    required_pages = end // layout.logical_page_size + (end % layout.logical_page_size != 0).astype(jnp.int32)
     page_live = jnp.arange(block_table.shape[1], dtype=jnp.int32) < required_pages
     page_ids = block_table[0]
-    pages_ok = jnp.all(
-        ~page_live | ((page_ids >= 0) & (page_ids < cache_local.shape[0]))
-    )
+    pages_ok = jnp.all(~page_live | ((page_ids >= 0) & (page_ids < cache_local.shape[0])))
     ordered = jnp.sort(jnp.where(page_live, page_ids, jnp.iinfo(jnp.int32).max))
     unique = jnp.all(
         jnp.where(
@@ -109,17 +104,12 @@ def write_prefill_cache_block(
         & (owner_index < layout.local_parallel_size)
     )
     # Padded rows have a safe address without offset+row overflow.
-    delta = jnp.minimum(
-        jnp.arange(rows.shape[0], dtype=jnp.int32), jnp.maximum(safe_count - 1, 0)
-    )
+    delta = jnp.minimum(jnp.arange(rows.shape[0], dtype=jnp.int32), jnp.maximum(safe_count - 1, 0))
     positions = jnp.minimum(safe_start, capacity - 1) + delta
     pages = page_ids[positions // layout.logical_page_size]
     local_row = positions % layout.local_rows_per_page
     owned = live & (layout.owner(positions) == owner_index)
-    flat_index = (
-        jnp.clip(pages, 0, cache_local.shape[0] - 1) * layout.local_rows_per_page
-        + local_row
-    )
+    flat_index = jnp.clip(pages, 0, cache_local.shape[0] - 1) * layout.local_rows_per_page + local_row
     # Positive sentinel; mode=drop is explicit and masked indices may repeat.
     targets = jnp.where(owned, flat_index, flat_count)
     clean_rows = jnp.where(live[:, None], rows, jnp.zeros((), rows.dtype))
@@ -163,24 +153,19 @@ def _require_decode_metadata(
     length = context_lengths[0]
     safe_current = jnp.clip(current, jnp.int32(0), jnp.int32(capacity - 1))
     logical_page = safe_current // jnp.int32(layout.logical_page_size)
-    safe_logical_page = jnp.clip(
-        logical_page, jnp.int32(0), jnp.int32(block_tables.shape[1] - 1)
-    )
+    safe_logical_page = jnp.clip(logical_page, jnp.int32(0), jnp.int32(block_tables.shape[1] - 1))
     physical_page = block_tables[0, safe_logical_page]
     physical_ok = (physical_page >= 0) & (physical_page < physical_page_count)
-    safe_physical_page = jnp.clip(
-        physical_page, jnp.int32(0), jnp.int32(physical_page_count - 1)
-    )
+    safe_physical_page = jnp.clip(physical_page, jnp.int32(0), jnp.int32(physical_page_count - 1))
     within_page = safe_current % jnp.int32(layout.logical_page_size)
     target_owner = within_page // jnp.int32(layout.local_rows_per_page)
     local_row = within_page % jnp.int32(layout.local_rows_per_page)
 
     page_ids = block_tables[0]
     page_slots = jnp.arange(block_tables.shape[1], dtype=jnp.int32)
-    required_pages = (
-        jnp.maximum(length, jnp.int32(0))
-        + jnp.int32(layout.logical_page_size - 1)
-    ) // jnp.int32(layout.logical_page_size)
+    required_pages = (jnp.maximum(length, jnp.int32(0)) + jnp.int32(layout.logical_page_size - 1)) // jnp.int32(
+        layout.logical_page_size
+    )
     live_pages = page_slots < required_pages
     page_table_ok = jnp.all(
         jnp.where(
@@ -189,12 +174,8 @@ def _require_decode_metadata(
             True,
         )
     )
-    ordered_live_pages = jnp.sort(
-        jnp.where(live_pages, page_ids, jnp.iinfo(jnp.int32).max)
-    )
-    adjacent_slots = jnp.arange(
-        1, block_tables.shape[1], dtype=jnp.int32
-    )
+    ordered_live_pages = jnp.sort(jnp.where(live_pages, page_ids, jnp.iinfo(jnp.int32).max))
+    adjacent_slots = jnp.arange(1, block_tables.shape[1], dtype=jnp.int32)
     page_table_unique = jnp.all(
         jnp.where(
             adjacent_slots < required_pages,
@@ -262,14 +243,10 @@ def canonicalize_selected_positions(
     safe_counts = jnp.clip(valid_counts, jnp.int32(0), jnp.int32(width))
     slots = lax.broadcasted_iota(jnp.int32, (rows, width), 1)
     live = slots < safe_counts[:, None]
-    sentinel_valid = jnp.all(
-        jnp.where(live, positions >= 0, positions == -1), axis=1
-    )
+    sentinel_valid = jnp.all(jnp.where(live, positions >= 0, positions == -1), axis=1)
     keys = jnp.where(live, positions, jnp.int32(_INT32_MAX))
     ordered_keys = jnp.sort(keys, axis=1)
-    ordered = jnp.where(
-        slots < safe_counts[:, None], ordered_keys, jnp.int32(-1)
-    )
+    ordered = jnp.where(slots < safe_counts[:, None], ordered_keys, jnp.int32(-1))
     adjacent_distinct = jnp.all(
         jnp.where(
             slots[:, 1:] < safe_counts[:, None],
@@ -279,9 +256,7 @@ def canonicalize_selected_positions(
         axis=1,
     )
     valid = counts_in_range & sentinel_valid & adjacent_distinct
-    return CanonicalSelectedPositions(
-        SelectedPositions(ordered.astype(jnp.int32), safe_counts), valid
-    )
+    return CanonicalSelectedPositions(SelectedPositions(ordered.astype(jnp.int32), safe_counts), valid)
 
 
 def selected_positions_for_owner(
@@ -311,9 +286,7 @@ def selected_positions_for_owner(
     keys = jnp.where(owned, positions, jnp.int32(_INT32_MAX))
     ordered = jnp.sort(keys, axis=1)
     owned_counts = jnp.sum(owned, axis=1, dtype=jnp.int32)
-    subset = jnp.where(
-        slots < owned_counts[:, None], ordered, jnp.int32(-1)
-    )
+    subset = jnp.where(slots < owned_counts[:, None], ordered, jnp.int32(-1))
     return CanonicalSelectedPositions(
         SelectedPositions(subset.astype(jnp.int32), owned_counts),
         canonical.contract_valid,
@@ -346,9 +319,7 @@ def gather_stage_local_selected_kv(
     if block_tables.shape[1] == 0:
         raise ValueError("block_tables must expose at least one logical block")
 
-    owned = selected_positions_for_owner(
-        selected, layout=layout, owner_index=owner_index
-    )
+    owned = selected_positions_for_owner(selected, layout=layout, owner_index=owner_index)
     positions = owned.selection.positions
     counts = owned.selection.valid_counts
     rows, width = positions.shape
@@ -372,19 +343,11 @@ def gather_stage_local_selected_kv(
     local_row = within_page % jnp.int32(layout.local_rows_per_page)
     flat_rows = safe_pages * local_rows + local_row
     flat_cache = cache_local.reshape(num_pages * local_rows, cache_width)
-    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(
-        rows, width, cache_width
-    )
+    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(rows, width, cache_width)
     slot_ok = live & position_ok & block_ok & page_ok & owner_ok
     gathered = jnp.where(slot_ok[..., None], gathered, jnp.zeros((), cache_local.dtype))
-    length_ok = (context_lengths >= 0) & (
-        context_lengths <= block_tables.shape[1] * layout.logical_page_size
-    )
-    row_valid = (
-        owned.contract_valid
-        & length_ok
-        & jnp.all(jnp.where(live, slot_ok, True), axis=1)
-    )
+    length_ok = (context_lengths >= 0) & (context_lengths <= block_tables.shape[1] * layout.logical_page_size)
+    row_valid = owned.contract_valid & length_ok & jnp.all(jnp.where(live, slot_ok, True), axis=1)
     return SelectedKvSegment(gathered, positions, counts, row_valid)
 
 
@@ -453,20 +416,10 @@ def gather_stage_local_selected_kv_aligned(
     local_row = within_page % jnp.int32(layout.local_rows_per_page)
     flat_rows = safe_pages * local_rows + local_row
     flat_cache = cache_local.reshape(num_pages * local_rows, cache_width)
-    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(
-        rows, width, cache_width
-    )
+    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(rows, width, cache_width)
     slot_ok = live & position_ok & block_ok & page_ok
     owned = slot_ok & (actual_owner == owner_index)
-    gathered = jnp.where(
-        owned[..., None], gathered, jnp.zeros((), cache_local.dtype)
-    )
-    length_ok = (context_lengths >= 0) & (
-        context_lengths <= block_tables.shape[1] * layout.logical_page_size
-    )
-    row_valid = (
-        canonical.contract_valid
-        & length_ok
-        & jnp.all(jnp.where(live, slot_ok, True), axis=1)
-    )
+    gathered = jnp.where(owned[..., None], gathered, jnp.zeros((), cache_local.dtype))
+    length_ok = (context_lengths >= 0) & (context_lengths <= block_tables.shape[1] * layout.logical_page_size)
+    row_valid = canonical.contract_valid & length_ok & jnp.all(jnp.where(live, slot_ok, True), axis=1)
     return SelectedKvSegment(gathered, positions, counts, row_valid)

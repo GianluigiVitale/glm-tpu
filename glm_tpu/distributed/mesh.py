@@ -43,9 +43,7 @@ class MeshContract:
         _positive_int(self.feature_axis_size, "feature_axis_size")
         if self.device_count != 32:
             raise PlanValidationError("WS32_2D requires exactly 32 devices")
-        if self.shared_expert_layout != (
-            "feature_sharded_expert_axis_replicated"
-        ):
+        if self.shared_expert_layout != ("feature_sharded_expert_axis_replicated"):
             raise PlanValidationError("unknown WS32 shared-expert layout")
 
     @property
@@ -62,14 +60,9 @@ class MeshContract:
 
     def validate_topology(self, topology: PhysicalTopology) -> None:
         if len(topology.devices) != self.device_count:
-            raise PlanValidationError(
-                f"WS32 expected {self.device_count} devices, "
-                f"found {len(topology.devices)}"
-            )
+            raise PlanValidationError(f"WS32 expected {self.device_count} devices, found {len(topology.devices)}")
         if topology.topology_shape != (2, 4, 4):
-            raise PlanValidationError(
-                "WS32 requires the protected physical 2x4x4 topology"
-            )
+            raise PlanValidationError("WS32 requires the protected physical 2x4x4 topology")
 
     def validate_geometry(self, geometry: ModelGeometry) -> None:
         divisibility = {
@@ -104,16 +97,12 @@ class MeshContract:
         block_out, block_in = geometry.fp8_block_shape
         block_dimensions = {
             "local hidden": geometry.hidden_size // self.feature_axis_size,
-            "local dense intermediate": (
-                geometry.dense_intermediate_size // self.expert_axis_size
-            ),
+            "local dense intermediate": (geometry.dense_intermediate_size // self.expert_axis_size),
             "MoE intermediate": geometry.moe_intermediate_size,
         }
         for name, value in block_dimensions.items():
             if value % block_out or value % block_in:
-                raise PlanValidationError(
-                    f"WS32 {name} must preserve complete FP8 blocks"
-                )
+                raise PlanValidationError(f"WS32 {name} must preserve complete FP8 blocks")
 
     def layout_summary(self, geometry: ModelGeometry) -> dict[str, Any]:
         """Return the exact global/local tensor ownership prototype."""
@@ -255,27 +244,16 @@ class PhysicalMesh:
             "feature_groups",
             tuple(tuple(group) for group in self.feature_groups),
         )
-        if len(self.device_ids) != 8 or any(
-            len(row) != 4 for row in self.device_ids
-        ):
+        if len(self.device_ids) != 8 or any(len(row) != 4 for row in self.device_ids):
             raise PlanValidationError("WS32 physical mesh must be exactly 8x4")
         flattened = tuple(item for row in self.device_ids for item in row)
         if len(set(flattened)) != 32:
-            raise PlanValidationError(
-                "WS32 physical mesh must use 32 unique devices"
-            )
+            raise PlanValidationError("WS32 physical mesh must use 32 unique devices")
         if self.feature_groups != self.device_ids:
-            raise PlanValidationError(
-                "WS32 feature groups must be the logical mesh rows"
-            )
-        expected_expert = tuple(
-            tuple(row[column] for row in self.device_ids)
-            for column in range(4)
-        )
+            raise PlanValidationError("WS32 feature groups must be the logical mesh rows")
+        expected_expert = tuple(tuple(row[column] for row in self.device_ids) for column in range(4))
         if self.expert_groups != expected_expert:
-            raise PlanValidationError(
-                "WS32 expert groups must be the logical mesh columns"
-            )
+            raise PlanValidationError("WS32 expert groups must be the logical mesh columns")
 
     @property
     def flattened_device_ids(self) -> tuple[int, ...]:
@@ -307,25 +285,13 @@ def build_physical_mesh(topology: PhysicalTopology) -> PhysicalMesh:
 
     contract = MeshContract()
     contract.validate_topology(topology)
-    by_coordinates = {
-        device.coordinates: device.device_id for device in topology.devices
-    }
-    rows = tuple(
-        tuple(by_coordinates[(x, y, z)] for z in range(4))
-        for x in range(2)
-        for y in range(4)
-    )
+    by_coordinates = {device.coordinates: device.device_id for device in topology.devices}
+    rows = tuple(tuple(by_coordinates[(x, y, z)] for z in range(4)) for x in range(2) for y in range(4))
     mesh = PhysicalMesh(
         device_ids=rows,
         feature_groups=rows,
-        expert_groups=tuple(
-            tuple(row[column] for row in rows) for column in range(4)
-        ),
+        expert_groups=tuple(tuple(row[column] for row in rows) for column in range(4)),
     )
-    if set(mesh.flattened_device_ids) != {
-        device.device_id for device in topology.devices
-    }:
-        raise PlanValidationError(
-            "WS32 physical mesh does not cover the observed topology"
-        )
+    if set(mesh.flattened_device_ids) != {device.device_id for device in topology.devices}:
+        raise PlanValidationError("WS32 physical mesh does not cover the observed topology")
     return mesh

@@ -42,9 +42,9 @@ MLP_TYPES = ("dense",) * 3 + ("sparse",) * 5
 
 @dataclass(frozen=True)
 class FrozenFixture:
-    config: Any                        # decoder config (production class)
-    arrays: dict[str, np.ndarray]      # checkpoint tensor name -> host array
-    wk_extra: tuple[np.ndarray, ...]   # the historical fixture's four trailing draws (not model weights)
+    config: Any  # decoder config (production class)
+    arrays: dict[str, np.ndarray]  # checkpoint tensor name -> host array
+    wk_extra: tuple[np.ndarray, ...]  # the historical fixture's four trailing draws (not model weights)
     panel_geometry: bool
 
 
@@ -66,9 +66,18 @@ def geometry(*, panel_geometry: bool = True) -> Any:
     intermediate = 256 if panel_geometry else 128
     return replace(
         ModelGeometry.from_hf_config(config_json()),
-        model_id=MODEL_ID, num_layers=8, hidden_size=hidden, attention_heads=16, kv_heads=16,
-        q_lora_rank=128, num_routed_experts=64, moe_intermediate_size=intermediate,
-        dense_intermediate_size=1024, vocab_size=256, dsa_top_k=128, mlp_layer_types=MLP_TYPES,
+        model_id=MODEL_ID,
+        num_layers=8,
+        hidden_size=hidden,
+        attention_heads=16,
+        kv_heads=16,
+        q_lora_rank=128,
+        num_routed_experts=64,
+        moe_intermediate_size=intermediate,
+        dense_intermediate_size=1024,
+        vocab_size=256,
+        dsa_top_k=128,
+        mlp_layer_types=MLP_TYPES,
         indexer_types=INDEXER_TYPES,
     )
 
@@ -76,8 +85,9 @@ def geometry(*, panel_geometry: bool = True) -> Any:
 def decoder_config(*, panel_geometry: bool = True, capacity: int = CAPACITY) -> Any:
     from glm_tpu.config.cache import CacheConfig
 
-    return CacheConfig(geometry(panel_geometry=panel_geometry), capacity,
-                             sparse_segment_block=128, host_main_rope_table=True)
+    return CacheConfig(
+        geometry(panel_geometry=panel_geometry), capacity, sparse_segment_block=128, host_main_rope_table=True
+    )
 
 
 def fixture_v1(*, panel_geometry: bool = True) -> FrozenFixture:
@@ -174,10 +184,10 @@ def name_spec_pairs(config: Any) -> list[tuple[str, Any]]:
 
     from glm_tpu.models.glm_moe_dsa.weights import decoder_weight_names, decoder_weight_specs
 
-    pairs = jax.tree.map(lambda name, spec: (name, spec), decoder_weight_names(config),
-                         decoder_weight_specs(config))
-    return list(jax.tree.leaves(pairs, is_leaf=lambda x: isinstance(x, tuple) and len(x) == 2
-                                and isinstance(x[0], str)))
+    pairs = jax.tree.map(lambda name, spec: (name, spec), decoder_weight_names(config), decoder_weight_specs(config))
+    return list(
+        jax.tree.leaves(pairs, is_leaf=lambda x: isinstance(x, tuple) and len(x) == 2 and isinstance(x[0], str))
+    )
 
 
 def bind(mesh: Any, fixture: FrozenFixture) -> Any:
@@ -200,8 +210,10 @@ def cpu_mesh() -> Any:
 
     devices = jax.devices()
     if len(devices) != 32 or jax.default_backend() != "cpu":
-        raise RuntimeError("the frozen fixture needs 32 forced CPU devices "
-                           "(XLA_FLAGS=--xla_force_host_platform_device_count=32, JAX_PLATFORMS=cpu)")
+        raise RuntimeError(
+            "the frozen fixture needs 32 forced CPU devices "
+            "(XLA_FLAGS=--xla_force_host_platform_device_count=32, JAX_PLATFORMS=cpu)"
+        )
     return Mesh(np.asarray(devices, object).reshape(8, 4), ("expert", "feature"))
 
 
@@ -249,9 +261,21 @@ def historical_equivalence() -> dict[str, Any]:
             identical=new == old and new_shardings == old_shardings,
             geometry_equal=frozen.config == config,
             geometry_sha256=digest_json(frozen.config.geometry.to_dict()),
-            config_fields=digest_json({k: getattr(frozen.config, k) for k in (
-                "context_capacity", "logical_page_size", "packed_cache_width", "sparse_segment_block",
-                "rms_norm_epsilon", "exact_dsa", "strategy_nd_dense", "host_main_rope_table")}),
+            config_fields=digest_json(
+                {
+                    k: getattr(frozen.config, k)
+                    for k in (
+                        "context_capacity",
+                        "logical_page_size",
+                        "packed_cache_width",
+                        "sparse_segment_block",
+                        "rms_norm_epsilon",
+                        "exact_dsa",
+                        "strategy_nd_dense",
+                        "host_main_rope_table",
+                    )
+                }
+            ),
         )
     return result
 

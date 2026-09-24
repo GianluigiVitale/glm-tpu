@@ -37,15 +37,11 @@ def test_exclusive_panels_restore_every_owned_row_once(offset):
         jnp.asarray(counts), jnp.int32(offset)
     )
     assert bool(plan.valid)
-    assert int(plan.active_panels) == sum(
-        (int(c) + 31) // 32 for c in counts[offset : offset + 2]
-    )
+    assert int(plan.active_panels) == sum((int(c) + 31) // 32 for c in counts[offset : offset + 2])
     packed = pack_expert_panel_rows(x, plan)
     live = np.arange(32)[None, :] < np.asarray(plan.live_counts)[:, None]
     np.testing.assert_array_equal(np.asarray(packed)[~live], 0)
-    owned = (np.repeat(np.arange(6), counts) >= offset) & (
-        np.repeat(np.arange(6), counts) < offset + 2
-    )
+    owned = (np.repeat(np.arange(6), counts) >= offset) & (np.repeat(np.arange(6), counts) < offset + 2)
     indices = np.asarray(plan.restore_indices)[owned]
     assert len(np.unique(indices)) == int(counts[offset : offset + 2].sum())
     assert live.reshape(-1)[indices].all()
@@ -91,9 +87,7 @@ def _dequantize_and_dot(x, bits, scales, counts, offset, dtype):
     local = np.repeat(np.arange(counts.size), counts) - offset
     owned = (local >= 0) & (local < groups)
     expanded = jnp.repeat(jnp.repeat(scales, 128, axis=1), 128, axis=2)
-    weights = (
-        lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32) * expanded
-    ).astype(jnp.bfloat16)
+    weights = (lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32) * expanded).astype(jnp.bfloat16)
     expert = np.clip(local, 0, groups - 1)
     acc = jnp.zeros((m, n), jnp.float32)
     for ki in range(k // 128):
@@ -118,20 +112,14 @@ def test_full_k_scales_and_n128_stripes_match_dequantize_and_dot(dtype):
     counts = np.array([1, 33, 7, 0], np.int32)
     m, k, n = 41, 1152, 512
     x = jnp.asarray(rng.normal(0, 0.2, (m, k)), jnp.bfloat16)
-    bits = lax.bitcast_convert_type(
-        jnp.asarray(rng.normal(0, 0.15, (2, n, k)), jnp.float8_e4m3fn), jnp.uint8
-    )
+    bits = lax.bitcast_convert_type(jnp.asarray(rng.normal(0, 0.15, (2, n, k)), jnp.float8_e4m3fn), jnp.uint8)
     scales = jnp.asarray(rng.uniform(0.1, 2.0, (2, 4, 9)), jnp.float32)
     scales = scales.at[0, 1, 8].set(0).at[1, 3, 8].set(3.25)
 
     @jax.jit
     def run(x, bits, scales):
-        plan = build_expert_panels(
-            jnp.asarray(counts), jnp.int32(1), rows=m, local_groups=2
-        )
-        return prefill_panel_fp8_matmul(
-            x, bits, scales, plan, result_dtype=dtype, interpret=True
-        )
+        plan = build_expert_panels(jnp.asarray(counts), jnp.int32(1), rows=m, local_groups=2)
+        return prefill_panel_fp8_matmul(x, bits, scales, plan, result_dtype=dtype, interpret=True)
 
     value, ok = run(x, bits, scales)
     expected, owned = _dequantize_and_dot(x, bits, scales, counts, 1, dtype)
@@ -157,9 +145,7 @@ def test_all_rows_one_expert_capacity_and_scale_zero():
     x = jnp.ones((129, 128), jnp.bfloat16)
     w = jnp.full((4, 256, 128), 56, jnp.uint8)  # 1.0
     s = jnp.ones((4, 2, 1), jnp.float32).at[1, 1, 0].set(0)
-    value, ok = jax.jit(
-        lambda x: prefill_panel_fp8_matmul(x, w, s, plan, interpret=True)
-    )(x)
+    value, ok = jax.jit(lambda x: prefill_panel_fp8_matmul(x, w, s, plan, interpret=True))(x)
     assert bool(ok)
     np.testing.assert_array_equal(np.asarray(value)[:, :128], 128)
     np.testing.assert_array_equal(np.asarray(value)[:, 128:], 0)

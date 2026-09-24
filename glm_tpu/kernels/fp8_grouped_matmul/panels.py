@@ -23,9 +23,7 @@ class ExpertPanels(NamedTuple):
     valid: Any
 
 
-def build_expert_panels(
-    group_sizes: Any, group_offset: Any, *, rows: int, local_groups: int
-) -> ExpertPanels:
+def build_expert_panels(group_sizes: Any, group_offset: Any, *, rows: int, local_groups: int) -> ExpertPanels:
     """Pack owned experts separately, with at most ceil(rows/32)+G-1 panels.
 
     Counts include all sorted rows, including unowned experts. Invalid dynamic
@@ -69,9 +67,7 @@ def build_expert_panels(
     row_starts = jnp.where(active, starts[local_ids[expert]] + within, 0)
     live = jnp.where(active, jnp.clip(local_counts[expert] - within, 0, 32), 0)
     row = jnp.arange(rows, dtype=jnp.int32)
-    row_expert = jnp.clip(
-        jnp.searchsorted(ends, row, side="right"), 0, group_sizes.size - 1
-    )
+    row_expert = jnp.clip(jnp.searchsorted(ends, row, side="right"), 0, group_sizes.size - 1)
     owned = valid & (row_expert >= offset) & (row_expert < offset + local_groups)
     local_row_expert = jnp.clip(row_expert - offset, 0, local_groups - 1)
     relative_row = row - starts[row_expert]

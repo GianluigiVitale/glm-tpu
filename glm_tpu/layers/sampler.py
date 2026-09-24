@@ -39,12 +39,8 @@ def compute_logits(
 ) -> Any:
     """Return one physically expert-sharded vocabulary-logit row."""
 
-    local_vocab, local_hidden = _require_vocabulary_geometry(
-        lm_head_local, vocab_size=vocab_size
-    )
-    if hidden_local.shape != (1, local_hidden) or (
-        hidden_local.dtype != jnp.bfloat16
-    ):
+    local_vocab, local_hidden = _require_vocabulary_geometry(lm_head_local, vocab_size=vocab_size)
+    if hidden_local.shape != (1, local_hidden) or (hidden_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 logits require one BF16 hidden feature shard")
     partial = lax.dot_general(
         hidden_local.astype(jnp.float32),
@@ -66,9 +62,7 @@ def greedy_sample(
 ) -> GreedySampleResult:
     """Select the exact lowest token id among globally tied maxima."""
 
-    if local_logits.ndim != 2 or local_logits.shape[0] != 1 or (
-        local_logits.dtype != jnp.bfloat16
-    ):
+    if local_logits.ndim != 2 or local_logits.shape[0] != 1 or (local_logits.dtype != jnp.bfloat16):
         raise ValueError("WS32 sampler requires one BF16 local logit row")
     local_vocab = local_logits.shape[1]
     if local_vocab <= 0 or local_vocab * 8 != vocab_size:
@@ -87,16 +81,10 @@ def greedy_sample(
         safe_logits[0, local_index],
         jnp.asarray(-jnp.inf, dtype=local_logits.dtype),
     )[None]
-    candidate_index = jnp.where(
-        finite, global_index, jnp.int32(vocab_size)
-    )[None]
+    candidate_index = jnp.where(finite, global_index, jnp.int32(vocab_size))[None]
     with jax.named_scope("greenfield_ws32_sampling/expert_candidate_exchange"):
-        scores = lax.all_gather(
-            candidate_score, axis_name=expert_axis, axis=0, tiled=False
-        )
-        indices = lax.all_gather(
-            candidate_index, axis_name=expert_axis, axis=0, tiled=False
-        )
+        scores = lax.all_gather(candidate_score, axis_name=expert_axis, axis=0, tiled=False)
+        indices = lax.all_gather(candidate_index, axis_name=expert_axis, axis=0, tiled=False)
     winning_score = jnp.max(scores, axis=0)
     chosen = jnp.min(
         jnp.where(
@@ -136,9 +124,7 @@ def final_sample(
         vocab_size=vocab_size,
         feature_axis=feature_axis,
     )
-    return greedy_sample(
-        logits, vocab_size=vocab_size, expert_axis=expert_axis
-    )
+    return greedy_sample(logits, vocab_size=vocab_size, expert_axis=expert_axis)
 
 
 def split_final_sample(
@@ -169,9 +155,7 @@ def split_final_sample(
         vocab_size=vocab_size,
         feature_axis=feature_axis,
     )
-    sampled = greedy_sample(
-        logits, vocab_size=vocab_size, expert_axis=expert_axis
-    )
+    sampled = greedy_sample(logits, vocab_size=vocab_size, expert_axis=expert_axis)
     return SplitGreedySampleResult(
         sampled.token_id,
         sampled.contract_valid,

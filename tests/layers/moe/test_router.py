@@ -33,9 +33,7 @@ def test_contract_refuses_nonlocal_expert_partition() -> None:
 def test_block_dequant_uses_checkpoint_out_in_blocks() -> None:
     weight = jnp.arange(1, 25, dtype=jnp.float32).reshape(4, 6)
     scale = jnp.asarray([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float32)
-    got = dequantize_fp8_block_weight(
-        weight, scale, block_shape=(2, 3), output_dtype=jnp.float32
-    )
+    got = dequantize_fp8_block_weight(weight, scale, block_shape=(2, 3), output_dtype=jnp.float32)
     expanded = np.asarray(
         [
             [1, 1, 1, 2, 2, 2],
@@ -60,10 +58,6 @@ def test_noaux_bias_selects_but_does_not_weight() -> None:
 
 def test_router_ties_choose_lowest_expert_ids() -> None:
     logits = jnp.zeros((1, 16), dtype=jnp.float32)
-    indices, weights = route_glm_noaux_tc_logits(
-        logits, jnp.zeros((16,), dtype=jnp.float32), top_k=8
-    )
+    indices, weights = route_glm_noaux_tc_logits(logits, jnp.zeros((16,), dtype=jnp.float32), top_k=8)
     np.testing.assert_array_equal(np.asarray(indices), [list(range(8))])
-    np.testing.assert_array_equal(
-        np.asarray(weights), np.full((1, 8), 0.125, dtype=np.float32)
-    )
+    np.testing.assert_array_equal(np.asarray(weights), np.full((1, 8), 0.125, dtype=np.float32))

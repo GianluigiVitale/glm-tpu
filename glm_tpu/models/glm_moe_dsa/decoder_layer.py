@@ -18,12 +18,28 @@ import jax.numpy as jnp
 from jax import lax
 
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
-from glm_tpu.layers.contracts import MlaNumericalContract, DsaNumericalContract, GlmMoeNumericalContract, StageLocalKvLayout
+from glm_tpu.layers.contracts import (
+    MlaNumericalContract,
+    DsaNumericalContract,
+    GlmMoeNumericalContract,
+    StageLocalKvLayout,
+)
 from glm_tpu.layers.moe.router import router_from_shards, prefill_router
 from glm_tpu.layers.norm import sharded_fused_add_rms_norm
 from glm_tpu.models.glm_moe_dsa.weights import (
-    Bf16AttentionWeights, Bf16DenseWeights, Bf16DsaWeights, Bf16MoeWeights, Bf16QkvAWeights, Bf16LayerWeights)
-from glm_tpu.layers.attention.mla import prefill_index_share_lse, prefill_prepare_attention, index_share_attention_bf16, prepare_attention_bf16
+    Bf16AttentionWeights,
+    Bf16DenseWeights,
+    Bf16DsaWeights,
+    Bf16MoeWeights,
+    Bf16QkvAWeights,
+    Bf16LayerWeights,
+)
+from glm_tpu.layers.attention.mla import (
+    prefill_index_share_lse,
+    prefill_prepare_attention,
+    index_share_attention_bf16,
+    prepare_attention_bf16,
+)
 from glm_tpu.layers.attention.dsa_indexer import prefill_dsa, dsa_bf16
 from glm_tpu.layers.mlp import prefill_dense, dense_bf16
 from glm_tpu.layers.moe.routed_experts import prefill_moe_from_routes, moe_grouped_routes
@@ -176,17 +192,12 @@ def prefill_transformer_layer(
     ):
         raise ValueError("prefill split residual geometry drifted")
     rows = hidden_update_local.shape[0]
-    if (
-        incoming_contract_valid.shape != (rows,)
-        or incoming_contract_valid.dtype != jnp.bool_
-    ):
+    if incoming_contract_valid.shape != (rows,) or incoming_contract_valid.dtype != jnp.bool_:
         raise ValueError("prefill layer requires per-row boolean incoming health")
     if valid_rows.shape != () or valid_rows.dtype != jnp.int32:
         raise ValueError("prefill live count must be int32 scalar")
     if (dsa_weights is None) != (materialized_wk is None):
-        raise ValueError(
-            "full indexer requires both raw DSA owners and completed repair wk"
-        )
+        raise ValueError("full indexer requires both raw DSA owners and completed repair wk")
     if (dense_weights is None) == (moe_weights is None):
         raise ValueError("prefill layer requires exactly one dense or MoE branch")
     if (
@@ -273,9 +284,7 @@ def prefill_transformer_layer(
     )
     normalized_mlp = jnp.where(live[:, None], normalized_mlp, 0)
     post_residual = jnp.where(live[:, None], post_residual, 0)
-    selected_live = (
-        jnp.arange(dsa_contract.top_k)[None] < selected_valid_counts[:, None]
-    )
+    selected_live = jnp.arange(dsa_contract.top_k)[None] < selected_valid_counts[:, None]
     prefix_valid = (
         incoming_contract_valid
         & dsa_valid
@@ -349,9 +358,7 @@ def prefill_layer_window(
     # router and routed-expert panels. Neither changes the causal prefix schedule.
     canonical_dense = dense_weights is not None
     if canonical_dense and (rows not in (114, 128) or moe_weights is not None):
-        raise ValueError(
-            "canonical dense requires original rolled B114/B128 dense window"
-        )
+        raise ValueError("canonical dense requires original rolled B114/B128 dense window")
     if (
         carried_residual_local.shape != hidden_update_local.shape
         or incoming_contract_valid.shape != (rows,)
@@ -369,12 +376,7 @@ def prefill_layer_window(
     capacity = cache_local.shape[0] * cache_local.shape[1] * 8
     start = jnp.clip(position_offset, 0, capacity - 1)
     count = jnp.clip(valid_rows, 0, rows)
-    span_valid = (
-        (position_offset == start)
-        & (valid_rows >= 0)
-        & (valid_rows <= rows)
-        & (count <= capacity - start)
-    )
+    span_valid = (position_offset == start) & (valid_rows >= 0) & (valid_rows <= rows) & (count <= capacity - start)
     # A rolled device loop carries only the three proposed caches. Row outputs
     # are stacked, never historical copies of the caches.
     tile_rows = min(rows, 32)
@@ -482,11 +484,7 @@ def prefill_layer_window(
             linear_interpret=linear_interpret,
         )
     output = jnp.where(live[:, None], output, 0)
-    health = (
-        prefix_health
-        & mlp_health
-        & (~live | jnp.all(jnp.isfinite(output), axis=1))
-    )
+    health = prefix_health & mlp_health & (~live | jnp.all(jnp.isfinite(output), axis=1))
     return PrefillLayerResult(
         output,
         carried_residual,
@@ -533,96 +531,213 @@ class MlpResult(NamedTuple):
     route_weights: Any
 
 
-def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_local: Any, selected_positions: Any,
-                         selected_valid_counts: Any, selected_scores: Any, position: Any, block_tables: Any,
-                         context_lengths: Any, qkv_a: Bf16QkvAWeights, attention: Bf16AttentionWeights,
-                         dsa: Bf16DsaWeights | None, *, normalized: Any, dsa_contract: DsaNumericalContract,
-                         attention_contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
-                         sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
-                         main_rope_table_row: Any, expert_axis: str = "expert",
-                         feature_axis: str = "feature") -> AttentionLayerResult:
-    prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized,
-                                     feature_axis=feature_axis)
+def attention_layer_bf16(
+    residual_local: Any,
+    cache_local: Any,
+    index_cache_local: Any,
+    selected_positions: Any,
+    selected_valid_counts: Any,
+    selected_scores: Any,
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    qkv_a: Bf16QkvAWeights,
+    attention: Bf16AttentionWeights,
+    dsa: Bf16DsaWeights | None,
+    *,
+    normalized: Any,
+    dsa_contract: DsaNumericalContract,
+    attention_contract: MlaNumericalContract,
+    cache_layout: StageLocalKvLayout,
+    sparse_attention_config: SparseMlaConfig,
+    sparse_attention_interpret: bool,
+    main_rope_table_row: Any,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+) -> AttentionLayerResult:
+    prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized, feature_axis=feature_axis)
     dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
     if dsa is not None:
-        result = dsa_bf16(prepared, index_cache_local, position, block_tables, context_lengths, dsa,
-                          expert_axis=expert_axis, feature_axis=feature_axis, contract=dsa_contract,
-                          cache_layout=cache_layout)
+        result = dsa_bf16(
+            prepared,
+            index_cache_local,
+            position,
+            block_tables,
+            context_lengths,
+            dsa,
+            expert_axis=expert_axis,
+            feature_axis=feature_axis,
+            contract=dsa_contract,
+            cache_layout=cache_layout,
+        )
         index_cache_local = result.index_cache_local
         selected_positions, selected_valid_counts, selected_scores = (
-            result.selected_positions, result.selected_valid_counts, result.selected_scores)
+            result.selected_positions,
+            result.selected_valid_counts,
+            result.selected_scores,
+        )
         dsa_valid = result.contract_valid
     attended = index_share_attention_bf16(
-        residual_local, prepared, cache_local, selected_positions, selected_valid_counts, position,
-        block_tables, context_lengths, attention, expert_axis=expert_axis, contract=attention_contract,
-        cache_layout=cache_layout, main_rope_table_row=main_rope_table_row,
-        sparse_attention_config=sparse_attention_config, sparse_attention_interpret=sparse_attention_interpret,
+        residual_local,
+        prepared,
+        cache_local,
+        selected_positions,
+        selected_valid_counts,
+        position,
+        block_tables,
+        context_lengths,
+        attention,
+        expert_axis=expert_axis,
+        contract=attention_contract,
+        cache_layout=cache_layout,
+        main_rope_table_row=main_rope_table_row,
+        sparse_attention_config=sparse_attention_config,
+        sparse_attention_interpret=sparse_attention_interpret,
     )
     return AttentionLayerResult(
-        attended.output_local, attended.cache_local, index_cache_local, selected_positions,
-        selected_valid_counts, selected_scores, dsa_valid & attended.contract_valid,
+        attended.output_local,
+        attended.cache_local,
+        index_cache_local,
+        selected_positions,
+        selected_valid_counts,
+        selected_scores,
+        dsa_valid & attended.contract_valid,
     )
 
 
-def mlp_bf16(post_attention_residual_local: Any, normalized: Any, dense: Bf16DenseWeights | None,
-             moe: Bf16MoeWeights | None, *, mlp_kind: str, contract: GlmMoeNumericalContract,
-             routed_projection: RoutedProjectionConfig | None, interpret: bool,
-             expert_axis: str = "expert", feature_axis: str = "feature") -> MlpResult:
+def mlp_bf16(
+    post_attention_residual_local: Any,
+    normalized: Any,
+    dense: Bf16DenseWeights | None,
+    moe: Bf16MoeWeights | None,
+    *,
+    mlp_kind: str,
+    contract: GlmMoeNumericalContract,
+    routed_projection: RoutedProjectionConfig | None,
+    interpret: bool,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+) -> MlpResult:
     if mlp_kind == "dense":
         if dense is None:
             raise ValueError("bf16 dense layer needs dense weights")
         update = dense_bf16(normalized, dense, expert_axis=expert_axis, feature_axis=feature_axis)
-        return MlpResult(update, jnp.full((1, contract.top_k), jnp.int32(-1), dtype=jnp.int32),
-                             jnp.zeros((1, contract.top_k), dtype=jnp.float32))
+        return MlpResult(
+            update,
+            jnp.full((1, contract.top_k), jnp.int32(-1), dtype=jnp.int32),
+            jnp.zeros((1, contract.top_k), dtype=jnp.float32),
+        )
     if moe is None:
         raise ValueError("bf16 sparse layer needs MoE weights")
     route_indices, route_weights = router_from_shards(
-        normalized, moe.router_weight_local, moe.correction_bias_local, top_k=contract.top_k,
+        normalized,
+        moe.router_weight_local,
+        moe.correction_bias_local,
+        top_k=contract.top_k,
     )
     update = moe_grouped_routes(
-        normalized, route_indices, route_weights, *moe[2:8],
-        None, None, None, None, None, None,
-        contract=contract, config=routed_projection, interpret=interpret,
+        normalized,
+        route_indices,
+        route_weights,
+        *moe[2:8],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        contract=contract,
+        config=routed_projection,
+        interpret=interpret,
         shared_bf16=(moe.shared_gate_local, moe.shared_up_local, moe.shared_down_local),
     )
     return MlpResult(update, route_indices, route_weights)
 
 
 # ----------------------------------------------------------------------------- layer / step
-def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any, cache_local: Any,
-                           index_cache_local: Any, selected_positions: Any, selected_valid_counts: Any,
-                           selected_scores: Any, position: Any, block_tables: Any, context_lengths: Any,
-                           layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str,
-                           mlp_kind: str, config: cache.CacheConfig,
-                           routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
-                           linear_interpret: bool, main_rope_table_row: Any) -> TransformerLayerResult:
+def transformer_layer_bf16(
+    hidden_update_local: Any,
+    carried_residual_local: Any,
+    cache_local: Any,
+    index_cache_local: Any,
+    selected_positions: Any,
+    selected_valid_counts: Any,
+    selected_scores: Any,
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    layer: Bf16LayerWeights,
+    incoming_contract_valid: Any,
+    *,
+    indexer_kind: str,
+    mlp_kind: str,
+    config: cache.CacheConfig,
+    routed_projection: RoutedProjectionConfig | None,
+    sparse_attention_interpret: bool,
+    linear_interpret: bool,
+    main_rope_table_row: Any,
+) -> TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
         raise ValueError("bf16 layer weight presence drifted")
     dsa_contract = config.dsa_contract
     normalized_input, combined_residual = sharded_fused_add_rms_norm(
-        hidden_update_local, carried_residual_local, layer.qkv_a.input_norm_weight_local,
-        global_hidden_size=dsa_contract.hidden_size, epsilon=config.rms_norm_epsilon,
+        hidden_update_local,
+        carried_residual_local,
+        layer.qkv_a.input_norm_weight_local,
+        global_hidden_size=dsa_contract.hidden_size,
+        epsilon=config.rms_norm_epsilon,
     )
     attention = attention_layer_bf16(
-        combined_residual, cache_local, index_cache_local, selected_positions, selected_valid_counts,
-        selected_scores, position, block_tables, context_lengths, layer.qkv_a, layer.attention, layer.dsa,
-        normalized=normalized_input, dsa_contract=dsa_contract, attention_contract=config.attention_contract,
+        combined_residual,
+        cache_local,
+        index_cache_local,
+        selected_positions,
+        selected_valid_counts,
+        selected_scores,
+        position,
+        block_tables,
+        context_lengths,
+        layer.qkv_a,
+        layer.attention,
+        layer.dsa,
+        normalized=normalized_input,
+        dsa_contract=dsa_contract,
+        attention_contract=config.attention_contract,
         cache_layout=config.cache_layout,
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
-        sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
+        sparse_attention_interpret=sparse_attention_interpret,
+        main_rope_table_row=main_rope_table_row,
     )
     normalized_mlp, post_attention_residual = sharded_fused_add_rms_norm(
-        attention.output_local, combined_residual, layer.post_attention_norm_weight_local,
-        global_hidden_size=config.moe_contract.hidden_size, epsilon=config.rms_norm_epsilon,
+        attention.output_local,
+        combined_residual,
+        layer.post_attention_norm_weight_local,
+        global_hidden_size=config.moe_contract.hidden_size,
+        epsilon=config.rms_norm_epsilon,
     )
-    mlp = mlp_bf16(post_attention_residual, normalized_mlp, layer.dense, layer.moe, mlp_kind=mlp_kind,
-                   contract=config.moe_contract, routed_projection=routed_projection, interpret=linear_interpret)
+    mlp = mlp_bf16(
+        post_attention_residual,
+        normalized_mlp,
+        layer.dense,
+        layer.moe,
+        mlp_kind=mlp_kind,
+        contract=config.moe_contract,
+        routed_projection=routed_projection,
+        interpret=linear_interpret,
+    )
     return TransformerLayerResult(
-        mlp.output_local, post_attention_residual, normalized_input, attention.cache_local,
-        attention.index_cache_local, attention.selected_positions, attention.selected_valid_counts,
-        attention.selected_scores, mlp.route_indices, mlp.route_weights,
+        mlp.output_local,
+        post_attention_residual,
+        normalized_input,
+        attention.cache_local,
+        attention.index_cache_local,
+        attention.selected_positions,
+        attention.selected_valid_counts,
+        attention.selected_scores,
+        mlp.route_indices,
+        mlp.route_weights,
         incoming_contract_valid & attention.contract_valid,
     )
 
@@ -653,9 +768,7 @@ def prefill_dense_canonical(
         or live.dtype != jnp.bool_
         or not isinstance(dense, Bf16DenseWeights)
     ):
-        raise ValueError(
-            "canonical dense requires B114/B128 and original dense weights"
-        )
+        raise ValueError("canonical dense requires B114/B128 and original dense weights")
     rows, width = normalized.shape
     safe = jnp.where(live[:, None], normalized, jnp.bfloat16(0))
     tiles = jnp.pad(safe, ((0, 128 - rows), (0, 0))).reshape(4, 32, width)

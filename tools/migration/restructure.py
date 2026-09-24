@@ -59,16 +59,17 @@ import libcst as cst
 
 REPO = Path(__file__).resolve().parents[2]
 MAP = Path(__file__).with_name("move_map.toml")
-SYMBOLS = Path(__file__).with_name("symbol_moves.toml")   # S4.1
-RENAMES = Path(__file__).with_name("renames.toml")        # S4.2
-MERGES = Path(__file__).with_name("test_merges.toml")     # S4.3
+SYMBOLS = Path(__file__).with_name("symbol_moves.toml")  # S4.1
+RENAMES = Path(__file__).with_name("renames.toml")  # S4.2
+MERGES = Path(__file__).with_name("test_merges.toml")  # S4.3
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
     r"(?<![\w.])(?:glm_tpu\.(?:optimized|greenfield|web)|glm_tpu\.(?:api|cli|ui|user_request)(?![\w])|"
     r"scripts\.[A-Za-z_]|tests\.(?:greenfield|release)(?![\w]))"
     r"|(?<![\w.-])(?:glm_tpu/(?:optimized|greenfield|web)/|glm_tpu/(?:api|cli|ui|user_request)\.py|"
-    r"scripts/[A-Za-z_]|reference/hf-glm53|licenses/GLM-5\.3|tests/(?:greenfield|release)/)")
+    r"scripts/[A-Za-z_]|reference/hf-glm53|licenses/GLM-5\.3|tests/(?:greenfield|release)/)"
+)
 # Names of the research tree archived at S2f; allowed only in the [provenance] files.
 ARCHIVED = re.compile(r"(?:glm_tpu|scripts|tests)[./]greenfield")
 ANCHOR = re.compile(r"^Path\(__file__\)(?:\.resolve\(\))?\.parents$")
@@ -106,19 +107,26 @@ class MoveMap:
     baseline: dict[str, list[str]]
     provenance: dict[str, str]
     pyproject: dict[str, list[str]]
-    paths: dict[str, str] = field(default_factory=dict)     # moved file: old path -> new path
-    dirs: dict[str, str] = field(default_factory=dict)      # moved directory: old -> new
-    modules: dict[str, str] = field(default_factory=dict)   # moved module: old dotted -> new dotted
+    paths: dict[str, str] = field(default_factory=dict)  # moved file: old path -> new path
+    dirs: dict[str, str] = field(default_factory=dict)  # moved directory: old -> new
+    modules: dict[str, str] = field(default_factory=dict)  # moved module: old dotted -> new dotted
     packages_removed: set[str] = field(default_factory=set)
 
     @classmethod
     def load(cls, path: Path = MAP) -> MoveMap:
         value = tomllib.loads(path.read_text())
         rewrite = value["rewrite"]
-        self = cls(files=value["files"], removed=value["removed"], packages=value["packages"],
-                   include=rewrite["include"], exclude=rewrite["exclude"], suffixes=rewrite["suffixes"],
-                   baseline=value.get("baseline_references", {}), provenance=value.get("provenance", {}),
-                   pyproject=value.get("pyproject", {}))
+        self = cls(
+            files=value["files"],
+            removed=value["removed"],
+            packages=value["packages"],
+            include=rewrite["include"],
+            exclude=rewrite["exclude"],
+            suffixes=rewrite["suffixes"],
+            baseline=value.get("baseline_references", {}),
+            provenance=value.get("provenance", {}),
+            pyproject=value.get("pyproject", {}),
+        )
         for old, new in self.files.items():
             if new == "":
                 if old not in self.removed:
@@ -140,7 +148,7 @@ class MoveMap:
                 directory = "/".join(parts[:depth])
                 bases = set()
                 for member in (p for p in self.files if p.startswith(directory + "/")):
-                    relative = member[len(directory):]
+                    relative = member[len(directory) :]
                     target = self.paths.get(member, "")
                     bases.add(target[: -len(relative)] if target.endswith(relative) else None)
                 if len(bases) == 1 and None not in bases:
@@ -210,8 +218,9 @@ class PythonRewriter(cst.CSTTransformer):
         modules = self.moves.modules
         if target in modules:
             return [node.with_changes(module=expression(modules[target]), relative=[])]
-        if not isinstance(node.names, cst.ImportStar) and any(f"{target}.{a.name.value}" in modules
-                                                               for a in node.names):
+        if not isinstance(node.names, cst.ImportStar) and any(
+            f"{target}.{a.name.value}" in modules for a in node.names
+        ):
             groups: dict[str, list[str]] = {}
             for alias in node.names:
                 name = alias.name.value
@@ -224,8 +233,10 @@ class PythonRewriter(cst.CSTTransformer):
                         raise SystemExit(f"{self.new}: {name} is imported from the dissolved package {target}")
                     parent, base = target, name
                 groups.setdefault(parent, []).append(base if base == local else f"{base} as {local}")
-            return [cst.parse_statement(f"from {parent} import {', '.join(names)}").body[0]
-                    for parent, names in groups.items()]
+            return [
+                cst.parse_statement(f"from {parent} import {', '.join(names)}").body[0]
+                for parent, names in groups.items()
+            ]
         if node.relative and self.moved:
             if target in self.moves.packages_removed:
                 raise SystemExit(f"{self.new}: a relative import names the dissolved package {target}")
@@ -243,8 +254,9 @@ class PythonRewriter(cst.CSTTransformer):
             names.append(alias)
         return node.with_changes(names=names)
 
-    def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine,
-                                  updated: cst.SimpleStatementLine) -> cst.BaseStatement | cst.FlattenSentinel:
+    def leave_SimpleStatementLine(
+        self, original: cst.SimpleStatementLine, updated: cst.SimpleStatementLine
+    ) -> cst.BaseStatement | cst.FlattenSentinel:
         body: list[cst.BaseSmallStatement] = []
         for statement in updated.body:
             if isinstance(statement, cst.ImportFrom):
@@ -254,9 +266,13 @@ class PythonRewriter(cst.CSTTransformer):
             else:
                 body.append(statement)
         if len(updated.body) == 1 and len(body) > 1:
-            lines = [updated.with_changes(body=[statement.with_changes(semicolon=cst.MaybeSentinel.DEFAULT)],
-                                          leading_lines=updated.leading_lines if index == 0 else ())
-                     for index, statement in enumerate(body)]
+            lines = [
+                updated.with_changes(
+                    body=[statement.with_changes(semicolon=cst.MaybeSentinel.DEFAULT)],
+                    leading_lines=updated.leading_lines if index == 0 else (),
+                )
+                for index, statement in enumerate(body)
+            ]
             return cst.FlattenSentinel(lines)
         return updated.with_changes(body=body)
 
@@ -264,14 +280,18 @@ class PythonRewriter(cst.CSTTransformer):
     def leave_SimpleString(self, original: cst.SimpleString, updated: cst.SimpleString) -> cst.SimpleString:
         value = updated.value
         prefix = len(value) - len(value.lstrip("rRbBuU"))
-        quote = 3 if value[prefix:prefix + 3] in ('"""', "'''") else 1
-        inner = value[prefix + quote: len(value) - quote]
+        quote = 3 if value[prefix : prefix + 3] in ('"""', "'''") else 1
+        inner = value[prefix + quote : len(value) - quote]
         text = self.moves.rewrite_text(inner, self.keep)
-        return updated if text == inner else updated.with_changes(
-            value=value[: prefix + quote] + text + value[len(value) - quote:])
+        return (
+            updated
+            if text == inner
+            else updated.with_changes(value=value[: prefix + quote] + text + value[len(value) - quote :])
+        )
 
-    def leave_FormattedStringText(self, original: cst.FormattedStringText,
-                                  updated: cst.FormattedStringText) -> cst.FormattedStringText:
+    def leave_FormattedStringText(
+        self, original: cst.FormattedStringText, updated: cst.FormattedStringText
+    ) -> cst.FormattedStringText:
         text = self.moves.rewrite_text(updated.value, self.keep)
         return updated if text == updated.value else updated.with_changes(value=text)
 
@@ -280,8 +300,7 @@ class PythonRewriter(cst.CSTTransformer):
         return updated if text == updated.value else updated.with_changes(value=text)
 
     # ------------------------------------------------------------------ path joins
-    def leave_BinaryOperation(self, original: cst.BinaryOperation,
-                              updated: cst.BinaryOperation) -> cst.BaseExpression:
+    def leave_BinaryOperation(self, original: cst.BinaryOperation, updated: cst.BinaryOperation) -> cst.BaseExpression:
         if not isinstance(updated.operator, cst.Divide):
             return updated
         operands: list[cst.BaseExpression] = [updated.right]
@@ -327,8 +346,9 @@ class PythonRewriter(cst.CSTTransformer):
         if int(index.value) == new_root:  # already the root of the new location (an applied move)
             return updated
         if int(index.value) != old_root:
-            self.notes.append(f"{self.new}: Path(__file__) parents[{index.value}] is not the repository root "
-                              "anchor; review by hand")
+            self.notes.append(
+                f"{self.new}: Path(__file__) parents[{index.value}] is not the repository root anchor; review by hand"
+            )
             return updated
         if old_root == new_root:
             return updated
@@ -352,8 +372,8 @@ def rewrite_pyproject(moves: MoveMap, text: str) -> str:
         text = replace(r"^(license-files = )\[.*\]$", toml_list(moves.pyproject["license_files"]), text)
     if "black_include" in moves.pyproject and re.search(r"^\[tool\.black\]$", text, flags=re.M):
         include = moves.pyproject["black_include"]
-        for path in sorted(dissolved_later()):   # a file S4.1 dissolved leaves the boundary
-            stem = path[len("glm_tpu/"):-3] if path.startswith("glm_tpu/") else None
+        for path in sorted(dissolved_later()):  # a file S4.1 dissolved leaves the boundary
+            stem = path[len("glm_tpu/") : -3] if path.startswith("glm_tpu/") else None
             if stem is not None:
                 include = include.replace(f"|{stem}|", "|")
         text = replace(r"^(include = )'.*'$", "'" + include + "'", text)
@@ -407,8 +427,9 @@ def plan_moves(moves: MoveMap) -> tuple[list[tuple[str, str]], list[str], list[s
 
 
 def add_closure_entries(moved: list[tuple[str, str]]) -> None:
-    entries = {module_name(new): module_name(old) for old, new in moved
-               if old.endswith(".py") and not old.startswith("tests/")}
+    entries = {
+        module_name(new): module_name(old) for old, new in moved if old.endswith(".py") and not old.startswith("tests/")
+    }
     if not entries:
         return
     lines = CLOSURE_MAP.read_text().splitlines(keepends=True)
@@ -473,8 +494,10 @@ def run_table(table: Path, *, check: bool) -> int:
     added = symbols.write_closure_entries(plan.stage, f"tools/migration/{table.name}", result.closure)
     for row in result.notes:
         print("review:", row)
-    print(f"apply {plan.stage}: {len(result.texts)} files written, {len(result.removed)} modules removed, "
-          f"{added} closure_map.toml entries")
+    print(
+        f"apply {plan.stage}: {len(result.texts)} files written, {len(result.removed)} modules removed, "
+        f"{added} closure_map.toml entries"
+    )
     return 0
 
 
@@ -487,11 +510,13 @@ def check_symbols(symbols: Any, plan: Any) -> int:
             problems.append(f"{path}: an interim _s3_ module is tracked")
         if not (REPO / path).is_file() or path.startswith(symbols.NEVER) or path in symbols.TEXT_SKIP:
             continue
-        if not (path.endswith((".py", ".toml", ".md")) and path.startswith(("glm_tpu/", "tests/", "tools/", "docs/"))
-                or path in ("pyproject.toml",)):
+        if not (
+            path.endswith((".py", ".toml", ".md"))
+            and path.startswith(("glm_tpu/", "tests/", "tools/", "docs/"))
+            or path in ("pyproject.toml",)
+        ):
             continue
-        for number, line in symbols.stale_mentions((REPO / path).read_text(), resolver,
-                                                   plan.allow_stale.get(path, ())):
+        for number, line in symbols.stale_mentions((REPO / path).read_text(), resolver, plan.allow_stale.get(path, ())):
             row = f"{path}:{number}: {line[:160]}"
             (reports if path.endswith(".md") else problems).append(row)
     for row in reports:
@@ -545,8 +570,10 @@ def run_files(moves: MoveMap, *, check: bool) -> int:
     add_closure_entries(pending)
     for row in notes:
         print("review:", row)
-    print(f"apply: {len(pending)} moved, {len(removals)} removed, {len(missing)} package initializers, "
-          f"{rewritten} files rewritten")
+    print(
+        f"apply: {len(pending)} moved, {len(removals)} removed, {len(missing)} package initializers, "
+        f"{rewritten} files rewritten"
+    )
     return 0
 
 

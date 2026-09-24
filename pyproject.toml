@@ -94,6 +94,9 @@ extend-immutable-calls = [
 
 # LF is pinned (ruff's default is "auto"); the other four settings are the defaults, written out.
 [tool.ruff.format]
+# The remote helper files are sent to the hosts byte for byte and the equivalence harness records
+# their SHA-256 (G9): reformatting them changes what the hosts receive, a host change of its own.
+exclude = ["glm_tpu/executor/remote/*.py"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"

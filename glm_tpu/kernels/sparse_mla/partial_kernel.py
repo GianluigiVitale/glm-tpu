@@ -25,21 +25,26 @@ def gathered_partial_attention(queries, cache, counts, *, contract, config, inte
 
     rows, heads, _ = queries.shape
     latent, width = contract.kv_lora_rank, contract.packed_cache_width
-    if (not 1 <= rows <= 32 or heads != contract.num_heads
-            or cache.shape != (rows, contract.top_k, width)
-            or counts.shape != (rows,) or counts.dtype != jnp.int32):
+    if (
+        not 1 <= rows <= 32
+        or heads != contract.num_heads
+        or cache.shape != (rows, contract.top_k, width)
+        or counts.shape != (rows,)
+        or counts.dtype != jnp.int32
+    ):
         raise ValueError("partial attention row/cache/count geometry drifted")
     block = min(config.segment_block, contract.top_k)
     if contract.top_k % block:
         raise ValueError("partial attention block must divide top_k")
     if queries.shape[-1] != latent + contract.qk_rope_head_dim:
         raise ValueError("partial attention packed query width drifted")
-    queries = jnp.pad(queries, ((0, 0), (0, 0), (0, width-queries.shape[-1])))
+    queries = jnp.pad(queries, ((0, 0), (0, 0), (0, width - queries.shape[-1])))
     blocks = contract.top_k // block
     cache = cache.reshape(rows, blocks, block, width)
 
     def kernel(count, q, kv, out, lse, maximum, denominator, accumulator):
         row, tile = pl.program_id(0), pl.program_id(1)
+
         @pl.when(tile == 0)
         def init():
             maximum[...] = jnp.full(maximum.shape, -jnp.inf, jnp.float32)
@@ -50,29 +55,56 @@ def gathered_partial_attention(queries, cache, counts, *, contract, config, inte
 
         @pl.when(tile * block < count[row])
         def attend():
-            scores = lax.dot_general(q[0], kv[0, 0], (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32) * jnp.float32(contract.softmax_scale)
+            scores = lax.dot_general(
+                q[0], kv[0, 0], (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32
+            ) * jnp.float32(contract.softmax_scale)
             live = jnp.arange(block)[None, :] + tile * block < count[row]
             scores = jnp.where(live, scores, -jnp.inf)
             m = jnp.maximum(maximum[...], jnp.max(scores, axis=1, keepdims=True))
             correction = jnp.exp(maximum[...] - m)
-            probs = jnp.exp(scores-m)
+            probs = jnp.exp(scores - m)
             den = denominator[...] * correction + jnp.sum(probs, axis=1, keepdims=True)
-            acc = accumulator[...] * correction + lax.dot_general(probs.astype(jnp.bfloat16), kv[0, 0, :, :latent], (((1,), (0,)), ((), ())), preferred_element_type=jnp.float32)
+            acc = accumulator[...] * correction + lax.dot_general(
+                probs.astype(jnp.bfloat16),
+                kv[0, 0, :, :latent],
+                (((1,), (0,)), ((), ())),
+                preferred_element_type=jnp.float32,
+            )
             maximum[...], denominator[...], accumulator[...] = m, den, acc
-            @pl.when(tile == (count[row]-1)//block)
-            def finish():
-                out[0] = (acc/den).astype(jnp.bfloat16)
-                lse[0] = jnp.broadcast_to(m+jnp.log(den), (heads, 128))
 
-    call = pl.pallas_call(kernel, grid_spec=pltpu.PrefetchScalarGridSpec(
-        num_scalar_prefetch=1, grid=(rows, blocks),
-        in_specs=(pl.BlockSpec((1, heads, width), lambda r, b, c: (r, 0, 0)),
-                  pl.BlockSpec((1, 1, block, width), lambda r, b, c: (r, b, 0, 0))),
-        out_specs=(pl.BlockSpec((1, heads, latent), lambda r, b, c: (r, 0, 0)),
-                   pl.BlockSpec((1, heads, 128), lambda r, b, c: (r, 0, 0))),
-        scratch_shapes=(pltpu.VMEM((heads, 1), jnp.float32), pltpu.VMEM((heads, 1), jnp.float32), pltpu.VMEM((heads, latent), jnp.float32))),
-        out_shape=(jax.ShapeDtypeStruct((rows, heads, latent), jnp.bfloat16), jax.ShapeDtypeStruct((rows, heads, 128), jnp.float32)),
-        compiler_params=pltpu.CompilerParams(dimension_semantics=("parallel", "arbitrary"), vmem_limit_bytes=config.vmem_limit_bytes),
-        interpret=interpret, name=KERNEL_NAMES["sparse_mla_partial_attention"])
+            @pl.when(tile == (count[row] - 1) // block)
+            def finish():
+                out[0] = (acc / den).astype(jnp.bfloat16)
+                lse[0] = jnp.broadcast_to(m + jnp.log(den), (heads, 128))
+
+    call = pl.pallas_call(
+        kernel,
+        grid_spec=pltpu.PrefetchScalarGridSpec(
+            num_scalar_prefetch=1,
+            grid=(rows, blocks),
+            in_specs=(
+                pl.BlockSpec((1, heads, width), lambda r, b, c: (r, 0, 0)),
+                pl.BlockSpec((1, 1, block, width), lambda r, b, c: (r, b, 0, 0)),
+            ),
+            out_specs=(
+                pl.BlockSpec((1, heads, latent), lambda r, b, c: (r, 0, 0)),
+                pl.BlockSpec((1, heads, 128), lambda r, b, c: (r, 0, 0)),
+            ),
+            scratch_shapes=(
+                pltpu.VMEM((heads, 1), jnp.float32),
+                pltpu.VMEM((heads, 1), jnp.float32),
+                pltpu.VMEM((heads, latent), jnp.float32),
+            ),
+        ),
+        out_shape=(
+            jax.ShapeDtypeStruct((rows, heads, latent), jnp.bfloat16),
+            jax.ShapeDtypeStruct((rows, heads, 128), jnp.float32),
+        ),
+        compiler_params=pltpu.CompilerParams(
+            dimension_semantics=("parallel", "arbitrary"), vmem_limit_bytes=config.vmem_limit_bytes
+        ),
+        interpret=interpret,
+        name=KERNEL_NAMES["sparse_mla_partial_attention"],
+    )
     output, lse = call(counts, queries, cache)
     return output, lse[..., 0]

@@ -51,10 +51,7 @@ def compile_program(
             name,
             seconds=seconds,
             memory=memory,
-            device_memory=[
-                dict(device_id=int(d.id), stats=_memory_stats(d))
-                for d in jax.local_devices()
-            ],
+            device_memory=[dict(device_id=int(d.id), stats=_memory_stats(d)) for d in jax.local_devices()],
         )
     hlo = compiled.as_text()
     _write_compiler_original(root, record, name, "optimized_hlo.txt", hlo)
@@ -78,8 +75,11 @@ def _compiled_memory(compiled: Any) -> dict[str, int]:
     if stats is None:
         raise RuntimeError("compiled memory analysis is unavailable")
     names = (
-        "argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes",
-        "temp_size_in_bytes", "generated_code_size_in_bytes",
+        "argument_size_in_bytes",
+        "output_size_in_bytes",
+        "alias_size_in_bytes",
+        "temp_size_in_bytes",
+        "generated_code_size_in_bytes",
     )
     return {name: int(getattr(stats, name)) for name in names}
 

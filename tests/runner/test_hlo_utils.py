@@ -5,7 +5,7 @@ from collections import Counter
 from glm_tpu.runner.hlo_utils import parse_hlo_module
 
 
-GOOD_HLO = r'''HloModule jit_pipeline, replica_count=1, num_partitions=8
+GOOD_HLO = r"""HloModule jit_pipeline, replica_count=1, num_partitions=8
 
 add_region {
   a = bf16[] parameter(0)
@@ -24,7 +24,7 @@ ENTRY main {
   input = bf16[1,6144]{1,0} parameter(0)
   ROOT call = bf16[1,6144]{1,0} call(input), to_apply=decode_repeated_layer
 }
-'''
+"""
 
 
 def test_parser_extracts_physical_collective_contract() -> None:
@@ -44,7 +44,7 @@ def test_parser_extracts_physical_collective_contract() -> None:
 
 
 def test_parser_preserves_tuple_operands_after_index_comments() -> None:
-    text = r'''HloModule tuple_comments
+    text = r"""HloModule tuple_comments
 
 ENTRY main {
   a = bf16[1] parameter(0)
@@ -52,7 +52,7 @@ ENTRY main {
   c = bf16[1] parameter(2)
   ROOT result = (bf16[1], bf16[1], bf16[1]) tuple(a, /*index=1*/b, c)
 }
-'''
+"""
     root = parse_hlo_module(text).instructions[-1]
     assert root.operand_names == ("a", "b", "c")
 
@@ -79,14 +79,14 @@ def test_parser_expands_current_jax_mesh_replica_groups() -> None:
 
 
 def test_tuple_collective_shapes_and_operands_are_preserved() -> None:
-    text = r'''HloModule tuple_reduce, replica_count=1, num_partitions=4
+    text = r"""HloModule tuple_reduce, replica_count=1, num_partitions=4
 
 decode_layer {
   x = bf16[1,6144]{1,0} parameter(0)
   y = f32[1,8]{1,0} parameter(1)
   ROOT reduced = (bf16[1,6144]{1,0}, f32[1,8]{1,0}) all-reduce(x, y), channel_id=3, replica_groups={{0,1,2,3}}, use_global_device_ids=true, metadata={op_name="decode/layer/tuple"}
 }
-'''
+"""
     instruction = parse_hlo_module(text).collectives[0]
     assert [shape.dimensions for shape in instruction.result_shapes] == [
         (1, 6144),
@@ -96,7 +96,7 @@ decode_layer {
 
 
 def test_operand_shape_resolution_is_computation_local() -> None:
-    text = r'''HloModule duplicate_names
+    text = r"""HloModule duplicate_names
 
 first {
   x = f32[99]{0} parameter(0)
@@ -107,7 +107,7 @@ decode_layer {
   x = bf16[1,6144]{1,0} parameter(0)
   ROOT reduced = bf16[1,6144]{1,0} all-reduce(x), replica_groups={{0,1,2,3}}, use_global_device_ids=true
 }
-'''
+"""
     instruction = parse_hlo_module(text).collectives[0]
     assert instruction.operand_shapes == instruction.result_shapes
 
@@ -115,12 +115,9 @@ decode_layer {
 def test_async_collective_start_counts_once_and_done_is_not_a_collective() -> None:
     # The TPU graph admission (optimized.admission.inspect_research_hlo) counts
     # module.collectives by opcode and relies on this normalization of async forms.
-    async_hlo = GOOD_HLO.replace(
-        "all-reduce(x)", "all-reduce-start(x)"
-    ).replace(
+    async_hlo = GOOD_HLO.replace("all-reduce(x)", "all-reduce-start(x)").replace(
         "  routed = bf16[1,2048]{1,0} slice(local),",
-        "  completed = bf16[1,6144]{1,0} all-reduce-done(local)\n"
-        "  routed = bf16[1,2048]{1,0} slice(completed),",
+        "  completed = bf16[1,6144]{1,0} all-reduce-done(local)\n  routed = bf16[1,2048]{1,0} slice(completed),",
     )
     assert "all-reduce-start(x)" in async_hlo and "all-reduce-done(local)" in async_hlo
     module = parse_hlo_module(async_hlo)

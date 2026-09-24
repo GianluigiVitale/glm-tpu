@@ -8,6 +8,7 @@ from glm_tpu.model_loader.placement import placements_for_source_tensor
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.model_loader.source_inventory import SourceTensor
 from glm_tpu.config.model import ModelGeometry
+
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (tests/config/test_model.py).
 from tools.equivalence.fixture import config_json
 
@@ -16,9 +17,7 @@ _BYTES = {"F8_E4M3": 1, "BF16": 2, "F32": 4}
 
 
 def _geometry() -> ModelGeometry:
-    return ModelGeometry.from_hf_config(
-        config_json()
-    )
+    return ModelGeometry.from_hf_config(config_json())
 
 
 def _tensor(name: str, dtype: str, shape: tuple[int, ...]) -> SourceTensor:
@@ -102,28 +101,16 @@ def test_ws32_attention_layout_uses_only_feature_or_expert_slices() -> None:
     for source, local_shape, partition_spec, replication in cases:
         placements = placements_for_source_tensor(source, geometry)
         assert len(placements) == 32
-        assert {placement.destination_shape for placement in placements} == {
-            local_shape
-        }
-        assert {placement.partition_spec for placement in placements} == {
-            partition_spec
-        }
-        assert sum(placement.byte_count for placement in placements) == (
-            source.byte_count * replication
-        )
+        assert {placement.destination_shape for placement in placements} == {local_shape}
+        assert {placement.partition_spec for placement in placements} == {partition_spec}
+        assert sum(placement.byte_count for placement in placements) == (source.byte_count * replication)
 
 
 def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
     geometry = _geometry()
-    embedding = _tensor(
-        "model.embed_tokens.weight", "BF16", (154880, 6144)
-    )
-    embedding_placements = placements_for_source_tensor(
-        embedding, geometry
-    )
-    assert {placement.destination_shape for placement in embedding_placements} == {
-        (19360, 1536)
-    }
+    embedding = _tensor("model.embed_tokens.weight", "BF16", (154880, 6144))
+    embedding_placements = placements_for_source_tensor(embedding, geometry)
+    assert {placement.destination_shape for placement in embedding_placements} == {(19360, 1536)}
     assert sum(item.byte_count for item in embedding_placements) == embedding.byte_count
 
     dense = _tensor(
@@ -132,12 +119,8 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
         (6144, 12288),
     )
     dense_placements = placements_for_source_tensor(dense, geometry)
-    assert {item.destination_shape for item in dense_placements} == {
-        (1536, 1536)
-    }
-    assert {item.partition_spec for item in dense_placements} == {
-        ("feature", "expert")
-    }
+    assert {item.destination_shape for item in dense_placements} == {(1536, 1536)}
+    assert {item.partition_spec for item in dense_placements} == {("feature", "expert")}
     assert sum(item.byte_count for item in dense_placements) == dense.byte_count
 
     shared = _tensor(
@@ -146,23 +129,17 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
         (6144, 2048),
     )
     shared_placements = placements_for_source_tensor(shared, geometry)
-    assert {item.destination_shape for item in shared_placements} == {
-        (1536, 2048)
-    }
+    assert {item.destination_shape for item in shared_placements} == {(1536, 2048)}
     assert sum(item.byte_count for item in shared_placements) == 8 * shared.byte_count
 
-    norm = _tensor(
-        "model.layers.0.self_attn.q_a_layernorm.weight", "BF16", (2048,)
-    )
+    norm = _tensor("model.layers.0.self_attn.q_a_layernorm.weight", "BF16", (2048,))
     norm_placements = placements_for_source_tensor(norm, geometry)
     assert {item.destination_shape for item in norm_placements} == {(2048,)}
     assert sum(item.byte_count for item in norm_placements) == 32 * norm.byte_count
 
 
 def test_ws32_mtp_sources_are_outside_the_base_decoder_layout() -> None:
-    mtp = _tensor(
-        "model.layers.78.input_layernorm.weight", "BF16", (6144,)
-    )
+    mtp = _tensor("model.layers.78.input_layernorm.weight", "BF16", (6144,))
     assert placements_for_source_tensor(mtp, _geometry()) == ()
 
 

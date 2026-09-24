@@ -18,7 +18,7 @@ import sys
 
 REPO = Path(__file__).resolve().parents[2]
 
-CHILD = r'''
+CHILD = r"""
 import json
 from glm_tpu.runner import programs
 from tools.equivalence import fixture
@@ -52,12 +52,16 @@ for label, capacity, lanes, interpret in (("plain", 1536, 0, False), ("donated",
                       calls=list(calls))
 out["state_leaves"] = len(__import__("jax").tree.leaves(decoder_state_specs()))
 print(json.dumps(out))
-'''
+"""
 
 
 def _child() -> dict:
-    env = dict(os.environ, JAX_PLATFORMS="cpu", PYTHONDONTWRITEBYTECODE="1",
-               XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    env = dict(
+        os.environ,
+        JAX_PLATFORMS="cpu",
+        PYTHONDONTWRITEBYTECODE="1",
+        XLA_FLAGS="--xla_force_host_platform_device_count=32",
+    )
     output = subprocess.check_output([sys.executable, "-c", CHILD], cwd=REPO, env=env, text=True, timeout=600)
     return json.loads(output.strip().splitlines()[-1])
 
@@ -67,15 +71,27 @@ def test_program_set_names_order_donation_and_builder_arguments():
 
     out = _child()
     head = [["wk_decode", [], False, True], ["wk_promote", [], False, True], ["cache_init", [], False, True]]
-    assert out["plain"]["specs"] == head + [["prefill_128", [], True, True], ["prefill_114", [], True, True],
-                                            ["decode", [], True, True]]
+    assert out["plain"]["specs"] == head + [
+        ["prefill_128", [], True, True],
+        ["prefill_114", [], True, True],
+        ["decode", [], True, True],
+    ]
     # capacity > 8,192: the prefill (state = argument 2) and decode (state = argument 1) donate
-    assert out["donated"]["specs"] == head + [["prefill_128", [2], True, True], ["prefill_114", [2], True, True],
-                                              ["decode", [1], True, True]]
-    batch = [["batch_cache_init", [], False, True], ["batch_insert", [0], False, True],
-             ["batch_decode", [1], True, True]]
-    assert out["concurrent"]["specs"] == head + [["prefill_128", [], True, True], ["prefill_114", [], True, True],
-                                                 *batch]
+    assert out["donated"]["specs"] == head + [
+        ["prefill_128", [2], True, True],
+        ["prefill_114", [2], True, True],
+        ["decode", [1], True, True],
+    ]
+    batch = [
+        ["batch_cache_init", [], False, True],
+        ["batch_insert", [0], False, True],
+        ["batch_decode", [1], True, True],
+    ]
+    assert out["concurrent"]["specs"] == head + [
+        ["prefill_128", [], True, True],
+        ["prefill_114", [], True, True],
+        *batch,
+    ]
     assert (out["plain"]["decode"], out["plain"]["batch"]) == (True, False)
     assert (out["concurrent"]["decode"], out["concurrent"]["batch"]) == (False, True)
     assert out["plain"]["prefill_rows"] == [128, 114]
@@ -97,22 +113,45 @@ def test_state_donation_rule_has_one_source():
 
     assert CAPACITY == 8192
     assert [donates_state(c) for c in (1536, 8191, 8192, 8193, 8704, 32768, 166912)] == [
-        False, False, False, True, True, True, True]
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+    ]
     # the runtime record's ownership mode reads the same rule: no second capacity comparison
     source = (REPO / "glm_tpu/runner/tpu_runner.py").read_text()
     assert "donates_state(self.capacity)" in source
-    compared = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Compare)
-                for side in (node.left, *node.comparators) if isinstance(side, ast.Name) and side.id == "CAPACITY"]
+    compared = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Compare)
+        for side in (node.left, *node.comparators)
+        if isinstance(side, ast.Name) and side.id == "CAPACITY"
+    ]
     assert not compared
 
 
 def test_runtime_and_compile_batch_build_no_program_themselves():
-    builders = {"build_prefill_program", "build_ws32_prefill_challenger_program", "build_packed_decoder_program",
-                "build_batched_decoder_program", "build_cache_initializer", "build_wk_programs", "jit"}
+    builders = {
+        "build_prefill_program",
+        "build_ws32_prefill_challenger_program",
+        "build_packed_decoder_program",
+        "build_batched_decoder_program",
+        "build_cache_initializer",
+        "build_wk_programs",
+        "jit",
+    }
     for relative in ("glm_tpu/runner/tpu_runner.py", "glm_tpu/engine/llm_engine.py"):
         tree = ast.parse((REPO / relative).read_text())
         names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
         names |= {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
-        names |= {alias.asname or alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-                  for alias in node.names}
+        names |= {
+            alias.asname or alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        }
         assert not names & builders, (relative, sorted(names & builders))

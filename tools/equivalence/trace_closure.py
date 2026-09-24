@@ -32,7 +32,7 @@ def _module_name(filename: str) -> str | None:
     root = str(REPO) + "/"
     if not filename.startswith(root):
         return None
-    relative = filename[len(root):]
+    relative = filename[len(root) :]
     if not relative.startswith("glm_tpu/") or not relative.endswith(".py"):
         return None
     name = relative[:-3].replace("/", ".")

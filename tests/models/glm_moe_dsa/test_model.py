@@ -3,13 +3,14 @@
 The eight histories come from the production cache initializer and prefill (until S2f: the frozen
 sampled FP8 prefill program, archived at ``archive/research-20260922``).
 """
+
 import json
 import os
 import subprocess
 import sys
 
 
-CPU_CHECK = r'''
+CPU_CHECK = r"""
 import json
 import jax, jax.numpy as jnp, numpy as np
 from types import SimpleNamespace
@@ -123,16 +124,18 @@ for step in range(2):
     stacked,input_tokens=out.state,out.next_token
     report['steps']+=1
 print(json.dumps(report))
-'''
+"""
 
 
 def test_eight_conversations_match_separate_decode_and_freeze_finished_lane():
-    env=dict(os.environ,JAX_PLATFORMS='cpu',
-             XLA_FLAGS=(os.environ.get('XLA_FLAGS','')+' --xla_force_host_platform_device_count=32').strip())
-    result=subprocess.run([sys.executable,'-c',CPU_CHECK],env=env,
-                          capture_output=True,text=True,timeout=1500)
-    assert result.returncode==0,result.stdout+result.stderr
-    report=json.loads(result.stdout.strip().splitlines()[-1])
-    assert report['conversations']==8 and report['steps']==2
-    assert report['other_lanes_unchanged_under_perturbation']
-    print(json.dumps(report,sort_keys=True))
+    env = dict(
+        os.environ,
+        JAX_PLATFORMS="cpu",
+        XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip(),
+    )
+    result = subprocess.run([sys.executable, "-c", CPU_CHECK], env=env, capture_output=True, text=True, timeout=1500)
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    assert report["conversations"] == 8 and report["steps"] == 2
+    assert report["other_lanes_unchanged_under_perturbation"]
+    print(json.dumps(report, sort_keys=True))

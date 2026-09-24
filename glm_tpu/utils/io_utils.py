@@ -32,7 +32,7 @@ def create_private_exclusive(path: Path, payload: bytes) -> None:
     try:
         view = memoryview(payload)
         while view:
-            view = view[os.write(fd, view):]
+            view = view[os.write(fd, view) :]
         os.fsync(fd)
     finally:
         os.close(fd)
@@ -108,8 +108,8 @@ def read_bounded(path: Path, cap: int) -> bytes:
 
 
 def atomic(path, value):
-    tmp = path.with_name(path.name + '.tmp')
-    with tmp.open('w', encoding='utf-8') as f:
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
         os.chmod(tmp, 0o600)
         json.dump(value, f, ensure_ascii=False)
         f.flush()
@@ -122,15 +122,17 @@ def atomic(path, value):
 
 
 def persist(path, value):
-    temporary=path.with_suffix('.tmp')
-    with temporary.open('w') as stream:
-        json.dump(value,stream,sort_keys=True,indent=2)
-        stream.write('\n');stream.flush();os.fsync(stream.fileno())
+    temporary = path.with_suffix(".tmp")
+    with temporary.open("w") as stream:
+        json.dump(value, stream, sort_keys=True, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
     temporary.replace(path)
 
 
 def private(path):
     _plain(path)
-    info=path.stat()
-    if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode)&0o077:
-        raise ValueError('optimized input namespace must be owner-only')
+    info = path.stat()
+    if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) & 0o077:
+        raise ValueError("optimized input namespace must be owner-only")

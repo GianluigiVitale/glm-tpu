@@ -49,7 +49,7 @@ class ClosureMap:
         prefixes = [key for key in self.modules if key.endswith(".") and name.startswith(key)]
         if prefixes:
             key = max(prefixes, key=len)
-            return self.modules[key] + name[len(key):]
+            return self.modules[key] + name[len(key) :]
         return name
 
     def function(self, entry: str) -> str:
@@ -62,7 +62,7 @@ class ClosureMap:
         prefixes = [key for key in self.functions if entry.startswith(key + ".")]
         if prefixes:
             key = max(prefixes, key=len)
-            return self.functions[key] + entry[len(key):]
+            return self.functions[key] + entry[len(key) :]
         module, _, qualname = entry.partition(":")
         return f"{self.module(module)}:{qualname}"
 
@@ -85,8 +85,9 @@ def load(path: Path = MAP) -> ClosureMap:
     tables: dict[str, dict[str, str]] = {}
     for name in TABLES:
         table = value.get(name, {})
-        if not isinstance(table, dict) or not all(isinstance(k, str) and isinstance(v, str) and v
-                                                  for k, v in table.items()):
+        if not isinstance(table, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) and v for k, v in table.items()
+        ):
             raise ValueError(f"closure_map.toml [{name}] must map strings to non-empty strings")
         tables[name] = table
     for key, old in tables["modules"].items():
@@ -102,18 +103,25 @@ def _is_package(module: str) -> bool:
     return (REPO / module.replace(".", "/") / "__init__.py").is_file()
 
 
-def compare_modules(old: list[str], new: list[str], cmap: ClosureMap, *,
-                    is_package: Callable[[str], bool] = _is_package) -> dict[str, Any]:
+def compare_modules(
+    old: list[str], new: list[str], cmap: ClosureMap, *, is_package: Callable[[str], bool] = _is_package
+) -> dict[str, Any]:
     """A stage closure may only shrink: every current module, mapped to its recorded name, must be
     in the recorded closure, declared in ``[added]``, or a package that only exists as the parent
     of a mapped (moved) module."""
     baseline = set(old)
     mapped = {name: cmap.module(name) for name in new}
-    moved_parents = {name.rsplit(".", i)[0] for name, target in mapped.items() if target != name
-                     for i in range(1, name.count(".") + 1)}
-    added = sorted(name for name, target in mapped.items()
-                   if target not in baseline and name not in cmap.added
-                   and not (name in moved_parents and is_package(name)))
+    moved_parents = {
+        name.rsplit(".", i)[0]
+        for name, target in mapped.items()
+        if target != name
+        for i in range(1, name.count(".") + 1)
+    }
+    added = sorted(
+        name
+        for name, target in mapped.items()
+        if target not in baseline and name not in cmap.added and not (name in moved_parents and is_package(name))
+    )
     removed = sorted(baseline - set(mapped.values()))
     return dict(added=added, removed=removed, renamed=sorted(f"{k} -> {v}" for k, v in mapped.items() if k != v))
 
@@ -126,8 +134,12 @@ def compare_functions(old: list[str], new: list[str], cmap: ClosureMap) -> dict[
     targets = set(mapped.values())
     added = sorted(entry for entry, target in mapped.items() if target not in baseline and entry not in cmap.added)
     removed = sorted(entry for entry in baseline - targets if entry not in cmap.removed)
-    return dict(added=added, removed=removed, renamed=sorted(f"{k} -> {v}" for k, v in mapped.items() if k != v),
-                declared_removed=sorted(baseline.intersection(cmap.removed) - targets))
+    return dict(
+        added=added,
+        removed=removed,
+        renamed=sorted(f"{k} -> {v}" for k, v in mapped.items() if k != v),
+        declared_removed=sorted(baseline.intersection(cmap.removed) - targets),
+    )
 
 
 def layering_entry(entry: str, cmap: ClosureMap) -> str:

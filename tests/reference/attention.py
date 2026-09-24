@@ -36,13 +36,23 @@ import jax.numpy as jnp
 import numpy as np
 from jax import lax
 
-from glm_tpu.layers.contracts import MlaNumericalContract, SelectedPositions, StageLocalKvLayout, _require_int32, _require_shape
+from glm_tpu.layers.contracts import (
+    MlaNumericalContract,
+    SelectedPositions,
+    StageLocalKvLayout,
+    _require_int32,
+    _require_shape,
+)
 from glm_tpu.kernels.sparse_mla.kernel import sparse_mla_attention, SparseAttentionResult
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round, build_rotary_table_host
 
 from .linear import einsum, project
 from .norm import rms_norm
-from glm_tpu.layers.attention.kv_cache import SelectedKvSegment, canonicalize_selected_positions, gather_stage_local_selected_kv
+from glm_tpu.layers.attention.kv_cache import (
+    SelectedKvSegment,
+    canonicalize_selected_positions,
+    gather_stage_local_selected_kv,
+)
 
 
 class QkvAWeights(NamedTuple):
@@ -80,14 +90,10 @@ def rotate(value: jax.Array, table_rows: jax.Array) -> jax.Array:
     return apply_rotary_fp32_final_round(value, cos, sin, interleaved=True)
 
 
-def prepare(
-    normalized: jax.Array, weights: QkvAWeights, *, epsilon: float
-) -> PreparedAttention:
+def prepare(normalized: jax.Array, weights: QkvAWeights, *, epsilon: float) -> PreparedAttention:
     """The shared q-a / kv-a boundary consumed by attention and the DSA indexer."""
     kv_lora_rank = weights.kv_a_norm.shape[0]
-    q_residual = rms_norm(
-        project(normalized, weights.q_a), weights.q_a_norm, epsilon=epsilon
-    )
+    q_residual = rms_norm(project(normalized, weights.q_a), weights.q_a_norm, epsilon=epsilon)
     kv = project(normalized, weights.kv_a)
     latent = rms_norm(kv[:, :kv_lora_rank], weights.kv_a_norm, epsilon=epsilon)
     return PreparedAttention(q_residual, latent, kv[:, kv_lora_rank:])
@@ -122,9 +128,7 @@ def mla_attention(
     cache_rows = jnp.concatenate((prepared.latent, key_rope), axis=-1)
     kv_cache = kv_cache.at[positions].set(cache_rows)
 
-    kv_b = weights.kv_b.reshape(
-        heads, nope + contract.v_head_dim, contract.kv_lora_rank
-    )
+    kv_b = weights.kv_b.reshape(heads, nope + contract.v_head_dim, contract.kv_lora_rank)
     q_absorbed = einsum("rhd,hdc->rhc", q[..., :nope], kv_b[:, :nope])
     segment = gather_paged_selected_kv(
         kv_cache[None],
@@ -186,19 +190,11 @@ def gather_paged_selected_kv(
     safe_pages = jnp.clip(page_ids, 0, max(num_pages - 1, 0))
     flat_rows = safe_pages * page_size + safe_positions % page_size
     flat_cache = cache.reshape(num_pages * page_size, cache_width)
-    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(
-        rows, width, cache_width
-    )
+    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(rows, width, cache_width)
     slot_ok = live & position_ok & block_ok & page_ok
     gathered = jnp.where(slot_ok[..., None], gathered, jnp.zeros((), cache.dtype))
-    length_ok = (context_lengths >= 0) & (
-        context_lengths <= block_tables.shape[1] * page_size
-    )
-    row_valid = (
-        canonical.contract_valid
-        & length_ok
-        & jnp.all(jnp.where(live, slot_ok, True), axis=1)
-    )
+    length_ok = (context_lengths >= 0) & (context_lengths <= block_tables.shape[1] * page_size)
+    row_valid = canonical.contract_valid & length_ok & jnp.all(jnp.where(live, slot_ok, True), axis=1)
     return SelectedKvSegment(gathered, positions, counts, row_valid)
 
 
@@ -212,34 +208,22 @@ def combine_stage_local_attention(
     if partial_outputs.ndim != 4 or partial_logsumexp.ndim != 3:
         raise ValueError("stage-local partial output/LSE ranks must be four/three")
     owners, rows, heads, _ = partial_outputs.shape
-    _require_shape(
-        "partial_logsumexp", partial_logsumexp, (owners, rows, heads)
-    )
-    _require_shape(
-        "partial_contract_valid", partial_contract_valid, (owners, rows)
-    )
+    _require_shape("partial_logsumexp", partial_logsumexp, (owners, rows, heads))
+    _require_shape("partial_contract_valid", partial_contract_valid, (owners, rows))
     if owners == 0:
         raise ValueError("stage-local attention requires at least one owner")
     live = jnp.isfinite(partial_logsumexp)
     maximum = jnp.max(jnp.where(live, partial_logsumexp, -jnp.inf), axis=0)
     any_live = jnp.any(live, axis=0)
     safe_maximum = jnp.where(any_live, maximum, 0.0)
-    weights = jnp.where(
-        live, jnp.exp(partial_logsumexp - safe_maximum[None, ...]), 0.0
-    )
+    weights = jnp.where(live, jnp.exp(partial_logsumexp - safe_maximum[None, ...]), 0.0)
     denominator = jnp.sum(weights, axis=0)
     safe_denominator = jnp.where(any_live, denominator, 1.0)
-    combined = jnp.sum(
-        partial_outputs.astype(jnp.float32) * weights[..., None], axis=0
-    ) / safe_denominator[..., None]
+    combined = jnp.sum(partial_outputs.astype(jnp.float32) * weights[..., None], axis=0) / safe_denominator[..., None]
     combined = jnp.where(any_live[..., None], combined, 0.0)
-    combined_lse = jnp.where(
-        any_live, safe_maximum + jnp.log(safe_denominator), -jnp.inf
-    )
+    combined_lse = jnp.where(any_live, safe_maximum + jnp.log(safe_denominator), -jnp.inf)
     valid = jnp.all(partial_contract_valid, axis=0)
-    return SparseAttentionResult(
-        combined.astype(partial_outputs.dtype), combined_lse, valid
-    )
+    return SparseAttentionResult(combined.astype(partial_outputs.dtype), combined_lse, valid)
 
 
 def stage_local_sparse_mla_reference(
@@ -262,9 +246,7 @@ def stage_local_sparse_mla_reference(
     if layout.packed_cache_width != contract.packed_cache_width:
         raise ValueError("KV layout and numerical contract cache widths disagree")
     if query_nope_absorbed.shape[0] != 1:
-        raise ValueError(
-            "decode_batch1 stage-local sparse MLA requires exactly one row"
-        )
+        raise ValueError("decode_batch1 stage-local sparse MLA requires exactly one row")
 
     outputs = []
     logsumexp = []
@@ -287,6 +269,4 @@ def stage_local_sparse_mla_reference(
         outputs.append(partial.output)
         logsumexp.append(partial.logsumexp)
         validity.append(partial.contract_valid)
-    return combine_stage_local_attention(
-        jnp.stack(outputs), jnp.stack(logsumexp), jnp.stack(validity)
-    )
+    return combine_stage_local_attention(jnp.stack(outputs), jnp.stack(logsumexp), jnp.stack(validity))

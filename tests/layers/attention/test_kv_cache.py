@@ -10,9 +10,7 @@ from glm_tpu.layers.contracts import StageLocalKvLayout
 
 
 @pytest.mark.parametrize("offset,count", [(60, 17), (504, 17), (1020, 4), (64, 0)])
-def test_block_writes_equal_scalar_reference_across_stripes_pages_and_tails(
-    offset, count
-):
+def test_block_writes_equal_scalar_reference_across_stripes_pages_and_tails(offset, count):
     layout = StageLocalKvLayout(local_parallel_size=8, packed_cache_width=128)
     table = jnp.asarray([[2, 0, 1]], jnp.int32)
     rows = jnp.arange(17 * 128, dtype=jnp.float32).reshape(17, 128).astype(jnp.bfloat16)
@@ -67,11 +65,7 @@ def test_invalid_block_never_changes_cache(offset, count, owner, table, bad_live
     rows = jnp.ones((17, 128), jnp.bfloat16)
     if bad_live:
         rows = rows.at[0, 0].set(jnp.inf)
-    out = jax.jit(
-        lambda c, r, t, o, n, e: write_prefill_cache_block(
-            c, r, t, o, n, e, layout=layout
-        )
-    )(
+    out = jax.jit(lambda c, r, t, o, n, e: write_prefill_cache_block(c, r, t, o, n, e, layout=layout))(
         cache,
         rows,
         jnp.asarray(table, jnp.int32),
@@ -81,9 +75,7 @@ def test_invalid_block_never_changes_cache(offset, count, owner, table, bad_live
     )
     assert not bool(out.valid)
     np.testing.assert_array_equal(np.asarray(out.cache), np.asarray(cache))
-    assert (
-        not np.asarray(out.row_valid).any() and not np.asarray(out.causal_lengths).any()
-    )
+    assert not np.asarray(out.row_valid).any() and not np.asarray(out.causal_lengths).any()
 
 
 def test_empty_at_capacity_ignores_padding_but_validates_live_prefix():

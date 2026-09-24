@@ -6,6 +6,7 @@ not create compute, load weights, call a legacy engine or copy caches to host.
 Pause/resume here means retaining this SAME live session/cache in memory; it
 is not a claim of process-crash or durable KV-checkpoint recovery.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,8 +37,9 @@ def request_uniform(*, seed: int, request_id: str, token_index: int) -> float:
     if type(request_id) is not str or not request_id:
         raise ValueError("a nonempty request id is required")
     identity = sha256(request_id.encode("utf-8")).digest()
-    digest = sha256(b"glm-ws32-request-uniform-v1\0" + seed.to_bytes(8, "big")
-                    + identity + token_index.to_bytes(8, "big")).digest()
+    digest = sha256(
+        b"glm-ws32-request-uniform-v1\0" + seed.to_bytes(8, "big") + identity + token_index.to_bytes(8, "big")
+    ).digest()
     return int.from_bytes(digest[:3], "big") / 2**24
 
 
@@ -53,15 +55,19 @@ class SampledRequestPolicy:
 
     def __post_init__(self) -> None:
         request_uniform(seed=self.seed, request_id=self.request_id, token_index=0)
-        if any(type(x) is not int or x <= 0 for x in (
-            self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size
-        )):
+        if any(
+            type(x) is not int or x <= 0
+            for x in (self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size)
+        ):
             raise ValueError("positive integer request dimensions required")
         if self.prompt_tokens + self.max_new_tokens > self.context_capacity:
             raise ValueError("full registered generation cap must fit; no silent truncation")
-        if (type(self.eos_ids) is not tuple or not self.eos_ids
-                or len(set(self.eos_ids)) != len(self.eos_ids)
-                or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)):
+        if (
+            type(self.eos_ids) is not tuple
+            or not self.eos_ids
+            or len(set(self.eos_ids)) != len(self.eos_ids)
+            or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)
+        ):
             raise ValueError("unique in-vocabulary EOS ids required")
 
 
@@ -83,7 +89,9 @@ class Ws32RequestSession:
     """
 
     def __init__(
-        self, policy: SampledRequestPolicy, *,
+        self,
+        policy: SampledRequestPolicy,
+        *,
         decode_step: Callable[[Any, Any, Any], DecodeStepResult],
         replicate_uniform: Callable[[np.ndarray], Any],
         fleet_all: Callable[[bool], bool],
@@ -93,8 +101,12 @@ class Ws32RequestSession:
         clock: Callable[[], float] = perf_counter,
     ) -> None:
         now = clock()
-        if (not math.isfinite(request_started) or not math.isfinite(now)
-                or request_started > now or not delivery_boundary.strip()):
+        if (
+            not math.isfinite(request_started)
+            or not math.isfinite(now)
+            or request_started > now
+            or not delivery_boundary.strip()
+        ):
             raise ValueError("request clock and named delivery boundary required")
         self.policy = policy
         self._decode = decode_step
@@ -141,8 +153,7 @@ class Ws32RequestSession:
         """Same draw for every nonfinal prompt block; first generated index=0."""
         if self._failed or self.finished:
             raise RuntimeError("terminal request cannot sample")
-        value = request_uniform(seed=self.policy.seed, request_id=self.policy.request_id,
-                                token_index=len(self._events))
+        value = request_uniform(seed=self.policy.seed, request_id=self.policy.request_id, token_index=len(self._events))
         return self._replicate(np.asarray(value, np.float32))
 
     def release(self) -> None:
@@ -172,19 +183,27 @@ class Ws32RequestSession:
         error = None
         try:
             token = np.asarray(token_array)
-            valid = (token.shape == (1,) and token.dtype == np.int32
-                     and 0 <= int(token[0]) < self.policy.vocab_size
-                     and bool(np.asarray(state.contract_valid).all())
-                     and np.array_equal(np.asarray(state.position), [expected])
-                     and np.array_equal(np.asarray(state.context_lengths), [expected + 1]))
+            valid = (
+                token.shape == (1,)
+                and token.dtype == np.int32
+                and 0 <= int(token[0]) < self.policy.vocab_size
+                and bool(np.asarray(state.contract_valid).all())
+                and np.array_equal(np.asarray(state.position), [expected])
+                and np.array_equal(np.asarray(state.context_lengths), [expected + 1])
+            )
         except Exception as exc:
             valid, error = False, exc
         self._vote(valid, error)
         if error is not None:  # Defensive: a bad vote callback cannot mask a local failure.
             raise RuntimeError("invalid request metadata") from error
         token_id = int(token[0])
-        reason = ("eos" if token_id in self.policy.eos_ids else
-                  "length" if len(self._events) + 1 == self.policy.max_new_tokens else None)
+        reason = (
+            "eos"
+            if token_id in self.policy.eos_ids
+            else "length"
+            if len(self._events) + 1 == self.policy.max_new_tokens
+            else None
+        )
         event = TokenEvent(self.policy.request_id, len(self._events), token_id, reason)
         # Commit the state/frontier BEFORE invoking user delivery code. A sink
         # failure may already have emitted bytes; never regenerate or retry it.
@@ -249,72 +268,83 @@ class Ws32RequestSession:
 
 
 class BatchedSession:
-    def __init__(self, requests, *, decode, put, vote, deliver, deadline,
-                 clock=time.perf_counter):
-        self.requests=requests
-        self.decode,self.put,self.vote,self.deliver=decode,put,vote,deliver
-        self.deadline,self.clock=deadline,clock
-        self.events=[[] for _ in requests]
-        self.active=np.ones(len(requests),bool)
-        self.finished_at=[None]*len(requests)
-        self.failed=False
-        self.round=0
+    def __init__(self, requests, *, decode, put, vote, deliver, deadline, clock=time.perf_counter):
+        self.requests = requests
+        self.decode, self.put, self.vote, self.deliver = decode, put, vote, deliver
+        self.deadline, self.clock = deadline, clock
+        self.events = [[] for _ in requests]
+        self.active = np.ones(len(requests), bool)
+        self.finished_at = [None] * len(requests)
+        self.failed = False
+        self.round = 0
 
     def require(self, valid):
-        agreed=self.vote(bool(valid) and self.clock()<self.deadline)
+        agreed = self.vote(bool(valid) and self.clock() < self.deadline)
         if not valid or agreed is not True:
-            raise RuntimeError('concurrent batch rejected state, delivery or deadline')
+            raise RuntimeError("concurrent batch rejected state, delivery or deadline")
 
     def accept(self, metadata):
         """Admit the whole round before committing/delivering any of its tokens."""
-        status=np.asarray(metadata)
-        valid=status.shape==(len(self.requests),4) and status.dtype==np.int32
+        status = np.asarray(metadata)
+        valid = status.shape == (len(self.requests), 4) and status.dtype == np.int32
         if valid:
-            for lane,item in enumerate(self.requests):
-                if not self.active[lane]:continue
-                token,health,position,length=map(int,status[lane])
-                expected=len(item['prompt_ids'])+len(self.events[lane])
-                valid &= (0<=token<item['vocab_size'] and health==1
-                          and position==expected and length==expected+1)
+            for lane, item in enumerate(self.requests):
+                if not self.active[lane]:
+                    continue
+                token, health, position, length = map(int, status[lane])
+                expected = len(item["prompt_ids"]) + len(self.events[lane])
+                valid &= (
+                    0 <= token < item["vocab_size"] and health == 1 and position == expected and length == expected + 1
+                )
         self.require(valid)
-        error=None
+        error = None
         try:
-            for lane,item in enumerate(self.requests):
-                if not self.active[lane]:continue
-                token=int(status[lane,0])
-                reason=('eos' if token in item['eos_ids'] else 'length'
-                        if len(self.events[lane])+1==item['max_new_tokens'] else None)
-                event=TokenEvent(item['request_id'],len(self.events[lane]),token,reason)
+            for lane, item in enumerate(self.requests):
+                if not self.active[lane]:
+                    continue
+                token = int(status[lane, 0])
+                reason = (
+                    "eos"
+                    if token in item["eos_ids"]
+                    else "length"
+                    if len(self.events[lane]) + 1 == item["max_new_tokens"]
+                    else None
+                )
+                event = TokenEvent(item["request_id"], len(self.events[lane]), token, reason)
                 self.events[lane].append(event)
-                if reason:self.active[lane]=False
-                self.deliver(lane,event,self.round)
-                if reason:self.finished_at[lane]=self.clock()
-        except Exception as exc:error=exc
+                if reason:
+                    self.active[lane] = False
+                self.deliver(lane, event, self.round)
+                if reason:
+                    self.finished_at[lane] = self.clock()
+        except Exception as exc:
+            error = exc
         self.require(error is None)
-        if error is not None:raise RuntimeError('concurrent delivery failed') from error
+        if error is not None:
+            raise RuntimeError("concurrent delivery failed") from error
 
     def run(self, state, tokens, first_metadata):
         if self.failed or self.round or any(self.events):
-            raise RuntimeError('concurrent session cannot be reused')
+            raise RuntimeError("concurrent session cannot be reused")
         try:
             self.accept(first_metadata)
-            self.decode_started=self.clock()
+            self.decode_started = self.clock()
             while self.active.any():
                 self.require(True)
-                out=jax.block_until_ready(self.decode(tokens,state,self.put(self.active)))
+                out = jax.block_until_ready(self.decode(tokens, state, self.put(self.active)))
                 # Transfer exclusive ownership before delivery: an ambiguous
                 # failure poisons this session and cannot replay consumed state.
-                state,tokens=out.state,out.next_token
-                self.round+=1
+                state, tokens = out.state, out.next_token
+                self.round += 1
                 self.accept(out.metadata)
                 del out
-            self.decode_seconds=self.clock()-self.decode_started
+            self.decode_seconds = self.clock() - self.decode_started
         except Exception:
-            self.failed=True
+            self.failed = True
             raise
         finally:
             # No live cache survives the completed or failed batch.
-            del state,tokens
+            del state, tokens
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,15 +367,19 @@ class RequestPolicy:
         if type(self.request_id) is not str or not self.request_id:
             raise ValueError("a nonempty request id is required")
         self.request_id.encode("utf-8")
-        if any(type(x) is not int or x <= 0 for x in (
-            self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size
-        )):
+        if any(
+            type(x) is not int or x <= 0
+            for x in (self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size)
+        ):
             raise ValueError("positive integer request dimensions required")
         if self.prompt_tokens + self.max_new_tokens > self.context_capacity:
             raise ValueError("full registered generation cap must fit; no silent truncation")
-        if (type(self.eos_ids) is not tuple or not self.eos_ids
-                or len(set(self.eos_ids)) != len(self.eos_ids)
-                or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)):
+        if (
+            type(self.eos_ids) is not tuple
+            or not self.eos_ids
+            or len(set(self.eos_ids)) != len(self.eos_ids)
+            or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)
+        ):
             raise ValueError("unique in-vocabulary EOS ids required")
 
 
@@ -358,7 +392,9 @@ class PackedRequestSession(Ws32RequestSession):
     """
 
     def __init__(
-        self, policy: RequestPolicy, *,
+        self,
+        policy: RequestPolicy,
+        *,
         decode_step: Callable[[Any, Any], PackedDecodeResult],
         fleet_all: Callable[[bool], bool],
         deliver: Callable[[TokenEvent], None],
@@ -367,46 +403,63 @@ class PackedRequestSession(Ws32RequestSession):
         clock: Callable[[], float] = perf_counter,
     ) -> None:
         if not isinstance(policy, RequestPolicy):
-            raise ValueError('an explicit greedy RequestPolicy is required')
+            raise ValueError("an explicit greedy RequestPolicy is required")
         # Greedy decoding draws no uniforms: nothing to replicate (next_uniform refuses).
-        super().__init__(policy, decode_step=decode_step, replicate_uniform=None, fleet_all=fleet_all,
-                         deliver=deliver, delivery_boundary=delivery_boundary,
-                         request_started=request_started, clock=clock)
+        super().__init__(
+            policy,
+            decode_step=decode_step,
+            replicate_uniform=None,
+            fleet_all=fleet_all,
+            deliver=deliver,
+            delivery_boundary=delivery_boundary,
+            request_started=request_started,
+            clock=clock,
+        )
 
     def next_uniform(self) -> Any:
-        raise RuntimeError('greedy decoding draws no uniforms')
+        raise RuntimeError("greedy decoding draws no uniforms")
 
     def step(self) -> TokenEvent:
         self._begin()
         try:
             if not self._events:
-                raise RuntimeError('complete prefill before decoding')
+                raise RuntimeError("complete prefill before decoding")
             started = self._clock()
-            packed = self._decode(self._pending_token,self._state)
+            packed = self._decode(self._pending_token, self._state)
             jax.block_until_ready(packed)
             elapsed = self._clock() - started
             error = None
             try:
                 status = np.asarray(packed.metadata)  # One device-to-host read.
                 expected = self.policy.prompt_tokens + len(self._events)
-                valid = (math.isfinite(elapsed) and elapsed >= 0
-                         and status.shape == (4,) and status.dtype == np.int32
-                         and 0 <= int(status[0]) < self.policy.vocab_size
-                         and int(status[1]) == 1 and int(status[2]) == expected
-                         and int(status[3]) == expected+1)
+                valid = (
+                    math.isfinite(elapsed)
+                    and elapsed >= 0
+                    and status.shape == (4,)
+                    and status.dtype == np.int32
+                    and 0 <= int(status[0]) < self.policy.vocab_size
+                    and int(status[1]) == 1
+                    and int(status[2]) == expected
+                    and int(status[3]) == expected + 1
+                )
             except Exception as exc:
-                valid,error = False,exc
-            self._vote(valid,error)
+                valid, error = False, exc
+            self._vote(valid, error)
             if error is not None:
-                raise RuntimeError('invalid packed request metadata') from error
+                raise RuntimeError("invalid packed request metadata") from error
             self._decode_seconds.append(elapsed)
             token_id = int(status[0])
-            reason = ('eos' if token_id in self.policy.eos_ids else
-                      'length' if len(self._events)+1 == self.policy.max_new_tokens else None)
-            event = TokenEvent(self.policy.request_id,len(self._events),token_id,reason)
+            reason = (
+                "eos"
+                if token_id in self.policy.eos_ids
+                else "length"
+                if len(self._events) + 1 == self.policy.max_new_tokens
+                else None
+            )
+            event = TokenEvent(self.policy.request_id, len(self._events), token_id, reason)
             result = packed.decoded
             # Commit before invoking the sink: an ambiguous failure cannot retry.
-            self._state,self._pending_token = result.state,result.next_token
+            self._state, self._pending_token = result.state, result.next_token
             self._events.append(event)
             delivered = None
             try:
@@ -414,12 +467,12 @@ class PackedRequestSession(Ws32RequestSession):
                 delivered = self._clock()
                 floor = self._delivered_at[-1] if self._delivered_at else self.request_started
                 if not math.isfinite(delivered) or delivered < floor:
-                    raise ValueError('delivery clock moved backwards')
+                    raise ValueError("delivery clock moved backwards")
             except Exception as exc:
                 error = exc
-            self._vote(error is None,error)
+            self._vote(error is None, error)
             if error is not None:
-                raise RuntimeError('delivery failed; request cannot be retried') from error
+                raise RuntimeError("delivery failed; request cannot be retried") from error
             self._delivered_at.append(delivered)
             return event
         except Exception:

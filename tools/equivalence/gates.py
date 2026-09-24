@@ -88,14 +88,22 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
         return _programs_with_programset("production", (), timeout=4 * 3600, prefix=prefix)
     if gate in PROTOCOL_OF:  # the same child as the frozen gate (shared within one invocation)
         tier = TIER_OF[PROTOCOL_OF[gate]]
-        return _program_child(tier, ("--consistency",) if tier == "fixture" else (),
-                              timeout=3600 if tier == "fixture" else 4 * 3600, prefix=prefix)
+        return _program_child(
+            tier,
+            ("--consistency",) if tier == "fixture" else (),
+            timeout=3600 if tier == "fixture" else 4 * 3600,
+            prefix=prefix,
+        )
     if gate == "G3":
-        return run_child("tools.equivalence.golden_run", timeout=3600, extra_env={"XLA_FLAGS": G3_XLA_FLAGS},
-                         prefix=prefix)
+        return run_child(
+            "tools.equivalence.golden_run", timeout=3600, extra_env={"XLA_FLAGS": G3_XLA_FLAGS}, prefix=prefix
+        )
     if gate == "G4":
-        return run_child("tools.equivalence.identities", "--live", timeout=1800) if live_manifest_readable() \
+        return (
+            run_child("tools.equivalence.identities", "--live", timeout=1800)
+            if live_manifest_readable()
             else run_child("tools.equivalence.identities", timeout=1800)
+        )
     if gate == "G6":
         return run_child("tools.equivalence.import_closure", timeout=3600)
     if gate == "G6-static":
@@ -117,13 +125,11 @@ def _program_child(tier: str, extra: tuple[str, ...], *, timeout: float, prefix:
     (G1/G2) and its protocol record (G1-protocol/G2-protocol) share it."""
     key = (tier, extra, prefix)
     if key not in _CHILDREN:
-        _CHILDREN[key] = run_child("tools.equivalence.programs", "--tier", tier, *extra, timeout=timeout,
-                                   prefix=prefix)
+        _CHILDREN[key] = run_child("tools.equivalence.programs", "--tier", tier, *extra, timeout=timeout, prefix=prefix)
     return _CHILDREN[key]
 
 
-def _programs_with_programset(tier: str, extra: tuple[str, ...], *, timeout: float,
-                              prefix: tuple[str, ...]) -> Any:
+def _programs_with_programset(tier: str, extra: tuple[str, ...], *, timeout: float, prefix: tuple[str, ...]) -> Any:
     """The tier's fingerprints from the real runtime (the gate), and -- in a parallel child -- those
     of ``build_program_set`` called standalone with the runtime's arguments, compared as a
     cross-check (``programset_cross_check``; S2c, it replaced the v0 replica of ``_load``)."""
@@ -131,8 +137,20 @@ def _programs_with_programset(tier: str, extra: tuple[str, ...], *, timeout: flo
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         real = pool.submit(_program_child, tier, extra, timeout=timeout, prefix=prefix)
-        standalone = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, "--adapter", "programset",
-                                 timeout=timeout, prefix=prefix) if program_set_exists() else None
+        standalone = (
+            pool.submit(
+                run_child,
+                "tools.equivalence.programs",
+                "--tier",
+                tier,
+                "--adapter",
+                "programset",
+                timeout=timeout,
+                prefix=prefix,
+            )
+            if program_set_exists()
+            else None
+        )
         record = dict(real.result())
         if standalone is None:
             record["programset_cross_check"] = dict(status="absent", reason="no glm_tpu/runner/programs.py (pre-S2c)")
@@ -164,12 +182,19 @@ def programset_cross_check(real: dict[str, Any], standalone: dict[str, Any]) -> 
 
     mismatches = sorted(expected ^ set(new))
     mismatches += sorted(k for k in expected & set(new) if pair(old[k]) != pair(new[k]))
-    mismatches += sorted(f"{k} (donation)" for k in new
-                         if new[k].get("declared_donate_argnums") != new[k].get("donated_argnums"))
+    mismatches += sorted(
+        f"{k} (donation)" for k in new if new[k].get("declared_donate_argnums") != new[k].get("donated_argnums")
+    )
     sets = real.get("program_sets") or {}
     not_from_set = sorted(run for run, info in sets.items() if not info.get("identical"))
-    return dict(status="compared", identical=bool(sets) and not mismatches and not not_from_set,
-                programs=len(new), runs=len(sets), mismatches=mismatches[:20], runs_not_compiled_from_set=not_from_set)
+    return dict(
+        status="compared",
+        identical=bool(sets) and not mismatches and not not_from_set,
+        programs=len(new),
+        runs=len(sets),
+        mismatches=mismatches[:20],
+        runs_not_compiled_from_set=not_from_set,
+    )
 
 
 def live_manifest_readable() -> bool:
@@ -191,10 +216,18 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
         # per run.
         # The frozen safety facts (verify arguments, probe and admission verdicts, admission
         # requests; verdicts.py) come from the same child and never change either.
-        return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"],
-                                      jit_compiler_options=v.get("jit_compiler_options"), compile=v.get("compile"))
-                              for k, v in record["programs"].items()},
-                    safety=record.get("safety"))
+        return dict(
+            programs={
+                k: dict(
+                    digest=v["digest"],
+                    signature_digest=v["signature_digest"],
+                    jit_compiler_options=v.get("jit_compiler_options"),
+                    compile=v.get("compile"),
+                )
+                for k, v in record["programs"].items()
+            },
+            safety=record.get("safety"),
+        )
     if gate in PROTOCOL_OF:
         # Characterization: the load protocol the real __init__/_load/compile followed (phases,
         # admissions, loader arguments, record keys, HLO directory, consensus probe), the
@@ -205,9 +238,13 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
     if gate == "G4":
         return record["record"]
     if gate in ("G6", "G6-static"):
-        return dict(stages={k: dict(modules=v["modules"], jax_imported=v["jax_imported"],
-                                    third_party=v.get("third_party", []))
-                            for k, v in record["stages"].items()}, static_layering=record["static_layering"])
+        return dict(
+            stages={
+                k: dict(modules=v["modules"], jax_imported=v["jax_imported"], third_party=v.get("third_party", []))
+                for k, v in record["stages"].items()
+            },
+            static_layering=record["static_layering"],
+        )
     if gate == "G7":
         return record["functions"]
     if gate == "G9":
@@ -221,12 +258,20 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
 
 # ----------------------------------------------------------------------------- data files
 def _envelope(gate: str, payload: dict[str, Any], environment: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:
-    return dict(gate=gate, format=1, environment=environment, source=source_record(), recorded_unix=int(time.time()),
-                **extra, **payload)
+    return dict(
+        gate=gate,
+        format=1,
+        environment=environment,
+        source=source_record(),
+        recorded_unix=int(time.time()),
+        **extra,
+        **payload,
+    )
 
 
-def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
-           rename_only: bool = False) -> list[dict[str, Any]]:
+def record(
+    gates: list[str], *, twice: bool = True, reason: str | None = None, rename_only: bool = False
+) -> list[dict[str, Any]]:
     """Record baseline data. G1 and G3 are produced twice in separate processes (G3's second run
     pinned to 4 CPUs when ``taskset`` exists) and must be identical before anything is written.
 
@@ -246,11 +291,15 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
     if changed_tree or rename_only:
         frozen = [g for g in gates if g in FROZEN_DATA]
         if frozen and changed_tree:
-            raise SystemExit(f"{', '.join(frozen)}: graph and identity goldens are recorded only from production "
-                             "paths equal to 181c013e (extract that tree and point GLM_EQUIVALENCE_SOURCE_ROOT at it)")
+            raise SystemExit(
+                f"{', '.join(frozen)}: graph and identity goldens are recorded only from production "
+                "paths equal to 181c013e (extract that tree and point GLM_EQUIVALENCE_SOURCE_ROOT at it)"
+            )
         if not valid_reason(reason):
-            raise SystemExit("this re-baseline needs --reason set to exactly one H number (H1..H16), stage token "
-                             "(e.g. S2d, S4.2b) or work unit (e.g. WU-E)")
+            raise SystemExit(
+                "this re-baseline needs --reason set to exactly one H number (H1..H16), stage token "
+                "(e.g. S2d, S4.2b) or work unit (e.g. WU-E)"
+            )
     marker = dict(kind="rename-only" if rename_only else "reviewed", reason=reason) if reason else None
     if marker is not None and set(gates) & set(FROZEN_DATA):
         raise SystemExit("graph and identity goldens (G1-G4, fixture) take no re-baseline marker")
@@ -262,23 +311,34 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             differing, info = _closure_check(gate, read_json(DATA / DATA_FILES[gate]), first)
             if differing:
                 raise SystemExit(f"{gate}: not a rename-only change: {differing[:20]}; nothing written")
-            marker = dict(marker, closure_map=info["closure_map"],
-                          previous_digest=digest_json(comparable(gate, read_json(DATA / DATA_FILES[gate]))))
+            marker = dict(
+                marker,
+                closure_map=info["closure_map"],
+                previous_digest=digest_json(comparable(gate, read_json(DATA / DATA_FILES[gate]))),
+            )
         determinism = None
         if twice and gate in ("G1", "G3"):
             second = produce(gate, cpus="0-3" if shutil.which("taskset") else None)
             identical = comparable(gate, first) == comparable(gate, second)
-            determinism = dict(runs=2, identical=identical,
-                               second_run_cpus="0-3" if shutil.which("taskset") else "all",
-                               first_digest=digest_json(comparable(gate, first)))
+            determinism = dict(
+                runs=2,
+                identical=identical,
+                second_run_cpus="0-3" if shutil.which("taskset") else "all",
+                first_digest=digest_json(comparable(gate, first)),
+            )
             if not identical:
                 raise SystemExit(f"{gate}: the two baseline recordings differ; nothing written")
             if gate == "G1":
                 determinism["tier_digest"] = [first["tier_digest"], second["tier_digest"]]
         seconds = round(time.perf_counter() - started, 1)
-        diffs = {name: _record_diff(name, first if name != "G9-http" else dict(cases=first["http"]))
-                 for name in (gate, *[p for p, frozen in PROTOCOL_OF.items() if frozen == gate],
-                              *(["G9-http"] if gate == "G9" else []))}
+        diffs = {
+            name: _record_diff(name, first if name != "G9-http" else dict(cases=first["http"]))
+            for name in (
+                gate,
+                *[p for p, frozen in PROTOCOL_OF.items() if frozen == gate],
+                *(["G9-http"] if gate == "G9" else []),
+            )
+        }
         written: list[str] = []
         unchanged: list[str] = []
 
@@ -293,23 +353,39 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             problems = _program_record_problems(gate, first)
             if problems:
                 raise SystemExit(f"{gate}: {', '.join(problems)}; nothing written")
-            payload = dict(programs=first["programs"], safety=first["safety"], tier_digest=first["tier_digest"],
-                           programset_cross_check=first["programset_cross_check"], adapter=first["adapter"])
+            payload = dict(
+                programs=first["programs"],
+                safety=first["safety"],
+                tier_digest=first["tier_digest"],
+                programset_cross_check=first["programset_cross_check"],
+                adapter=first["adapter"],
+            )
             if gate == "G1":
                 payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
             write(gate, _envelope(gate, payload, first["environment"], tier=TIER_OF[gate]))
             # The frozen baseline comes with its characterization record (same child, same tree).
             protocol = next(name for name, frozen in PROTOCOL_OF.items() if frozen == gate)
-            write(protocol, _envelope(protocol, dict(runtime=first["runtime"], defaults=first["defaults"],
-                                                     verdicts=first["verdicts"]),
-                                      first["environment"], tier=TIER_OF[gate]))
+            write(
+                protocol,
+                _envelope(
+                    protocol,
+                    dict(runtime=first["runtime"], defaults=first["defaults"], verdicts=first["verdicts"]),
+                    first["environment"],
+                    tier=TIER_OF[gate],
+                ),
+            )
         elif gate in PROTOCOL_OF:
-            payload = dict(runtime=first["runtime"], defaults=first["defaults"], verdicts=first["verdicts"],
-                           **({"rebaseline": marker} if marker else {}))
+            payload = dict(
+                runtime=first["runtime"],
+                defaults=first["defaults"],
+                verdicts=first["verdicts"],
+                **({"rebaseline": marker} if marker else {}),
+            )
             write(gate, _envelope(gate, payload, first["environment"], tier=TIER_OF[PROTOCOL_OF[gate]]))
         elif gate == "G3":
-            payload = dict(groups=first["groups"], components=first["components"], digest=first["digest"],
-                           determinism=determinism)
+            payload = dict(
+                groups=first["groups"], components=first["components"], digest=first["digest"], determinism=determinism
+            )
             write(gate, _envelope(gate, payload, first["environment"]))
         elif gate == "G4":
             if "live" not in first:
@@ -329,14 +405,23 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             write("G9-http", _envelope("G9-http", dict(cases=first["http"], **extra), environment))
         elif gate == "fixture":
             write(gate, _envelope(gate, dict(fixture=first["fixture"]), first["environment"]))
-        reports.append(dict(gate=gate, status="recorded" if written else "unchanged", seconds=seconds,
-                            determinism=determinism, diff=diffs, written=written, unchanged=unchanged))
+        reports.append(
+            dict(
+                gate=gate,
+                status="recorded" if written else "unchanged",
+                seconds=seconds,
+                determinism=determinism,
+                diff=diffs,
+                written=written,
+                unchanged=unchanged,
+            )
+        )
     return reports
 
 
 def _brief(value: Any, width: int = 160) -> str:
     text = json.dumps(value, sort_keys=True, separators=(",", ":"))
-    return text if len(text) <= width else text[:width - 3] + "..."
+    return text if len(text) <= width else text[: width - 3] + "..."
 
 
 def value_diff(old: Any, new: Any, prefix: str = "") -> list[str]:
@@ -353,8 +438,12 @@ def value_diff(old: Any, new: Any, prefix: str = "") -> list[str]:
                 out.extend(value_diff(old[key], new[key], f"{prefix}{key}."))
         return out
     where = prefix.rstrip(".") or "<root>"
-    if (isinstance(old, list) and isinstance(new, list) and all(isinstance(x, str) for x in old + new)
-            and (len(old) != len(new) or sorted(old) != sorted(new))):
+    if (
+        isinstance(old, list)
+        and isinstance(new, list)
+        and all(isinstance(x, str) for x in old + new)
+        and (len(old) != len(new) or sorted(old) != sorted(new))
+    ):
         # name lists (closures, executed functions, phases): what appeared and what disappeared
         added, removed = sorted(set(new) - set(old)), sorted(set(old) - set(new))
         lines = [f"{where}: + {x}" for x in added] + [f"{where}: - {x}" for x in removed]
@@ -410,8 +499,12 @@ def check(gate: str) -> dict[str, Any]:
         return _check(gate, started)
     except Exception as exc:  # a crashed child or comparison must not hide the remaining gates
         lines = [line for line in str(exc).splitlines() if line.strip()]
-        return dict(gate=gate, status="error", reason=f"{type(exc).__name__}: " + " | ".join(lines[-12:])[-3000:],
-                    seconds=round(time.perf_counter() - started, 1))
+        return dict(
+            gate=gate,
+            status="error",
+            reason=f"{type(exc).__name__}: " + " | ".join(lines[-12:])[-3000:],
+            seconds=round(time.perf_counter() - started, 1),
+        )
 
 
 def _check(gate: str, started: float) -> dict[str, Any]:
@@ -423,8 +516,9 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         return dict(gate=gate, status="fail", reason="no baseline " + ", ".join(missing), differing=["<baseline>"])
     baseline = read_json(DATA / DATA_FILES[gate])
     if not baseline.get("environment"):
-        return dict(gate=gate, status="fail", reason=f"{DATA_FILES[gate]} records no environment",
-                    differing=["<environment>"])
+        return dict(
+            gate=gate, status="fail", reason=f"{DATA_FILES[gate]} records no environment", differing=["<environment>"]
+        )
     reason = version_mismatch(baseline["environment"], BOUND_PACKAGES.get(gate, BOUND_PACKAGES["default"]))
     if reason:
         return dict(gate=gate, status="skip", reason=reason)
@@ -438,21 +532,29 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
         live = baseline["live"]
         new = fresh["record"]
-        if new["headers"] != live["headers"] or new["placement"]["sha256"] != live["placement_sha256"] \
-                or new["geometry"]["sha256"] != live["geometry_sha256"]:
+        if (
+            new["headers"] != live["headers"]
+            or new["placement"]["sha256"] != live["placement_sha256"]
+            or new["geometry"]["sha256"] != live["geometry_sha256"]
+        ):
             differing.append("live_manifest")
     elif gate in ("G6", "G6-static", "G7"):
         differing, info = _closure_check(gate, baseline, fresh)
     elif gate in ("G1", "G2"):
         old, new = comparable(gate, baseline), comparable(gate, fresh)
-        differing = sorted(k for k in set(old["programs"]) | set(new["programs"])
-                           if old["programs"].get(k) != new["programs"].get(k))
+        differing = sorted(
+            k for k in set(old["programs"]) | set(new["programs"]) if old["programs"].get(k) != new["programs"].get(k)
+        )
         differing += ["safety." + k for k in _diff_keys(old["safety"], new["safety"])][:40]
         differing += _program_record_problems(gate, fresh)
     else:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
-    report: dict[str, Any] = dict(gate=gate, status="pass" if not differing else "fail", differing=differing,
-                                  seconds=round(time.perf_counter() - started, 1))
+    report: dict[str, Any] = dict(
+        gate=gate,
+        status="pass" if not differing else "fail",
+        differing=differing,
+        seconds=round(time.perf_counter() - started, 1),
+    )
     if differing and gate not in ("G1", "G2", "G6", "G6-static", "G7"):
         report["diff"] = value_diff(comparable(gate, baseline), comparable(gate, fresh))[:60]
     if differing and gate in ("G1", "G2") and any(k.startswith("safety.") for k in differing):
@@ -462,9 +564,11 @@ def _check(gate: str, started: float) -> dict[str, Any]:
     if gate in ("G1", "G2"):
         report["programset_cross_check"] = fresh.get("programset_cross_check")
         if differing:
-            report["summary_diff"] = {k: _summary_delta(_resolved(baseline["programs"], k),
-                                                        _resolved(fresh["programs"], k))
-                                      for k in differing[:10] if k in baseline["programs"] or k in fresh["programs"]}
+            report["summary_diff"] = {
+                k: _summary_delta(_resolved(baseline["programs"], k), _resolved(fresh["programs"], k))
+                for k in differing[:10]
+                if k in baseline["programs"] or k in fresh["programs"]
+            }
     return report
 
 
@@ -502,8 +606,10 @@ def _closure_check(gate: str, baseline: dict[str, Any], fresh: dict[str, Any]) -
 
         differing += lean_violations(new["stages"])
         recorded = {closure_map.layering_entry(e, closure_map.ClosureMap()) for e in old["static_layering"]}
-        differing += ["static_layering+" + e for e in sorted({closure_map.layering_entry(e, cmap)
-                                                              for e in new["static_layering"]} - recorded)]
+        differing += [
+            "static_layering+" + e
+            for e in sorted({closure_map.layering_entry(e, cmap) for e in new["static_layering"]} - recorded)
+        ]
         info.update(removed=removed, renamed=renamed)
     else:
         result = closure_map.compare_functions(baseline["functions"], fresh["functions"], cmap)
@@ -540,14 +646,20 @@ def _summary_delta(old: dict[str, Any] | None, new: dict[str, Any] | None) -> An
         return "program added" if old is None else "program removed"
     a, b = old.get("summary", {}), new.get("summary", {})
     old_ops, new_ops = a.get("ops", {}), b.get("ops", {})
-    ops = {k: [old_ops.get(k, 0), new_ops.get(k, 0)] for k in set(old_ops) | set(new_ops)
-           if old_ops.get(k) != new_ops.get(k)}
-    return dict(signature_changed=old["signature_digest"] != new["signature_digest"],
-                jit_compiler_options=[old.get("jit_compiler_options"), new.get("jit_compiler_options")],
-                compile=[old.get("compile"), new.get("compile")], ops=ops,
-                kernels_changed=a.get("kernels") != b.get("kernels"),
-                collectives_changed=a.get("collectives") != b.get("collectives"),
-                bytes=[a.get("bytes"), b.get("bytes")])
+    ops = {
+        k: [old_ops.get(k, 0), new_ops.get(k, 0)]
+        for k in set(old_ops) | set(new_ops)
+        if old_ops.get(k) != new_ops.get(k)
+    }
+    return dict(
+        signature_changed=old["signature_digest"] != new["signature_digest"],
+        jit_compiler_options=[old.get("jit_compiler_options"), new.get("jit_compiler_options")],
+        compile=[old.get("compile"), new.get("compile")],
+        ops=ops,
+        kernels_changed=a.get("kernels") != b.get("kernels"),
+        collectives_changed=a.get("collectives") != b.get("collectives"),
+        bytes=[a.get("bytes"), b.get("bytes")],
+    )
 
 
 def diff(program: str, *, against: str, tier: str) -> dict[str, Any]:
@@ -562,19 +674,38 @@ def diff(program: str, *, against: str, tier: str) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-diff-") as scratch:
         root = Path(scratch) / "baseline"
         root.mkdir()
-        present = subprocess.run(["git", "ls-tree", "--name-only", against, "--", *PRODUCTION_PATHS],
-                                 cwd=HARNESS_REPO, check=True, capture_output=True, text=True).stdout.split()
-        archive = subprocess.run(["git", "archive", "--format=tar", against, *present], cwd=HARNESS_REPO,
-                                 check=True, capture_output=True).stdout
+        present = subprocess.run(
+            ["git", "ls-tree", "--name-only", against, "--", *PRODUCTION_PATHS],
+            cwd=HARNESS_REPO,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+        archive = subprocess.run(
+            ["git", "archive", "--format=tar", against, *present], cwd=HARNESS_REPO, check=True, capture_output=True
+        ).stdout
         with tarfile.open(fileobj=__import__("io").BytesIO(archive)) as tar:
             tar.extractall(root, filter="data")
         texts = []
         for source in (root, REPO):
-            texts.append(run_child("tools.equivalence.programs", "--tier", tier, "--only", program, "--text",
-                                   source_root=source, timeout=4 * 3600))
+            texts.append(
+                run_child(
+                    "tools.equivalence.programs",
+                    "--tier",
+                    tier,
+                    "--only",
+                    program,
+                    "--text",
+                    source_root=source,
+                    timeout=4 * 3600,
+                )
+            )
     old, new = texts[0]["text"], texts[1]["text"]
-    lines = list(difflib.unified_diff(old.splitlines(), new.splitlines(), f"{against}:{program}", f"worktree:{program}",
-                                      n=2, lineterm=""))
+    lines = list(
+        difflib.unified_diff(
+            old.splitlines(), new.splitlines(), f"{against}:{program}", f"worktree:{program}", n=2, lineterm=""
+        )
+    )
     return dict(program=program, against=against, identical=old == new, diff_lines=len(lines), diff=lines[:400])
 
 

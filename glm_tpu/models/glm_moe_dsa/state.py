@@ -8,6 +8,7 @@ promotes repaired keys. This is an unpromoted numerical path, not §21 evidence.
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).
 """
+
 from __future__ import annotations
 
 from typing import Any, NamedTuple
@@ -32,18 +33,14 @@ class BatchedPrefillResult(NamedTuple):
 
 
 def batched_prefill_state_specs() -> BatchedPrefillState:
-    return BatchedPrefillState(
-        decoder_state_specs(), P(None, None, "expert", None), P(), P()
-    )
+    return BatchedPrefillState(decoder_state_specs(), P(None, None, "expert", None), P(), P())
 
 
 def _require_config(config: CacheConfig) -> None:
     # Reuse raw final-layout weight views, never silently consume the promoted
     # convolution aliases or StrategyND overlay as if they were the raw kernels.
     if config.exact_dsa or config.strategy_nd_dense:
-        raise PlanValidationError(
-            "batched prefill requires raw weight config, no exact aliases/StrategyND"
-        )
+        raise PlanValidationError("batched prefill requires raw weight config, no exact aliases/StrategyND")
     if not config.host_main_rope_table or config.logical_page_size != 512:
         raise PlanValidationError("batched prefill requires host main RoPE and page512")
 
@@ -64,9 +61,7 @@ def finish_batched_prefill(
         not bool(np.asarray(state.finished))
         or not np.asarray(state.decoder.contract_valid).all()
         or not np.asarray(state.decoder.position == state.prompt_length).all()
-        or not np.asarray(
-            state.decoder.context_lengths == state.prompt_length + 1
-        ).all()
+        or not np.asarray(state.decoder.context_lengths == state.prompt_length + 1).all()
         or not np.asarray(result.next_token >= 0).all()
     ):
         raise ValueError("batched prefill is not complete and healthy; decode refused")
@@ -106,9 +101,7 @@ def decoder_state_specs() -> DecoderState:
 
 
 def decode_result_specs() -> DecodeStepResult:
-    return DecodeStepResult(
-        decoder_state_specs(), P(), P(None, "feature")
-    )
+    return DecodeStepResult(decoder_state_specs(), P(), P(None, "feature"))
 
 
 def _validate_local_state(
@@ -128,37 +121,21 @@ def _validate_local_state(
         config.local_rows_per_page,
         geometry.dsa_indexer_head_dim,
     )
-    if state.kv_cache_local.shape != expected_kv or (
-        state.kv_cache_local.dtype != jnp.bfloat16
-    ):
+    if state.kv_cache_local.shape != expected_kv or (state.kv_cache_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 local KV state geometry drifted")
-    if state.index_cache_local.shape != expected_index or (
-        state.index_cache_local.dtype != jnp.bfloat16
-    ):
+    if state.index_cache_local.shape != expected_index or (state.index_cache_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 local index state geometry drifted")
-    if state.selected_positions.shape != (1, geometry.dsa_top_k) or (
-        state.selected_positions.dtype != jnp.int32
-    ):
+    if state.selected_positions.shape != (1, geometry.dsa_top_k) or (state.selected_positions.dtype != jnp.int32):
         raise ValueError("WS32 selected-position state geometry drifted")
-    if state.selected_valid_counts.shape != (1,) or (
-        state.selected_valid_counts.dtype != jnp.int32
-    ):
+    if state.selected_valid_counts.shape != (1,) or (state.selected_valid_counts.dtype != jnp.int32):
         raise ValueError("WS32 selected-count state geometry drifted")
-    if state.selected_scores.shape != (1, geometry.dsa_top_k) or (
-        state.selected_scores.dtype != jnp.float32
-    ):
+    if state.selected_scores.shape != (1, geometry.dsa_top_k) or (state.selected_scores.dtype != jnp.float32):
         raise ValueError("WS32 selected-score state geometry drifted")
     if state.position.shape != (1,) or state.position.dtype != jnp.int32:
         raise ValueError("WS32 position state geometry drifted")
-    if state.block_tables.shape != (1, config.page_count) or (
-        state.block_tables.dtype != jnp.int32
-    ):
+    if state.block_tables.shape != (1, config.page_count) or (state.block_tables.dtype != jnp.int32):
         raise ValueError("WS32 block-table state geometry drifted")
-    if state.context_lengths.shape != (1,) or (
-        state.context_lengths.dtype != jnp.int32
-    ):
+    if state.context_lengths.shape != (1,) or (state.context_lengths.dtype != jnp.int32):
         raise ValueError("WS32 context-length state geometry drifted")
-    if state.contract_valid.shape != (1,) or (
-        state.contract_valid.dtype != jnp.bool_
-    ):
+    if state.contract_valid.shape != (1,) or (state.contract_valid.dtype != jnp.bool_):
         raise ValueError("WS32 decoder health must be one boolean row")

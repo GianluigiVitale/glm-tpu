@@ -97,49 +97,66 @@ def requests_record() -> dict[str, Any]:
     prompt = [(i * 7919 + 13) % 154880 for i in range(96)]
     bodies = {}
     for capacity in PROFILES:
-        value = request.from_token_ids(prompt, request_id=f"golden-{capacity}", max_new_tokens=64,
-                                       context_capacity=capacity)
+        value = request.from_token_ids(
+            prompt, request_id=f"golden-{capacity}", max_new_tokens=64, context_capacity=capacity
+        )
         bodies[capacity] = value
-        out[f"single_{capacity}"] = dict(_bytes_record(canonical(value)), request_sha256=value["request_sha256"],
-                                         keys=sorted(value))
-    sequential = request.batch([bodies[8192], request.from_token_ids(prompt[:40], request_id="golden-8192-b",
-                                                                      max_new_tokens=8)])
-    out["batch_sequential"] = dict(_bytes_record(canonical(sequential)),
-                                   request_sha256=sequential["request_sha256"], keys=sorted(sequential))
-    lanes = [request.from_token_ids(prompt[: 20 + 10 * i], request_id=f"lane-{i}", max_new_tokens=32,
-                                    context_capacity=32768) for i in range(4)]
+        out[f"single_{capacity}"] = dict(
+            _bytes_record(canonical(value)), request_sha256=value["request_sha256"], keys=sorted(value)
+        )
+    sequential = request.batch(
+        [bodies[8192], request.from_token_ids(prompt[:40], request_id="golden-8192-b", max_new_tokens=8)]
+    )
+    out["batch_sequential"] = dict(
+        _bytes_record(canonical(sequential)), request_sha256=sequential["request_sha256"], keys=sorted(sequential)
+    )
+    lanes = [
+        request.from_token_ids(prompt[: 20 + 10 * i], request_id=f"lane-{i}", max_new_tokens=32, context_capacity=32768)
+        for i in range(4)
+    ]
     concurrent = request.batch(lanes, concurrent=True)
-    out["batch_concurrent"] = dict(_bytes_record(canonical(concurrent)),
-                                   request_sha256=concurrent["request_sha256"], keys=sorted(concurrent))
+    out["batch_concurrent"] = dict(
+        _bytes_record(canonical(concurrent)), request_sha256=concurrent["request_sha256"], keys=sorted(concurrent)
+    )
     tampered = dict(bodies[32768], max_new_tokens=65)
     out["refusals"] = dict(
-        non_ascii_request_id=_error(lambda: request.from_token_ids(prompt, request_id="richiesta-è",
-                                                                   max_new_tokens=8)),
+        non_ascii_request_id=_error(lambda: request.from_token_ids(prompt, request_id="richiesta-è", max_new_tokens=8)),
         tampered=_error(lambda: request.validate(tampered)),
-        unsupported_capacity=_error(lambda: request.from_token_ids(prompt, request_id="x", max_new_tokens=8,
-                                                                   context_capacity=4096)),
+        unsupported_capacity=_error(
+            lambda: request.from_token_ids(prompt, request_id="x", max_new_tokens=8, context_capacity=4096)
+        ),
         over_budget=_error(lambda: request.from_token_ids(prompt, request_id="x", max_new_tokens=8150)),
-        concurrent_capacity=_error(lambda: request.batch(
-            [request.from_token_ids(prompt, request_id=f"c{i}", max_new_tokens=8) for i in range(2)],
-            concurrent=True)),
+        concurrent_capacity=_error(
+            lambda: request.batch(
+                [request.from_token_ids(prompt, request_id=f"c{i}", max_new_tokens=8) for i in range(2)],
+                concurrent=True,
+            )
+        ),
         duplicate_ids=_error(lambda: request.batch([bodies[8192], bodies[8192]])),
     )
-    out["stop_cause"] = dict(eos=request.stop_cause(bodies[8192], "eos"),
-                             output_cap=request.stop_cause(bodies[8192], "length"),
-                             context_exhausted=request.stop_cause(
-                                 request.from_token_ids(prompt, request_id="full", max_new_tokens=8192 - len(prompt)),
-                                 "length"))
+    out["stop_cause"] = dict(
+        eos=request.stop_cause(bodies[8192], "eos"),
+        output_cap=request.stop_cause(bodies[8192], "length"),
+        context_exhausted=request.stop_cause(
+            request.from_token_ids(prompt, request_id="full", max_new_tokens=8192 - len(prompt)), "length"
+        ),
+    )
     out["messages_non_ascii"] = dict(
         wire=_bytes_record(canonical(NON_ASCII_MESSAGES)),
         api_cap_measure=api_cap_measure(),
         converted=_bytes_record(canonical(convert(NON_ASCII_MESSAGES))),
     )
-    out["constants"] = dict(schemas=[request.SCHEMA, request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA],
-                            capacities=list(request.CAPACITIES), prompt_limits={str(k): v for k, v in
-                                                                                 request.PROMPT_LIMITS.items()},
-                            concurrent_limit=request.CONCURRENT_LIMIT, payload_cap=request.PAYLOAD_CAP,
-                            messages_cap=request.MESSAGES_CAP, max_new=request.MAX_NEW, vocab=request.VOCAB,
-                            eos=list(request.EOS))
+    out["constants"] = dict(
+        schemas=[request.SCHEMA, request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA],
+        capacities=list(request.CAPACITIES),
+        prompt_limits={str(k): v for k, v in request.PROMPT_LIMITS.items()},
+        concurrent_limit=request.CONCURRENT_LIMIT,
+        payload_cap=request.PAYLOAD_CAP,
+        messages_cap=request.MESSAGES_CAP,
+        max_new=request.MAX_NEW,
+        vocab=request.VOCAB,
+        eos=list(request.EOS),
+    )
     return out
 
 
@@ -179,9 +196,17 @@ def api_cap_measure() -> dict[str, Any]:
 def _state(position: int, healthy: bool = True) -> Any:
     from glm_tpu.models.glm_moe_dsa.state import DecoderState
 
-    return DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
-                            np.zeros((1, 1), np.float32), np.array([position], np.int32),
-                            np.zeros((1, 1), np.int32), np.array([position + 1], np.int32), np.array([healthy]))
+    return DecoderState(
+        np.zeros((1,)),
+        np.zeros((1,)),
+        np.zeros((1, 1), np.int32),
+        np.ones((1,), np.int32),
+        np.zeros((1, 1), np.float32),
+        np.array([position], np.int32),
+        np.zeros((1, 1), np.int32),
+        np.array([position + 1], np.int32),
+        np.array([healthy]),
+    )
 
 
 def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) -> Any:
@@ -213,9 +238,10 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     def execute_prefill(block: Any, count: Any, fresh: Any, *args: Any) -> Any:
         length = prompt["length"]
         runtime.prefill_calls.append([int(np.asarray(block).size), int(np.asarray(count))])
-        return BatchedPrefillResult(BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
-                                                                np.array(length, np.int32), np.array(True)),
-                                        np.array([outputs[0]], np.int32))
+        return BatchedPrefillResult(
+            BatchedPrefillState(_state(length, healthy), np.zeros((1,)), np.array(length, np.int32), np.array(True)),
+            np.array([outputs[0]], np.int32),
+        )
 
     def decode(token: Any, previous: Any, *args: Any) -> Any:
         calls.append(int(np.asarray(token)[0]))
@@ -264,9 +290,10 @@ def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any
         lane = lanes["index"]
         length = lanes["lengths"][lane]
         runtime.prefill_calls.append([lane, int(np.asarray(block).size), int(np.asarray(count))])
-        return BatchedPrefillResult(BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
-                                                                np.array(length, np.int32), np.array(True)),
-                                        np.array([schedules[lane][0]], np.int32))
+        return BatchedPrefillResult(
+            BatchedPrefillState(_state(length, healthy), np.zeros((1,)), np.array(length, np.int32), np.array(True)),
+            np.array([schedules[lane][0]], np.int32),
+        )
 
     def insert_batch(state: Any, one: Any, index: Any) -> Any:
         return state
@@ -319,16 +346,29 @@ def _fleet_fakes(*, divergent: bool = False) -> Iterator[None]:
     with ExitStack() as stack:
         # the answer writer finds the tokenizer through the current site (patched loader below)
         stack.enter_context(_installed_site(synthetic_site(Path("/site"))))
-        stack.enter_context(mock.patch.object(multihost_utils, "process_allgather",
-                                              lambda value: _allgather(value, divergent=divergent)))
-        stack.enter_context(mock.patch("transformers.AutoTokenizer.from_pretrained",
-                                       lambda *args, **kwargs: tokenizer))
+        stack.enter_context(
+            mock.patch.object(
+                multihost_utils, "process_allgather", lambda value: _allgather(value, divergent=divergent)
+            )
+        )
+        stack.enter_context(mock.patch("transformers.AutoTokenizer.from_pretrained", lambda *args, **kwargs: tokenizer))
         yield
 
 
-_REPORT_VALUES = ("emitted", "finish_reason", "stop_cause", "output_directory", "output_budget_tokens",
-                  "token_sha256", "request_sha256", "prompt_tokens", "timed_decode_tokens", "sampling",
-                  "speculative", "request_id")
+_REPORT_VALUES = (
+    "emitted",
+    "finish_reason",
+    "stop_cause",
+    "output_directory",
+    "output_budget_tokens",
+    "token_sha256",
+    "request_sha256",
+    "prompt_tokens",
+    "timed_decode_tokens",
+    "sampling",
+    "speculative",
+    "request_id",
+)
 
 
 def _tree(root: Path) -> list[str]:
@@ -344,20 +384,25 @@ def _run_queued(capacity: int) -> dict[str, Any]:
     from glm_tpu.engine import request
     from glm_tpu.worker import tpu_worker as worker
 
-    items = [request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4,
-                                    context_capacity=capacity),
-             request.from_token_ids([40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3,
-                                    context_capacity=capacity),
-             request.from_token_ids([50 + i % 7 for i in range(114)], request_id="golden-q3", max_new_tokens=2,
-                                    context_capacity=capacity),
-             request.from_token_ids([60 + i % 5 for i in range(242)], request_id="golden-q4", max_new_tokens=2,
-                                    context_capacity=capacity)]
+    items = [
+        request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4, context_capacity=capacity),
+        request.from_token_ids(
+            [40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3, context_capacity=capacity
+        ),
+        request.from_token_ids(
+            [50 + i % 7 for i in range(114)], request_id="golden-q3", max_new_tokens=2, context_capacity=capacity
+        ),
+        request.from_token_ids(
+            [60 + i % 5 for i in range(242)], request_id="golden-q4", max_new_tokens=2, context_capacity=capacity
+        ),
+    ]
     value = request.batch(items)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
         runtime = _runtime([7, 9, 10, 154820], capacity=capacity)
-        reports = worker.run_queued(runtime, request.requests(value), value, root, 0, time.perf_counter() + 600,
-                                    save=lambda reports: None)
+        reports = worker.run_queued(
+            runtime, request.requests(value), value, root, 0, time.perf_counter() + 600, save=lambda reports: None
+        )
         return dict(
             layout=_tree(root),
             tokens=[(root / f"item{i:03d}" / "tokens.jsonl").read_text() for i in range(len(items))],
@@ -385,18 +430,24 @@ def fleet_refusals() -> dict[str, str]:
     from glm_tpu.engine import request
 
     single = request.from_token_ids([30, 31, 32], request_id="golden-vote", max_new_tokens=3)
-    lanes = [request.from_token_ids([7 + lane] * (3 + lane), request_id=f"vote-lane{lane}", max_new_tokens=2,
-                                    context_capacity=32768) for lane in range(2)]
+    lanes = [
+        request.from_token_ids(
+            [7 + lane] * (3 + lane), request_id=f"vote-lane{lane}", max_new_tokens=2, context_capacity=32768
+        )
+        for lane in range(2)
+    ]
     schedules = [[10, 11, 12], [20, 21, 22]]
     out: dict[str, str] = {}
 
     def sequential(*, healthy: bool = True) -> None:
-        _runtime([7, 9, 10], healthy=healthy).generate(single, deliver=lambda event: None,
-                                                      deadline=time.perf_counter() + 600)
+        _runtime([7, 9, 10], healthy=healthy).generate(
+            single, deliver=lambda event: None, deadline=time.perf_counter() + 600
+        )
 
     def batched(*, healthy: bool = True) -> None:
         _batched_runtime(schedules, healthy=healthy).generate_concurrent(
-            lanes, deliver=lambda *args: None, deadline=time.perf_counter() + 600)
+            lanes, deliver=lambda *args: None, deadline=time.perf_counter() + 600
+        )
 
     with _fleet_fakes(divergent=True):
         out["output_consensus_divergent_host"] = _attempt(sequential)
@@ -419,9 +470,12 @@ def worker_record() -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
         lengths, budgets = (130, 114, 20, 242), (3, 2, 4, 3)
-        pending = [request.from_token_ids([7 + lane] * length, request_id=f"lane{lane}", max_new_tokens=budget,
-                                          context_capacity=32768)
-                   for lane, (length, budget) in enumerate(zip(lengths, budgets, strict=True))]
+        pending = [
+            request.from_token_ids(
+                [7 + lane] * length, request_id=f"lane{lane}", max_new_tokens=budget, context_capacity=32768
+            )
+            for lane, (length, budget) in enumerate(zip(lengths, budgets, strict=True))
+        ]
         # lane 1 stops on EOS in round 1; the others run to their output budget (length)
         schedules = [[10, 11, 12, 13], [20, 154820, 22], [30, 31, 32, 33, 34], [40, 41, 42, 43]]
         runtime = _batched_runtime(schedules)
@@ -430,12 +484,18 @@ def worker_record() -> dict[str, Any]:
             layout=_tree(root),
             tokens=[(root / f"item{i:03d}" / "tokens.jsonl").read_text() for i in range(len(pending))],
             answers=[(root / f"item{i:03d}" / "answer.txt").read_text() for i in range(len(pending))],
-            report_keys=sorted(reports[0]), aggregate_keys=sorted(aggregate),
-            reports=[{k: r[k] for k in (*_REPORT_VALUES, "batch_size", "batch_rounds", "context_capacity") if k in r}
-                     for r in reports],
+            report_keys=sorted(reports[0]),
+            aggregate_keys=sorted(aggregate),
+            reports=[
+                {k: r[k] for k in (*_REPORT_VALUES, "batch_size", "batch_rounds", "context_capacity") if k in r}
+                for r in reports
+            ],
             aggregate=dict(batch_size=aggregate["batch_size"], decode_rounds=aggregate["decode_rounds"]),
-            runtime_phases=sorted(runtime.record["phases"]), runtime_record_keys=sorted(runtime.record),
-            batches=len(runtime.record.get("batches", [])), prefill_calls=runtime.prefill_calls)
+            runtime_phases=sorted(runtime.record["phases"]),
+            runtime_record_keys=sorted(runtime.record),
+            batches=len(runtime.record.get("batches", [])),
+            prefill_calls=runtime.prefill_calls,
+        )
 
     # resident_loop: ready file, per-round record, stop; the model run itself is faked.
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
@@ -453,9 +513,13 @@ def worker_record() -> dict[str, Any]:
         with mock.patch.object(worker, "run_queued", fake_run):
             worker.resident_loop(runtime, base, root, 0, 3600, stream=io.StringIO(commands))
         record = json.loads((root / "resident-0001" / "runner.rank0.json").read_text())
-        out["resident_loop"] = dict(layout=_tree(root), ready=(root / "resident-ready.json").read_text(),
-                                    round_record_keys=sorted(record), calls=seen,
-                                    persist_format=_bytes_record((root / "resident-ready.json").read_bytes()))
+        out["resident_loop"] = dict(
+            layout=_tree(root),
+            ready=(root / "resident-ready.json").read_text(),
+            round_record_keys=sorted(record),
+            calls=seen,
+            persist_format=_bytes_record((root / "resident-ready.json").read_bytes()),
+        )
     out["main_record"] = worker_main_record()
     return out
 
@@ -482,23 +546,59 @@ def synthetic_fleet() -> dict[str, Any]:
     contract = dict(topology=topology.to_dict(), code_hash=SYNTHETIC_CODE_HASH)
     contract_hash = _canonical_sha(contract)
     order = [[process * 4 + offset for offset in range(4)] for process in range(8)]
-    captures = [dict(captured_utc="1970-01-01T00:00:00Z", contract=contract, contract_hash=contract_hash,
-                     fleet_contract_hashes=[contract_hash] * 8, fleet_local_device_ids_in_runtime_order=order,
-                     hostname=f"example-w-{i}", jax_device_count=32, jax_local_device_count=4, jax_process_count=8,
-                     jax_process_index=i, jax_version="synthetic", launch_process_id=i, local_device_ids=order[i],
-                     schema_version=1) for i in range(8)]
-    fleet = _canonical_sha(dict(fleet_local_device_ids_in_runtime_order=order, records=[
-        {k: c[k] for k in ("contract_hash", "hostname", "jax_process_index", "launch_process_id", "local_device_ids")}
-        for c in captures]))
+    captures = [
+        dict(
+            captured_utc="1970-01-01T00:00:00Z",
+            contract=contract,
+            contract_hash=contract_hash,
+            fleet_contract_hashes=[contract_hash] * 8,
+            fleet_local_device_ids_in_runtime_order=order,
+            hostname=f"example-w-{i}",
+            jax_device_count=32,
+            jax_local_device_count=4,
+            jax_process_count=8,
+            jax_process_index=i,
+            jax_version="synthetic",
+            launch_process_id=i,
+            local_device_ids=order[i],
+            schema_version=1,
+        )
+        for i in range(8)
+    ]
+    fleet = _canonical_sha(
+        dict(
+            fleet_local_device_ids_in_runtime_order=order,
+            records=[
+                {
+                    k: c[k]
+                    for k in ("contract_hash", "hostname", "jax_process_index", "launch_process_id", "local_device_ids")
+                }
+                for c in captures
+            ],
+        )
+    )
     payloads = {f"topology.rank{i}.json": json.dumps(c, sort_keys=True).encode() for i, c in enumerate(captures)}
-    binding = dict(schema="glm_perf_topology_rebinding_v1", physical_devices_identical=True, all_hosts_idle_after=True,
-                   original_topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
-                   original_fleet_sha256=fleet, fleet_sha256=fleet,
-                   capture_sha256={name: sha256_hex(raw) for name, raw in payloads.items()},
-                   host_to_slots={str(i): [s for s, d in enumerate(physical.flattened_device_ids) if d in order[i]]
-                                  for i in range(8)}, code_hash=SYNTHETIC_CODE_HASH)
-    return dict(topology=topology, physical=physical, fleet=fleet, payloads=payloads,
-                binding=json.dumps(binding, sort_keys=True).encode())
+    binding = dict(
+        schema="glm_perf_topology_rebinding_v1",
+        physical_devices_identical=True,
+        all_hosts_idle_after=True,
+        original_topology_sha256=topology.topology_hash,
+        mesh_sha256=physical.mesh_hash,
+        original_fleet_sha256=fleet,
+        fleet_sha256=fleet,
+        capture_sha256={name: sha256_hex(raw) for name, raw in payloads.items()},
+        host_to_slots={
+            str(i): [s for s, d in enumerate(physical.flattened_device_ids) if d in order[i]] for i in range(8)
+        },
+        code_hash=SYNTHETIC_CODE_HASH,
+    )
+    return dict(
+        topology=topology,
+        physical=physical,
+        fleet=fleet,
+        payloads=payloads,
+        binding=json.dumps(binding, sort_keys=True).encode(),
+    )
 
 
 def _write_private(path: Path, raw: bytes, mode: int = 0o600) -> None:
@@ -522,16 +622,21 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     root.mkdir(mode=0o700)
     os.chmod(root, 0o700)
     raw_request = json_utils.canonical(value) + b"\n"
-    names = [Path(worker.__file__).resolve().relative_to(REPO.resolve()).as_posix(),
-             Path(importlib_file("glm_tpu.runner.tpu_runner")).resolve().relative_to(REPO.resolve()).as_posix()]
+    names = [
+        Path(worker.__file__).resolve().relative_to(REPO.resolve()).as_posix(),
+        Path(importlib_file("glm_tpu.runner.tpu_runner")).resolve().relative_to(REPO.resolve()).as_posix(),
+    ]
     manifest = {name: sha256_hex((REPO / name).read_bytes()) for name in names}
     if tamper == "deployed_source":
         manifest[names[0]] = "0" * 64
     raw_manifest = json.dumps(manifest, sort_keys=True).encode()
     _write_private(root / "request.json", raw_request, 0o640 if tamper == "owner_only" else 0o600)
     _write_private(root / "source_manifest.json", raw_manifest)
-    site = synthetic_site(Path("/site"), fleet=dict(coordinator_address=SYNTHETIC_COORDINATOR),
-                          paths=dict(run_root=str(runs), model_path="/site/model", hlo_dump_root="/site/hlo"))
+    site = synthetic_site(
+        Path("/site"),
+        fleet=dict(coordinator_address=SYNTHETIC_COORDINATOR),
+        paths=dict(run_root=str(runs), model_path="/site/model", hlo_dump_root="/site/hlo"),
+    )
     raw_site = site.resolved_json()
     _write_private(root / "site.json", raw_site)
     _write_private(root / "topology_rebinding.json", fleet["binding"])
@@ -540,14 +645,28 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
         _write_private(root / "topology_capture" / name, raw)
     if tamper == "existing_namespace":
         (root / "native.rank0").mkdir(mode=0o700)
-    return ["--output", str(root), "--code-hash", SYNTHETIC_CODE_HASH,
-            "--source-manifest-sha256", sha256_hex(raw_manifest),
-            "--request-file-sha256", "f" * 64 if tamper == "request_digest" else sha256_hex(raw_request),
-            "--site-sha256", "d" * 64 if tamper == "site_digest" else sha256_hex(raw_site),
-            "--topology-rebinding-sha256", "e" * 64 if tamper == "binding_pin" else sha256_hex(fleet["binding"]),
-            "--coordinator-address", SYNTHETIC_COORDINATOR.replace(":8476", ":8477") if tamper == "port"
-            else SYNTHETIC_COORDINATOR.replace(".10:", ".11:") if tamper == "site_coordinator"
-            else SYNTHETIC_COORDINATOR, "--wall-seconds", "60"]
+    return [
+        "--output",
+        str(root),
+        "--code-hash",
+        SYNTHETIC_CODE_HASH,
+        "--source-manifest-sha256",
+        sha256_hex(raw_manifest),
+        "--request-file-sha256",
+        "f" * 64 if tamper == "request_digest" else sha256_hex(raw_request),
+        "--site-sha256",
+        "d" * 64 if tamper == "site_digest" else sha256_hex(raw_site),
+        "--topology-rebinding-sha256",
+        "e" * 64 if tamper == "binding_pin" else sha256_hex(fleet["binding"]),
+        "--coordinator-address",
+        SYNTHETIC_COORDINATOR.replace(":8476", ":8477")
+        if tamper == "port"
+        else SYNTHETIC_COORDINATOR.replace(".10:", ".11:")
+        if tamper == "site_coordinator"
+        else SYNTHETIC_COORDINATOR,
+        "--wall-seconds",
+        "60",
+    ]
 
 
 def importlib_file(module: str) -> str:
@@ -594,25 +713,49 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
 
     calls: dict[str, Any] = dict(template=[], distributed=[], meshes=[])
     topology, physical = fleet["topology"], fleet["physical"]
-    devices = [FakeDevice(d.device_id, d.process_index, d.local_device_id, tuple(d.coordinates), d.core_on_chip,
-                          d.platform, d.device_kind) for d in topology.devices]
+    devices = [
+        FakeDevice(
+            d.device_id,
+            d.process_index,
+            d.local_device_id,
+            tuple(d.coordinates),
+            d.core_on_chip,
+            d.platform,
+            d.device_kind,
+        )
+        for d in topology.devices
+    ]
     process = int(hostname.rsplit("-w-", 1)[1])
 
     def site_binding(args: Any, site: Any) -> Any:
-        for name, value in dict(model_id=model.MODEL_ID, model_revision=model.REVISION,
-                                source_inventory_sha256="1" * 64, checkpoint_manifest_sha256="2" * 64,
-                                checkpoint_success_sha256="3" * 64, source_complete_sha256="4" * 64,
-                                checkpoint_root=Path("/site/checkpoint"), source_inventory=Path("/site/inventory"),
-                                checkpoint_transport="shm", topology_capture_root=Path("/site/captures"),
-                                topology_sha256=topology.topology_hash, topology_fleet_sha256=fleet["fleet"],
-                                mesh_sha256=physical.mesh_hash, slice_name=topology.slice_name,
-                                num_processes=8, hlo_dump_root=site.paths.hlo_dump_root).items():
+        for name, value in dict(
+            model_id=model.MODEL_ID,
+            model_revision=model.REVISION,
+            source_inventory_sha256="1" * 64,
+            checkpoint_manifest_sha256="2" * 64,
+            checkpoint_success_sha256="3" * 64,
+            source_complete_sha256="4" * 64,
+            checkpoint_root=Path("/site/checkpoint"),
+            source_inventory=Path("/site/inventory"),
+            checkpoint_transport="shm",
+            topology_capture_root=Path("/site/captures"),
+            topology_sha256=topology.topology_hash,
+            topology_fleet_sha256=fleet["fleet"],
+            mesh_sha256=physical.mesh_hash,
+            slice_name=topology.slice_name,
+            num_processes=8,
+            hlo_dump_root=site.paths.hlo_dump_root,
+        ).items():
             setattr(args, name, value)
         return args
 
     def verified_template(repo: Any, tokenizer_root: Any) -> str:
-        calls["template"].append(dict(repo_is_source=Path(repo).resolve() == REPO.resolve(),
-                                      tokenizer_is_site_root=Path(tokenizer_root) == get_current_site().paths.model_path))
+        calls["template"].append(
+            dict(
+                repo_is_source=Path(repo).resolve() == REPO.resolve(),
+                tokenizer_is_site_root=Path(tokenizer_root) == get_current_site().paths.model_path,
+            )
+        )
         return "<template>"
 
     def distributed(**kwargs: Any) -> None:
@@ -634,8 +777,11 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
         stack.enter_context(mock.patch.object(jax, "process_count", lambda *args: 8))
         stack.enter_context(mock.patch.object(jax, "process_index", lambda *args: process))
         stack.enter_context(mock.patch.object(jax, "devices", lambda *args: list(devices)))
-        stack.enter_context(mock.patch.object(jax, "local_devices", lambda *args, **kwargs: [
-            d for d in devices if d.process_index == process]))
+        stack.enter_context(
+            mock.patch.object(
+                jax, "local_devices", lambda *args, **kwargs: [d for d in devices if d.process_index == process]
+            )
+        )
         stack.enter_context(mock.patch.object(jax.sharding, "Mesh", mesh))
         yield calls
 
@@ -649,7 +795,7 @@ def _describe_arg(value: Any, root: Path, labels: dict[str, str] | None = None) 
     if isinstance(value, Path):
         text = str(value)
         if text == str(root) or text.startswith(str(root) + "/"):
-            return "<run>" + text[len(str(root)):]
+            return "<run>" + text[len(str(root)) :]
         return text if text.startswith("/site/") else f"<path:{value.name}>"
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
@@ -658,9 +804,12 @@ def _describe_arg(value: Any, root: Path, labels: dict[str, str] | None = None) 
 
 def _mesh_record(mesh: Any, physical: Any) -> dict[str, Any]:
     order = [int(device.id) for device in np.asarray(mesh.devices).flat]
-    return dict(axis_names=list(mesh.axis_names), shape=list(np.asarray(mesh.devices).shape),
-                device_order_digest=digest_json(order),
-                device_order_is_physical=order == list(physical.flattened_device_ids))
+    return dict(
+        axis_names=list(mesh.axis_names),
+        shape=list(np.asarray(mesh.devices).shape),
+        device_order_digest=digest_json(order),
+        device_order_is_physical=order == list(physical.flattened_device_ids),
+    )
 
 
 def worker_main_record() -> dict[str, Any]:
@@ -673,9 +822,15 @@ def worker_main_record() -> dict[str, Any]:
     from glm_tpu.engine import request
 
     sequential = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
-    concurrent = request.batch([request.from_token_ids([30 + lane] * (4 + lane), request_id=f"golden-lane{lane}",
-                                                       max_new_tokens=3, context_capacity=32768)
-                                for lane in range(3)], concurrent=True)
+    concurrent = request.batch(
+        [
+            request.from_token_ids(
+                [30 + lane] * (4 + lane), request_id=f"golden-lane{lane}", max_new_tokens=3, context_capacity=32768
+            )
+            for lane in range(3)
+        ],
+        concurrent=True,
+    )
     record = dict(_worker_main_run(sequential), concurrent=_worker_main_run(concurrent))
     record["refusals"] = worker_refusals(sequential)
     return record
@@ -741,8 +896,11 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
         bound, (checked, binding) = seen["preflight"]
         jax_module, mesh, physical, topology, fleet_sha = seen["initialize"]
         kwargs = constructed[0]
-        known = {"<mesh from _initialize_runtime>": mesh, "<physical from _initialize_runtime>": physical,
-                 "<topology from _initialize_runtime>": topology}
+        known = {
+            "<mesh from _initialize_runtime>": mesh,
+            "<physical from _initialize_runtime>": physical,
+            "<topology from _initialize_runtime>": topology,
+        }
         described: dict[str, Any] = {}
         for name, item in sorted(kwargs.items()):
             label = next((k for k, v in known.items() if item is v), None)
@@ -757,33 +915,60 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             elif callable(item):
                 described[name] = f"{getattr(item, '__module__', '?')}:{getattr(item, '__qualname__', '?')}"
             elif isinstance(item, Path):
-                described[name] = ("<source root>" if item.resolve() == REPO.resolve()
-                                   else "<output>/" + str(item.relative_to(root)))
+                described[name] = (
+                    "<source root>" if item.resolve() == REPO.resolve() else "<output>/" + str(item.relative_to(root))
+                )
             elif item is None or isinstance(item, (bool, int, float, str)):
                 described[name] = item
             else:
                 described[name] = f"<{type(item).__name__}>"
-        labels = {argv[argv.index("--source-manifest-sha256") + 1]: "<staged source manifest sha256>",
-                  argv[argv.index("--site-sha256") + 1]: "<staged site sha256>"}
+        labels = {
+            argv[argv.index("--source-manifest-sha256") + 1]: "<staged source manifest sha256>",
+            argv[argv.index("--site-sha256") + 1]: "<staged site sha256>",
+        }
         preflight_record = dict(
             bound={name: _describe_arg(item, root, labels) for name, item in sorted(vars(bound).items())},
             request_sha256_equal=checked["request_sha256"] == value["request_sha256"],
-            binding={k: binding[k] for k in sorted(binding)}, template_checks=calls["template"])
+            binding={k: binding[k] for k in sorted(binding)},
+            template_checks=calls["template"],
+        )
         initialize_record = dict(
             distributed=[{k: _describe_arg(v, root) for k, v in sorted(call.items())} for call in calls["distributed"]],
-            mesh=_mesh_record(mesh, fleet["physical"]), meshes_built=len(calls["meshes"]),
-            returns_jax=jax_module.__name__ == "jax", physical_mesh_hash_bound=physical.mesh_hash == bound.mesh_sha256,
-            topology_hash_bound=topology.topology_hash == bound.topology_sha256, fleet_sha256_bound=fleet_sha ==
-            bound.topology_fleet_sha256)
-        construction = {kind: {k: _describe_arg(v, root) if isinstance(v, str) and v.startswith("/") else v
-                               for k, v in changes.items()} for kind, changes in seen["construction"].items()}
-        return dict(exit_code=code, keys=sorted(record), request_keys=sorted(record["request"]), layout=layout,
-                    runtime_arguments=described, preflight=preflight_record, initialize=initialize_record,
-                    runtime_construction=construction)
+            mesh=_mesh_record(mesh, fleet["physical"]),
+            meshes_built=len(calls["meshes"]),
+            returns_jax=jax_module.__name__ == "jax",
+            physical_mesh_hash_bound=physical.mesh_hash == bound.mesh_sha256,
+            topology_hash_bound=topology.topology_hash == bound.topology_sha256,
+            fleet_sha256_bound=fleet_sha == bound.topology_fleet_sha256,
+        )
+        construction = {
+            kind: {
+                k: _describe_arg(v, root) if isinstance(v, str) and v.startswith("/") else v for k, v in changes.items()
+            }
+            for kind, changes in seen["construction"].items()
+        }
+        return dict(
+            exit_code=code,
+            keys=sorted(record),
+            request_keys=sorted(record["request"]),
+            layout=layout,
+            runtime_arguments=described,
+            preflight=preflight_record,
+            initialize=initialize_record,
+            runtime_construction=construction,
+        )
 
 
-REFUSALS = ("deployed_source", "existing_namespace", "port", "owner_only", "request_digest", "binding_pin",
-            "site_digest", "site_coordinator")
+REFUSALS = (
+    "deployed_source",
+    "existing_namespace",
+    "port",
+    "owner_only",
+    "request_digest",
+    "binding_pin",
+    "site_digest",
+    "site_coordinator",
+)
 
 
 def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
@@ -801,9 +986,15 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
 
     def namespace(argv: list[str]) -> Any:
         pairs = dict(zip(argv[::2], argv[1::2], strict=True))
-        return argparse.Namespace(**{k[2:].replace("-", "_"): v for k, v in pairs.items()} | dict(
-            output=Path(pairs["--output"]), wall_seconds=int(pairs["--wall-seconds"]), preflight_only=False,
-            keep_loaded=False))
+        return argparse.Namespace(
+            **{k[2:].replace("-", "_"): v for k, v in pairs.items()}
+            | dict(
+                output=Path(pairs["--output"]),
+                wall_seconds=int(pairs["--wall-seconds"]),
+                preflight_only=False,
+                keep_loaded=False,
+            )
+        )
 
     for case in REFUSALS:
         with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
@@ -829,14 +1020,24 @@ def controller_record() -> dict[str, Any]:
     from glm_tpu.executor import multihost_executor as launch
     from glm_tpu.utils import io_utils
 
-    rows = [dict(rank=i, hostname=f"example-w-{i}", complete=True, code_hash="a" * 40, request_sha256="b" * 64,
-                 request=dict(token_sha256="c" * 64, emitted=3),
-                 programs=dict(decode=dict(stablehlo_sha256="d" * 64, optimized_hlo_sha256="e" * 64)))
-            for i in range(8)]
+    rows = [
+        dict(
+            rank=i,
+            hostname=f"example-w-{i}",
+            complete=True,
+            code_hash="a" * 40,
+            request_sha256="b" * 64,
+            request=dict(token_sha256="c" * 64, emitted=3),
+            programs=dict(decode=dict(stablehlo_sha256="d" * 64, optimized_hlo_sha256="e" * 64)),
+        )
+        for i in range(8)
+    ]
     summary = launch.summarize(rows, "a" * 40, "b" * 64)
     resident = launch.summarize(rows, "a" * 40, "b" * 64, idle_after=False)
-    out: dict[str, Any] = dict(summary=dict(keys=sorted(summary), bytes=_bytes_record(
-        json.dumps(summary, sort_keys=True).encode())), resident_summary_keys=sorted(resident))
+    out: dict[str, Any] = dict(
+        summary=dict(keys=sorted(summary), bytes=_bytes_record(json.dumps(summary, sort_keys=True).encode())),
+        resident_summary_keys=sorted(resident),
+    )
     from .controller import launcher_record
 
     out["launcher_main"] = launcher_record()
@@ -887,18 +1088,30 @@ def controller_record() -> dict[str, Any]:
             stack.enter_context(mock.patch.object(launch, "remote_all", collect))
             stack.enter_context(mock.patch.object(launch.time, "sleep", wait))
             stack.enter_context(mock.patch("sys.stdout", printed))
-            launch.resident_controller([], processes, root, "a" * 40, first, 3600, False,
-                                       hosts=[row["hostname"] for row in rows], fleet=synthetic_site(root).fleet,
-                                       helpers=HelperTexts.from_package())
+            launch.resident_controller(
+                [],
+                processes,
+                root,
+                "a" * 40,
+                first,
+                3600,
+                False,
+                hosts=[row["hostname"] for row in rows],
+                fleet=synthetic_site(root).fleet,
+                helpers=HelperTexts.from_package(),
+            )
         stdin = processes[0].stdin.getvalue()
         measurement = json.loads((root / "resident-measurement.json").read_text())
         out["resident_controller"] = dict(
-            worker_stdin=_bytes_record(stdin), stdin_lines=len(stdin.splitlines()),
+            worker_stdin=_bytes_record(stdin),
+            stdin_lines=len(stdin.splitlines()),
             stop_line=stdin.splitlines()[-1].decode(),
             all_workers_equal=len({p.stdin.getvalue() for p in processes}) == 1,
             command_prefix=stdin.splitlines()[0][:24].decode(),
-            measurement_keys=sorted(measurement), layout=_tree(root),
-            stdout_markers=sorted({line.split(" ", 1)[0] for line in printed.getvalue().splitlines() if line}))
+            measurement_keys=sorted(measurement),
+            layout=_tree(root),
+            stdout_markers=sorted({line.split(" ", 1)[0] for line in printed.getvalue().splitlines() if line}),
+        )
     return out
 
 
@@ -908,8 +1121,12 @@ def runtime_record_keys() -> dict[str, Any]:
     source = (REPO / "glm_tpu" / "runner" / "tpu_runner.py").read_text()
     for node in ast.walk(ast.parse(source)):
         targets = [t for t in getattr(node, "targets", []) if isinstance(t, ast.Attribute) and t.attr == "record"]
-        if (isinstance(node, ast.Assign) and targets and isinstance(node.value, ast.Call)
-                and getattr(node.value.func, "id", None) == "dict"):
+        if (
+            isinstance(node, ast.Assign)
+            and targets
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "id", None) == "dict"
+        ):
             keys = sorted(k.arg for k in node.value.keywords if k.arg)
             identity = next((k.value for k in node.value.keywords if k.arg == "physical_identity"), None)
             sub = sorted(k.arg for k in identity.keywords) if isinstance(identity, ast.Call) else []
@@ -944,11 +1161,16 @@ class FakeResident:
         pass
 
     def prepare(self, messages: Any, key: str) -> dict[str, Any]:
-        return dict(prompt_ids=[1, 2] + [3] * len(messages), max_new_tokens=32000, request_id="ui-" + key,
-                    context_capacity=32768)
+        return dict(
+            prompt_ids=[1, 2] + [3] * len(messages),
+            max_new_tokens=32000,
+            request_id="ui-" + key,
+            context_capacity=32768,
+        )
 
-    def prepare_api(self, messages: Any, key: str, *, tools: Any, effort: Any, max_new_tokens: Any,
-                    context_capacity: int) -> dict[str, Any]:
+    def prepare_api(
+        self, messages: Any, key: str, *, tools: Any, effort: Any, max_new_tokens: Any, context_capacity: int
+    ) -> dict[str, Any]:
         ids = [1] * (len(json.dumps(messages)) // 10 + 1)
         budget = context_capacity - len(ids) if max_new_tokens is None else max_new_tokens
         return dict(prompt_ids=ids, max_new_tokens=budget, request_id="api-" + key, context_capacity=context_capacity)
@@ -961,8 +1183,15 @@ class FakeResident:
 
     def observe(self, job: Any) -> dict[str, Any]:
         self.sequence = job["sequence"]
-        return dict(status="complete", answer=self.answer, thinking=self.thinking, output_tokens=7,
-                    decode_tps=13.5, prefill_seconds=1.0, stop_cause="eos")
+        return dict(
+            status="complete",
+            answer=self.answer,
+            thinking=self.thinking,
+            output_tokens=7,
+            decode_tps=13.5,
+            prefill_seconds=1.0,
+            stop_cause="eos",
+        )
 
 
 def http_record() -> dict[str, Any]:
@@ -985,15 +1214,26 @@ def http_record() -> dict[str, Any]:
                 store.step()
                 time.sleep(0.01)
 
-        threads = [threading.Thread(target=server.serve_forever, daemon=True),
-                   threading.Thread(target=pump, daemon=True)]
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True),
+            threading.Thread(target=pump, daemon=True),
+        ]
         for thread in threads:
             thread.start()
         host = f"127.0.0.1:{port}"
         cases: dict[str, Any] = {}
 
-        def call(name: str, method: str, path: str, *, body: Any = None, headers: dict[str, str] | None = None,
-                 auth: bool = False, ui: bool = False, host_header: str | None = None) -> bytes:
+        def call(
+            name: str,
+            method: str,
+            path: str,
+            *,
+            body: Any = None,
+            headers: dict[str, str] | None = None,
+            auth: bool = False,
+            ui: bool = False,
+            host_header: str | None = None,
+        ) -> bytes:
             data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode())
             sent = {"Host": host_header or host}
             if auth:
@@ -1042,25 +1282,60 @@ def http_record() -> dict[str, Any]:
             call("get_style_css", "GET", "/style.css")
             call("get_state_empty", "GET", "/api/state")
             created = json.loads(call("post_chat_create", "POST", "/api/chat", body=dict(action="create"), ui=True))
-            call("post_chat_send", "POST", "/api/chat", ui=True,
-                 body=dict(action="send", chat=created["id"], id="a" * 32, text=NON_ASCII_MESSAGES[1]["content"]))
+            call(
+                "post_chat_send",
+                "POST",
+                "/api/chat",
+                ui=True,
+                body=dict(action="send", chat=created["id"], id="a" * 32, text=NON_ASCII_MESSAGES[1]["content"]),
+            )
             wait_for(lambda: all(j["status"] == "complete" for j in store.snapshot()["jobs"]))
             call("get_state_after_answer", "GET", "/api/state")
             call("get_models", "GET", "/v1/models", auth=True)
-            call("post_completion", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(model="glm-5.3", messages=NON_ASCII_MESSAGES))
-            call("post_completion_stream", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(model="glm-5.3-low", messages=NON_ASCII_MESSAGES, stream=True))
-            backend.answer = ("I will look.<tool_call>read_file<arg_key>path</arg_key><arg_value>a.txt</arg_value>"
-                              "<arg_key>lines</arg_key><arg_value>12</arg_value></tool_call>")
-            tools = [dict(type="function", function=dict(name="read_file", description="Read a file",
-                                                        parameters=dict(type="object",
-                                                                        properties=dict(path=dict(type="string")))))]
-            call("post_completion_tool_call", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(model="glm-5.3", messages=[dict(role="user", content="read a.txt")], tools=tools))
-            call("post_completion_tool_call_stream", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(model="glm-5.3-high", messages=[dict(role="user", content="read a.txt")], tools=tools,
-                           stream=True))
+            call(
+                "post_completion",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(model="glm-5.3", messages=NON_ASCII_MESSAGES),
+            )
+            call(
+                "post_completion_stream",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(model="glm-5.3-low", messages=NON_ASCII_MESSAGES, stream=True),
+            )
+            backend.answer = (
+                "I will look.<tool_call>read_file<arg_key>path</arg_key><arg_value>a.txt</arg_value>"
+                "<arg_key>lines</arg_key><arg_value>12</arg_value></tool_call>"
+            )
+            tools = [
+                dict(
+                    type="function",
+                    function=dict(
+                        name="read_file",
+                        description="Read a file",
+                        parameters=dict(type="object", properties=dict(path=dict(type="string"))),
+                    ),
+                )
+            ]
+            call(
+                "post_completion_tool_call",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(model="glm-5.3", messages=[dict(role="user", content="read a.txt")], tools=tools),
+            )
+            call(
+                "post_completion_tool_call_stream",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(
+                    model="glm-5.3-high", messages=[dict(role="user", content="read a.txt")], tools=tools, stream=True
+                ),
+            )
             backend.answer = "42"
             call("error_401_models", "GET", "/v1/models")
             call("error_401_completion", "POST", "/v1/chat/completions", body=dict(messages=[]))
@@ -1069,11 +1344,21 @@ def http_record() -> dict[str, Any]:
             call("error_404_asset", "GET", "/nope")
             call("error_404_v1", "GET", "/v1/nope", auth=True)
             call("error_404_ui", "POST", "/api/nope", ui=True, body=dict(action="create"))
-            call("error_404_model", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(model="gpt-4", messages=[dict(role="user", content="hi")]))
+            call(
+                "error_404_model",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(model="gpt-4", messages=[dict(role="user", content="hi")]),
+            )
             call("error_400_json", "POST", "/v1/chat/completions", auth=True, body=b"{not json")
-            call("error_400_effort", "POST", "/v1/chat/completions", auth=True,
-                 body=dict(messages=[dict(role="user", content="hi")], reasoning_effort="medium"))
+            call(
+                "error_400_effort",
+                "POST",
+                "/v1/chat/completions",
+                auth=True,
+                body=dict(messages=[dict(role="user", content="hi")], reasoning_effort="medium"),
+            )
             call("error_400_chat", "POST", "/api/chat", ui=True, body=dict(action="send", chat="0" * 32))
         finally:
             stop.set()
@@ -1118,17 +1403,22 @@ def process_changes() -> dict[str, dict[str, Any]]:
     now = dict(jax.config.values)
     names = {k for k in set(environ) | set(os.environ) if COMPILE_ENVIRONMENT.match(k)}
     return dict(
-        jax_config={k: _config_value(now.get(k, _UNSET)) for k in sorted(config)
-                    if config[k] != now.get(k, _UNSET)},
-        environment={k: os.environ.get(k, _UNSET) for k in sorted(names)
-                     if environ.get(k, _UNSET) != os.environ.get(k, _UNSET)})
+        jax_config={k: _config_value(now.get(k, _UNSET)) for k in sorted(config) if config[k] != now.get(k, _UNSET)},
+        environment={
+            k: os.environ.get(k, _UNSET) for k in sorted(names) if environ.get(k, _UNSET) != os.environ.get(k, _UNSET)
+        },
+    )
 
 
 def record() -> dict[str, Any]:
     os.environ.setdefault("JAX_PLATFORMS", "cpu")
     snapshot_process()
-    wire = dict(requests=requests_record(), worker=worker_record(), controller=controller_record(),
-                runtime_record=runtime_record_keys())
+    wire = dict(
+        requests=requests_record(),
+        worker=worker_record(),
+        controller=controller_record(),
+        runtime_record=runtime_record_keys(),
+    )
     return dict(wire=wire, http=http_record(), source=source_record())
 
 

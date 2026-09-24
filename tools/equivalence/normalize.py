@@ -34,18 +34,20 @@ from typing import Any
 
 _STRING = r'"(?:[^"\\]|\\.)*"'
 _STRING_RE = re.compile(_STRING)
-_NAME = r'(?:' + _STRING + r'|[A-Za-z_][\w$.\-]*)'
-_SYMBOL = re.compile(r'@(' + _NAME + r')')
-_PRIVATE = re.compile(r'func\.func private @(' + _NAME + r')')
-_MODULE = re.compile(r'\A(module @)(' + _NAME + r')')
-_PYTREE_NAME = re.compile(r'(, )?jax\.(?:result|arg)_info = ' + _STRING + r'(, )?')
-_BODY = re.compile(r'(\\22body\\22: \\22)([A-Za-z0-9+/=]*)(\\22)')
-_KERNEL_NAME = re.compile(r'kernel_name = (' + _STRING + r')')
-_OP = re.compile(r'\b((?:stablehlo|sdy|mhlo|chlo|func|tpu)\.[a-z_]+)\b')
-_COLLECTIVE = re.compile(r'stablehlo\.(all_reduce|all_gather|reduce_scatter|all_to_all|collective_permute|'
-                         r'collective_broadcast)"?.*?'
-                         r'(replica_groups = dense<[^>]*>|source_target_pairs = dense<[^>]*>)')
-_ARG = re.compile(r'%arg(\d+): ')
+_NAME = r"(?:" + _STRING + r"|[A-Za-z_][\w$.\-]*)"
+_SYMBOL = re.compile(r"@(" + _NAME + r")")
+_PRIVATE = re.compile(r"func\.func private @(" + _NAME + r")")
+_MODULE = re.compile(r"\A(module @)(" + _NAME + r")")
+_PYTREE_NAME = re.compile(r"(, )?jax\.(?:result|arg)_info = " + _STRING + r"(, )?")
+_BODY = re.compile(r"(\\22body\\22: \\22)([A-Za-z0-9+/=]*)(\\22)")
+_KERNEL_NAME = re.compile(r"kernel_name = (" + _STRING + r")")
+_OP = re.compile(r"\b((?:stablehlo|sdy|mhlo|chlo|func|tpu)\.[a-z_]+)\b")
+_COLLECTIVE = re.compile(
+    r"stablehlo\.(all_reduce|all_gather|reduce_scatter|all_to_all|collective_permute|"
+    r'collective_broadcast)"?.*?'
+    r"(replica_groups = dense<[^>]*>|source_target_pairs = dense<[^>]*>)"
+)
+_ARG = re.compile(r"%arg(\d+): ")
 
 
 def stablehlo_text(lowered: Any) -> str:
@@ -238,8 +240,10 @@ def jit_compiler_options(lowered: Any) -> list[list[Any]]:
     lowering = getattr(lowered, "_lowering", None)
     kvs = getattr(lowering, "_compiler_options_kvs", None)
     if lowering is None or kvs is None:
-        raise RuntimeError("jax internals changed: Lowered._lowering._compiler_options_kvs is missing; "
-                           "update normalize.jit_compiler_options for this jax version")
+        raise RuntimeError(
+            "jax internals changed: Lowered._lowering._compiler_options_kvs is missing; "
+            "update normalize.jit_compiler_options for this jax version"
+        )
     return [[str(key), _option_value(value)] for key, value in kvs]
 
 

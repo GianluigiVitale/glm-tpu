@@ -22,6 +22,7 @@ Usage (rank 0, fleet idle)::
     GLM_TPU_TEST_SITE=~/.config/glm-tpu/site.toml JAX_PLATFORMS=cpu \\
         python -m pytest -p no:cacheprovider tests/worker/test_local_preflight.py -m site
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -58,8 +59,9 @@ def _site_file() -> Path:
 
 def _shell(command: str, *, payload: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
     env = {name: os.environ[name] for name in SHELL_ENV if name in os.environ}
-    return subprocess.run(["bash", "-c", command], input=payload, capture_output=True, env=env, timeout=TIMEOUT,
-                          check=False)
+    return subprocess.run(
+        ["bash", "-c", command], input=payload, capture_output=True, env=env, timeout=TIMEOUT, check=False
+    )
 
 
 def _last_line(data: bytes) -> str:
@@ -87,8 +89,9 @@ def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_c
         pytest.skip("not a host of the site's fleet")
 
     repo = launch_policy.package_checkout()
-    pin = subprocess.run(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=repo, check=True,
-                         capture_output=True, text=True).stdout.strip()
+    pin = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
     value = request.from_token_ids([30, 31, 32], request_id="site-preflight", max_new_tokens=2)
     raw = canonical(value) + b"\n"
     root = runs / ("optimized_request_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ"))
@@ -101,18 +104,36 @@ def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_c
         os.umask(previous)
     hosts = [f"placeholder-host-{r}" for r in range(fleet.num_hosts)]
     hosts[rank] = hostname
-    staged = _shell(remote.command(fleet, "stage_bundle", dict(root=str(root), digest=sha256(bundle).hexdigest(),
-                                                               hosts=hosts)), payload=bundle)
+    staged = _shell(
+        remote.command(fleet, "stage_bundle", dict(root=str(root), digest=sha256(bundle).hexdigest(), hosts=hosts)),
+        payload=bundle,
+    )
     assert staged.returncode == 0, _last_line(staged.stderr)
     assert (root / "source" / "glm_tpu" / "worker" / "tpu_worker.py").is_file()
     assert sha256((root / "site.json").read_bytes()).hexdigest() == site.resolved_sha256()
 
     # The launcher's worker argv (launch_ws32_optimized_request.main), then its preflight string.
-    command = [fleet.worker_python, "-m", protocol.WORKER_MODULE, "--output", str(root), "--code-hash", pin,
-               "--source-manifest-sha256", manifest_sha, "--request-file-sha256", sha256(raw).hexdigest(),
-               "--site-sha256", site.resolved_sha256(),
-               "--topology-rebinding-sha256", site.topology.binding_sha256,
-               "--coordinator-address", fleet.coordinator_address, "--wall-seconds", "60"]
+    command = [
+        fleet.worker_python,
+        "-m",
+        protocol.WORKER_MODULE,
+        "--output",
+        str(root),
+        "--code-hash",
+        pin,
+        "--source-manifest-sha256",
+        manifest_sha,
+        "--request-file-sha256",
+        sha256(raw).hexdigest(),
+        "--site-sha256",
+        site.resolved_sha256(),
+        "--topology-rebinding-sha256",
+        site.topology.binding_sha256,
+        "--coordinator-address",
+        fleet.coordinator_address,
+        "--wall-seconds",
+        "60",
+    ]
     preflight = remote.preflight_command(fleet, root, command)
     result = _shell(preflight)
     assert result.returncode == 0, _last_line(result.stderr)
@@ -121,8 +142,8 @@ def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_c
     assert environment["jax"] == environment["jaxlib"] == "0.10.1"
     assert set(environment["sha256"]) == {"python", "jax", "jaxlib", "libtpu"}
     assert sorted(p.name for p in root.iterdir()) == sorted(
-        ["request.json", "site.json", "source", "source_manifest.json", "topology_capture",
-         "topology_rebinding.json"])  # the preflight wrote nothing
+        ["request.json", "site.json", "source", "source_manifest.json", "topology_capture", "topology_rebinding.json"]
+    )  # the preflight wrote nothing
 
     # Sensitivity: one staged source byte changed after staging is refused before any device use.
     target = root / "source" / "README.md"

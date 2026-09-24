@@ -56,20 +56,14 @@ def dequantize_fp8_bits_block_weight(
     if weight_bits.dtype != jnp.uint8:
         raise ValueError(f"FP8 storage must be uint8 bits, got {weight_bits.dtype}")
     if len(block_shape) != 2 or any(
-        not isinstance(item, int) or isinstance(item, bool) or item <= 0
-        for item in block_shape
+        not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in block_shape
     ):
         raise ValueError("block_shape must contain two positive integers")
     expected = tuple(
-        (dimension + block - 1) // block
-        for dimension, block in zip(
-            weight_bits.shape[-2:], block_shape, strict=True
-        )
+        (dimension + block - 1) // block for dimension, block in zip(weight_bits.shape[-2:], block_shape, strict=True)
     )
     if tuple(scale.shape[-2:]) != expected:
-        raise ValueError(
-            f"FP8 scale tail must be {expected}, got {scale.shape[-2:]}"
-        )
+        raise ValueError(f"FP8 scale tail must be {expected}, got {scale.shape[-2:]}")
     lookup = jnp.asarray(fp8_e4m3fn_lookup(), dtype=jnp.float32)
     out_blocks = jnp.arange(weight_bits.shape[-2]) // block_shape[0]
     in_blocks = jnp.arange(weight_bits.shape[-1]) // block_shape[1]
@@ -91,14 +85,9 @@ def decode_stage_local_prefill_index_wk_bf16(
     if wk_bits.shape != expected_shape or wk_bits.dtype != jnp.uint8:
         raise ValueError("prefill repair wk bits have an invalid shape/dtype")
     expected_scale_shape = tuple(
-        (dimension + block - 1) // block
-        for dimension, block in zip(
-            expected_shape, fp8_block_shape, strict=True
-        )
+        (dimension + block - 1) // block for dimension, block in zip(expected_shape, fp8_block_shape, strict=True)
     )
-    if wk_scale.shape != expected_scale_shape or (
-        wk_scale.dtype != jnp.float32
-    ):
+    if wk_scale.shape != expected_scale_shape or (wk_scale.dtype != jnp.float32):
         raise ValueError("prefill repair wk scales have an invalid shape/dtype")
     return dequantize_fp8_bits_block_weight(
         wk_bits,
@@ -142,8 +131,13 @@ def _decode_program(mesh: Any, bits: Any, scale: Any, spec: Any, block: tuple[in
 
     key = (tuple(bits.shape), tuple(scale.shape), tuple(spec), block)
     if key not in _DECODERS:
-        _DECODERS[key] = jax.jit(jax.shard_map(
-            lambda b, s: decode_fp8_table(b, s, block_shape=block),
-            mesh=mesh, in_specs=(spec, spec), out_specs=spec, check_vma=False,
-        ))
+        _DECODERS[key] = jax.jit(
+            jax.shard_map(
+                lambda b, s: decode_fp8_table(b, s, block_shape=block),
+                mesh=mesh,
+                in_specs=(spec, spec),
+                out_specs=spec,
+                check_vma=False,
+            )
+        )
     return _DECODERS[key]

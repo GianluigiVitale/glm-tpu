@@ -3,6 +3,7 @@
 ``test_import_closures`` runs every stage (the graph stage builds the real runtime on 32 CPU devices:
 heavy, refused while a TPU run is live); ``test_import_closures_static`` is the light subset
 (entry-module stages, the launcher exercise and the static scan)."""
+
 import pytest
 
 from tools.equivalence.common import DATA, read_json
@@ -37,10 +38,15 @@ def test_worker_and_graph_closures_are_lean():
 
 
 def test_lean_allowlist_flags_every_module_outside_glm_tpu():
-    stages = dict(worker_main=dict(modules=["glm_tpu", "glm_tpu.runner.tpu_runner", "glm_tpu.worker.tpu_worker",
-                                            "bench.x", "glm_tpu_extra.y"]),
-                  graph=dict(modules=["tools.x", "glm_tpu.runner.programs"]),
-                  serving=dict(modules=["tests.fixtures.site"]))  # serving is not lean-checked
-    assert lean_violations(stages) == ["stages.worker_main.not_lean+bench.x",
-                                       "stages.worker_main.not_lean+glm_tpu_extra.y",
-                                       "stages.graph.not_lean+tools.x"]
+    stages = dict(
+        worker_main=dict(
+            modules=["glm_tpu", "glm_tpu.runner.tpu_runner", "glm_tpu.worker.tpu_worker", "bench.x", "glm_tpu_extra.y"]
+        ),
+        graph=dict(modules=["tools.x", "glm_tpu.runner.programs"]),
+        serving=dict(modules=["tests.fixtures.site"]),
+    )  # serving is not lean-checked
+    assert lean_violations(stages) == [
+        "stages.worker_main.not_lean+bench.x",
+        "stages.worker_main.not_lean+glm_tpu_extra.y",
+        "stages.graph.not_lean+tools.x",
+    ]

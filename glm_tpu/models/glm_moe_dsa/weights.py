@@ -33,21 +33,21 @@ from glm_tpu.layers.fp8 import _decode_program
 # ----------------------------------------------------------------------------- weights
 class Bf16QkvAWeights(NamedTuple):
     input_norm_weight_local: Any
-    q_a_local: Any          # bf16 [q_lora, local_hidden]
+    q_a_local: Any  # bf16 [q_lora, local_hidden]
     q_a_norm_weight: Any
-    kv_a_local: Any         # bf16 [kv_lora + rope, local_hidden]
+    kv_a_local: Any  # bf16 [kv_lora + rope, local_hidden]
     kv_a_norm_weight: Any
 
 
 class Bf16AttentionWeights(NamedTuple):
-    q_b_local: Any          # bf16 [local_heads * qk_head, q_lora]
-    kv_b_local: Any         # bf16 [local_heads * 448, 512]
-    o_local: Any            # bf16 [local_hidden, local_heads * v_head]
+    q_b_local: Any  # bf16 [local_heads * qk_head, q_lora]
+    kv_b_local: Any  # bf16 [local_heads * 448, 512]
+    o_local: Any  # bf16 [local_hidden, local_heads * v_head]
 
 
 class Bf16DsaWeights(NamedTuple):
-    wq_b_local: Any         # bf16 [local_dsa_heads * 128, q_lora]
-    wk_local: Any           # bf16 [128, local_hidden]
+    wq_b_local: Any  # bf16 [local_dsa_heads * 128, q_lora]
+    wk_local: Any  # bf16 [128, local_hidden]
     key_norm_weight: Any
     key_norm_bias: Any
     head_weight_local: Any
@@ -69,7 +69,7 @@ class Bf16MoeWeights(NamedTuple):
     expert_down_bits_local: Any
     expert_down_scale_local: Any
     shared_gate_local: Any  # bf16
-    shared_up_local: Any    # bf16
+    shared_up_local: Any  # bf16
     shared_down_local: Any  # bf16
 
 
@@ -95,21 +95,43 @@ def bf16_weight_specs(config: CacheConfig) -> Bf16DecoderWeights:
     layers = []
     for spec in frozen.layers:
         q, a, d, dn, m = spec.qkv_a, spec.attention, spec.dsa, spec.dense, spec.moe
-        layers.append(Bf16LayerWeights(
-            Bf16QkvAWeights(q.input_norm_weight_local, q.q_a_bits_local, q.q_a_norm_weight,
-                            q.kv_a_bits_local, q.kv_a_norm_weight),
-            Bf16AttentionWeights(a.q_b_bits_local, a.kv_b_bits_local, a.o_bits_local),
-            None if d is None else Bf16DsaWeights(d.wq_b_bits_local, d.wk_bits_local, d.key_norm_weight,
-                                                  d.key_norm_bias, d.head_weight_local),
-            spec.post_attention_norm_weight_local,
-            None if dn is None else Bf16DenseWeights(dn.gate_bits_local, dn.up_bits_local, dn.down_bits_local),
-            None if m is None else Bf16MoeWeights(
-                m.router_weight_local, m.correction_bias_local,
-                m.expert_gate_bits_local, m.expert_gate_scale_local, m.expert_up_bits_local,
-                m.expert_up_scale_local, m.expert_down_bits_local, m.expert_down_scale_local,
-                m.shared_gate_bits_local, m.shared_up_bits_local, m.shared_down_bits_local),
-        ))
-    return Bf16DecoderWeights(frozen.embedding_local, tuple(layers), frozen.final_norm_weight_local, frozen.lm_head_local)
+        layers.append(
+            Bf16LayerWeights(
+                Bf16QkvAWeights(
+                    q.input_norm_weight_local,
+                    q.q_a_bits_local,
+                    q.q_a_norm_weight,
+                    q.kv_a_bits_local,
+                    q.kv_a_norm_weight,
+                ),
+                Bf16AttentionWeights(a.q_b_bits_local, a.kv_b_bits_local, a.o_bits_local),
+                None
+                if d is None
+                else Bf16DsaWeights(
+                    d.wq_b_bits_local, d.wk_bits_local, d.key_norm_weight, d.key_norm_bias, d.head_weight_local
+                ),
+                spec.post_attention_norm_weight_local,
+                None if dn is None else Bf16DenseWeights(dn.gate_bits_local, dn.up_bits_local, dn.down_bits_local),
+                None
+                if m is None
+                else Bf16MoeWeights(
+                    m.router_weight_local,
+                    m.correction_bias_local,
+                    m.expert_gate_bits_local,
+                    m.expert_gate_scale_local,
+                    m.expert_up_bits_local,
+                    m.expert_up_scale_local,
+                    m.expert_down_bits_local,
+                    m.expert_down_scale_local,
+                    m.shared_gate_bits_local,
+                    m.shared_up_bits_local,
+                    m.shared_down_bits_local,
+                ),
+            )
+        )
+    return Bf16DecoderWeights(
+        frozen.embedding_local, tuple(layers), frozen.final_norm_weight_local, frozen.lm_head_local
+    )
 
 
 def bf16_resident_weights(mesh: Any, config: CacheConfig, weights: Fp8DecoderWeights) -> Bf16DecoderWeights:
@@ -150,7 +172,9 @@ def bf16_resident_weights(mesh: Any, config: CacheConfig, weights: Fp8DecoderWei
             dsa = Bf16DsaWeights(
                 dec(d.wq_b_bits_local, d.wq_b_scale_local, ds.wq_b_bits_local),
                 dec(d.wk_bits_local, d.wk_scale_local, ds.wk_bits_local),
-                d.key_norm_weight, d.key_norm_bias, d.head_weight_local,
+                d.key_norm_weight,
+                d.key_norm_bias,
+                d.head_weight_local,
             )
         dense = None
         if layer.dense is not None:
@@ -164,21 +188,26 @@ def bf16_resident_weights(mesh: Any, config: CacheConfig, weights: Fp8DecoderWei
         if layer.moe is not None:
             m, ms = layer.moe, spec.moe
             moe = Bf16MoeWeights(
-                m.router_weight_local, m.correction_bias_local,
-                m.expert_gate_bits_local, m.expert_gate_scale_local, m.expert_up_bits_local,
-                m.expert_up_scale_local, m.expert_down_bits_local, m.expert_down_scale_local,
+                m.router_weight_local,
+                m.correction_bias_local,
+                m.expert_gate_bits_local,
+                m.expert_gate_scale_local,
+                m.expert_up_bits_local,
+                m.expert_up_scale_local,
+                m.expert_down_bits_local,
+                m.expert_down_scale_local,
                 dec(m.shared_gate_bits_local, m.shared_gate_scale_local, ms.shared_gate_bits_local),
                 dec(m.shared_up_bits_local, m.shared_up_scale_local, ms.shared_up_bits_local),
                 dec(m.shared_down_bits_local, m.shared_down_scale_local, ms.shared_down_bits_local),
             )
         layers.append(Bf16LayerWeights(qkv, att, dsa, layer.post_attention_norm_weight_local, dense, moe))
-    return Bf16DecoderWeights(weights.embedding_local, tuple(layers), weights.final_norm_weight_local, weights.lm_head_local)
+    return Bf16DecoderWeights(
+        weights.embedding_local, tuple(layers), weights.final_norm_weight_local, weights.lm_head_local
+    )
 
 
 # ----------------------------------------------------------------------------- indexer WK programs
-def build_wk_programs(
-    mesh: Any, bits_spec: Any, scale_spec: Any, *, contract: Any
-) -> tuple[Any, Any]:
+def build_wk_programs(mesh: Any, bits_spec: Any, scale_spec: Any, *, contract: Any) -> tuple[Any, Any]:
     """Reuse the mandatory COMPLETED BF16 decode -> separate FP32 promotion."""
     import jax
     from jax import lax
@@ -263,9 +292,7 @@ def _dsa_specs() -> Fp8DsaWeights:
     )
 
 
-def _dense_specs(
-    *, strategy_nd: bool = False
-) -> Fp8DenseWeights | Fp8StrategyNdDenseWeights:
+def _dense_specs(*, strategy_nd: bool = False) -> Fp8DenseWeights | Fp8StrategyNdDenseWeights:
     if strategy_nd:
         return Fp8StrategyNdDenseWeights(
             P("expert", None, None),
@@ -317,11 +344,7 @@ def decoder_weight_specs(config: CacheConfig) -> Fp8DecoderWeights:
                 _attention_specs(),
                 _dsa_specs() if indexer_kind == "full" else None,
                 P("feature"),
-                (
-                    _dense_specs(strategy_nd=config.strategy_nd_dense)
-                    if mlp_kind == "dense"
-                    else None
-                ),
+                (_dense_specs(strategy_nd=config.strategy_nd_dense) if mlp_kind == "dense" else None),
                 _moe_specs() if mlp_kind == "sparse" else None,
             )
         )
@@ -350,27 +373,15 @@ def decoder_weight_names(config: CacheConfig) -> Fp8DecoderWeights:
     ):
         prefix = f"model.layers.{layer_id}"
         attention_prefix = f"{prefix}.self_attn"
-        q_a_bits, q_a_scale = _fp8_names(
-            f"{attention_prefix}.q_a_proj"
-        )
-        kv_a_bits, kv_a_scale = _fp8_names(
-            f"{attention_prefix}.kv_a_proj_with_mqa"
-        )
-        q_b_bits, q_b_scale = _fp8_names(
-            f"{attention_prefix}.q_b_proj"
-        )
-        kv_b_bits, kv_b_scale = _fp8_names(
-            f"{attention_prefix}.kv_b_proj"
-        )
+        q_a_bits, q_a_scale = _fp8_names(f"{attention_prefix}.q_a_proj")
+        kv_a_bits, kv_a_scale = _fp8_names(f"{attention_prefix}.kv_a_proj_with_mqa")
+        q_b_bits, q_b_scale = _fp8_names(f"{attention_prefix}.q_b_proj")
+        kv_b_bits, kv_b_scale = _fp8_names(f"{attention_prefix}.kv_b_proj")
         o_bits, o_scale = _fp8_names(f"{attention_prefix}.o_proj")
         dsa = None
         if indexer_kind == "full":
-            wq_b_bits, wq_b_scale = _fp8_names(
-                f"{attention_prefix}.indexer.wq_b"
-            )
-            wk_bits, wk_scale = _fp8_names(
-                f"{attention_prefix}.indexer.wk"
-            )
+            wq_b_bits, wq_b_scale = _fp8_names(f"{attention_prefix}.indexer.wq_b")
+            wk_bits, wk_scale = _fp8_names(f"{attention_prefix}.indexer.wk")
             dsa = Fp8DsaWeights(
                 wq_b_bits,
                 wq_b_scale,
@@ -404,24 +415,12 @@ def decoder_weight_names(config: CacheConfig) -> Fp8DecoderWeights:
                     down_scale,
                 )
         else:
-            expert_gate_bits, expert_gate_scale = _fp8_names(
-                f"{prefix}.mlp.experts.gate_proj"
-            )
-            expert_up_bits, expert_up_scale = _fp8_names(
-                f"{prefix}.mlp.experts.up_proj"
-            )
-            expert_down_bits, expert_down_scale = _fp8_names(
-                f"{prefix}.mlp.experts.down_proj"
-            )
-            shared_gate_bits, shared_gate_scale = _fp8_names(
-                f"{prefix}.mlp.shared_experts.gate_proj"
-            )
-            shared_up_bits, shared_up_scale = _fp8_names(
-                f"{prefix}.mlp.shared_experts.up_proj"
-            )
-            shared_down_bits, shared_down_scale = _fp8_names(
-                f"{prefix}.mlp.shared_experts.down_proj"
-            )
+            expert_gate_bits, expert_gate_scale = _fp8_names(f"{prefix}.mlp.experts.gate_proj")
+            expert_up_bits, expert_up_scale = _fp8_names(f"{prefix}.mlp.experts.up_proj")
+            expert_down_bits, expert_down_scale = _fp8_names(f"{prefix}.mlp.experts.down_proj")
+            shared_gate_bits, shared_gate_scale = _fp8_names(f"{prefix}.mlp.shared_experts.gate_proj")
+            shared_up_bits, shared_up_scale = _fp8_names(f"{prefix}.mlp.shared_experts.up_proj")
+            shared_down_bits, shared_down_scale = _fp8_names(f"{prefix}.mlp.shared_experts.down_proj")
             moe = Fp8MoeWeights(
                 f"{prefix}.mlp.gate.weight",
                 f"{prefix}.mlp.gate.e_score_correction_bias",
@@ -477,9 +476,7 @@ def _weight_name_leaves(value: object) -> tuple[str, ...]:
     if isinstance(value, str):
         return (value,)
     if isinstance(value, tuple):
-        return tuple(
-            name for item in value for name in _weight_name_leaves(item)
-        )
+        return tuple(name for item in value for name in _weight_name_leaves(item))
     raise TypeError("WS32 weight-name tree contains a non-string leaf")
 
 
@@ -511,10 +508,7 @@ def bind_decoder_weights(
     if observed != expected:
         missing = sorted(expected - observed)[:5]
         unexpected = sorted(observed - expected)[:5]
-        raise ValueError(
-            "WS32 decoder tensor set drifted: "
-            f"missing={missing}, unexpected={unexpected}"
-        )
+        raise ValueError(f"WS32 decoder tensor set drifted: missing={missing}, unexpected={unexpected}")
     result = _bind_weight_name_tree(names, arrays)
     if not isinstance(result, Fp8DecoderWeights):
         raise AssertionError("WS32 decoder binding lost its typed root")

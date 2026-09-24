@@ -42,20 +42,25 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("JAX_PLATFORMS", "cpu")
     if os.environ["JAX_PLATFORMS"] != "cpu":
         raise SystemExit("tools.equivalence requires JAX_PLATFORMS=cpu")
-    parser = argparse.ArgumentParser(prog="python -m tools.equivalence", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        prog="python -m tools.equivalence", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     rec = commands.add_parser("record")
     rec.add_argument("--gates", required=True, type=_gates)
     rec.add_argument("--once", action="store_true", help="skip the second determinism recording (not for baselines)")
     rec.add_argument("--reason", help="re-baseline marker (H number, stage or commit); required on a changed tree")
-    rec.add_argument("--rename-only", action="store_true",
-                     help="G6/G7: re-record under current names only if closure_map.toml explains every difference")
+    rec.add_argument(
+        "--rename-only",
+        action="store_true",
+        help="G6/G7: re-record under current names only if closure_map.toml explains every difference",
+    )
     chk = commands.add_parser("check")
     chk.add_argument("--gates", type=_gates, default=list(DEFAULT_CHECK))
     chk.add_argument("--tier", choices=("fixture", "production"))
-    chk.add_argument("--allow-skip", action="store_true",
-                     help="accept a gate skipped for a package-version mismatch (never in CI)")
+    chk.add_argument(
+        "--allow-skip", action="store_true", help="accept a gate skipped for a package-version mismatch (never in CI)"
+    )
     commands.add_parser("selftest")
     site = commands.add_parser("site-check")
     site.add_argument("--record", action="store_true")

@@ -13,14 +13,25 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.layers.attention.dsa_indexer import dsa_index_keys_from_projection, dsa_scores, local_topk_candidates, merge_topk_candidates_with_scores
+from glm_tpu.layers.attention.dsa_indexer import (
+    dsa_index_keys_from_projection,
+    dsa_scores,
+    local_topk_candidates,
+    merge_topk_candidates_with_scores,
+)
 from glm_tpu.layers.contracts import DsaNumericalContract
-from tests.reference.dsa import distributed_exact_topk_reference, dsa_index_keys, dsa_query_and_head_weights, exact_topk, merge_topk_candidates
+from tests.reference.dsa import (
+    distributed_exact_topk_reference,
+    dsa_index_keys,
+    dsa_query_and_head_weights,
+    exact_topk,
+    merge_topk_candidates,
+)
 from tests.reference.linear import linear
 
 
 def test_two_stage_matches_frozen_cpu8():
-    code = r'''
+    code = r"""
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.layers.attention.dsa_indexer import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
@@ -59,7 +70,7 @@ for trial in range(60):
     if trial == 59: assert bool(f), "signed-zero cut must fall back"
 assert paths=={False,True}, paths
 print('60 randomized tied/skewed trials, both cut-check branches, bitwise equal')
-'''
+"""
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=8")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -82,7 +93,7 @@ def test_physical_page_scores_match_logical_key_gather_bitwise():
     logical = jnp.take(cache, jnp.clip(tables[0], 0, 3), axis=0).reshape(-1, 128)
     expected = dsa_scores(query, logical, weights, precision="highest")
     np.testing.assert_array_equal(actual, expected)
-    expected_positions = np.arange(4)[:, None]*128 + 5*16 + np.arange(16)[None]
+    expected_positions = np.arange(4)[:, None] * 128 + 5 * 16 + np.arange(16)[None]
     expected_positions[2] = -1
     np.testing.assert_array_equal(positions, expected_positions.reshape(-1))
 
@@ -114,7 +125,7 @@ FROZEN_TILED_SELECTOR = {
 
 
 def test_one_pass_prefill_matches_the_recorded_tiled_selector_cpu32():
-    code = r'''
+    code = r"""
 import hashlib, json
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
@@ -138,7 +149,7 @@ out={}
 for lengths in ([0,127,2048],[1,511,1984],[0,0,0]):
     out[",".join(map(str,lengths))]=[digest(x) for x in jax.tree.leaves(fn(q,k,w,jnp.asarray(p),jnp.array(lengths,jnp.int32)))]
 print(json.dumps(out))
-'''
+"""
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=180)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -185,9 +196,7 @@ def test_dsa_contract_refuses_semantic_drift() -> None:
 
 def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
     contract = small_contract()
-    hidden_query = jnp.asarray(
-        [[0.5, -1.0, 0.25, 0.75, -0.5, 1.25]], dtype=jnp.bfloat16
-    )
+    hidden_query = jnp.asarray([[0.5, -1.0, 0.25, 0.75, -0.5, 1.25]], dtype=jnp.bfloat16)
     q_residual = jnp.asarray([[0.5, -0.25, 1.0, 0.75]], dtype=jnp.bfloat16)
     hidden_keys = jnp.asarray(
         [
@@ -197,17 +206,12 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
         ],
         dtype=jnp.bfloat16,
     )
-    query_weight = (
-        jnp.arange(32, dtype=jnp.float32).reshape(8, 4) / 31.0 - 0.5
-    ).astype(jnp.bfloat16)
+    query_weight = (jnp.arange(32, dtype=jnp.float32).reshape(8, 4) / 31.0 - 0.5).astype(jnp.bfloat16)
     head_weight = jnp.asarray(
-        [[0.5, 0.25, -0.5, 1.0, 0.0, -0.25],
-         [-0.5, 0.75, 0.25, 0.0, 1.0, 0.5]],
+        [[0.5, 0.25, -0.5, 1.0, 0.0, -0.25], [-0.5, 0.75, 0.25, 0.0, 1.0, 0.5]],
         dtype=jnp.bfloat16,
     )
-    key_weight = (
-        jnp.arange(24, dtype=jnp.float32).reshape(4, 6) / 23.0 - 0.5
-    ).astype(jnp.bfloat16)
+    key_weight = (jnp.arange(24, dtype=jnp.float32).reshape(4, 6) / 23.0 - 0.5).astype(jnp.bfloat16)
     norm_weight = jnp.asarray([1.0, 0.5, 1.5, -0.5], dtype=jnp.float32)
     norm_bias = jnp.asarray([0.0, 0.1, -0.2, 0.3], dtype=jnp.float32)
     query, weights = dsa_query_and_head_weights(
@@ -226,9 +230,7 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
         jnp.asarray([0, 1, 2], dtype=jnp.int32),
         contract=contract,
     )
-    projected_keys = linear(
-        hidden_keys, key_weight, output_dtype=jnp.float32
-    )
+    projected_keys = linear(hidden_keys, key_weight, output_dtype=jnp.float32)
     keys_from_projection = dsa_index_keys_from_projection(
         projected_keys,
         norm_weight,
@@ -238,8 +240,7 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
     )
     got = dsa_scores(query, keys, weights)
     expected_per_head = np.maximum(
-        np.einsum("rhd,sd->rhs", np.asarray(query), np.asarray(keys))
-        * contract.head_dim**-0.5,
+        np.einsum("rhd,sd->rhs", np.asarray(query), np.asarray(keys)) * contract.head_dim**-0.5,
         0.0,
     )
     expected = np.einsum("rh,rhs->rs", np.asarray(weights), expected_per_head)
@@ -247,24 +248,18 @@ def test_query_key_and_score_math_matches_direct_fp32_formula() -> None:
     assert keys.shape == (3, 4)
     assert got.shape == (1, 3)
     assert got.dtype == jnp.float32
-    np.testing.assert_array_equal(
-        np.asarray(keys_from_projection), np.asarray(keys)
-    )
+    np.testing.assert_array_equal(np.asarray(keys_from_projection), np.asarray(keys))
     np.testing.assert_allclose(np.asarray(got), expected, rtol=2e-7, atol=2e-7)
 
 
 def test_index_key_norm_exposes_exact_divide_sqrt_association() -> None:
     contract = small_contract()
-    projected = jnp.asarray(
-        [[0.125, -0.75, 1.25, 0.5]], dtype=jnp.float32
-    )
+    projected = jnp.asarray([[0.125, -0.75, 1.25, 0.5]], dtype=jnp.float32)
     weight = jnp.asarray([1.0, 0.5, -0.25, 1.5], dtype=jnp.float32)
     bias = jnp.asarray([0.0, 0.1, -0.2, 0.3], dtype=jnp.float32)
     positions = jnp.asarray([0], dtype=jnp.int32)
 
-    default = dsa_index_keys_from_projection(
-        projected, weight, bias, positions, contract=contract
-    )
+    default = dsa_index_keys_from_projection(projected, weight, bias, positions, contract=contract)
     reciprocal = dsa_index_keys_from_projection(
         projected,
         weight,
@@ -282,12 +277,9 @@ def test_index_key_norm_exposes_exact_divide_sqrt_association() -> None:
         key_norm_mode="divide_sqrt",
     )
     np.testing.assert_array_equal(np.asarray(default), np.asarray(reciprocal))
-    centered = np.asarray(projected) - np.asarray(projected).mean(
-        axis=-1, keepdims=True
-    )
+    centered = np.asarray(projected) - np.asarray(projected).mean(axis=-1, keepdims=True)
     expected = centered / np.sqrt(
-        np.mean(centered * centered, axis=-1, keepdims=True)
-        + contract.key_layer_norm_epsilon
+        np.mean(centered * centered, axis=-1, keepdims=True) + contract.key_layer_norm_epsilon
     )
     expected = expected * np.asarray(weight) + np.asarray(bias)
     np.testing.assert_allclose(np.asarray(divided), expected, rtol=2e-7, atol=2e-7)
@@ -324,12 +316,8 @@ def test_exact_topk_has_lowest_position_ties_and_minus_one_tail() -> None:
         [[5.0, 5.0, 4.0, 3.0, 2.0], [9.0, 8.0, 7.0, 6.0, 5.0]],
         dtype=jnp.float32,
     )
-    selected = exact_topk(
-        scores, jnp.asarray([5, 2], dtype=jnp.int32), top_k=4
-    )
-    np.testing.assert_array_equal(
-        np.asarray(selected.positions), [[0, 1, 2, 3], [0, 1, -1, -1]]
-    )
+    selected = exact_topk(scores, jnp.asarray([5, 2], dtype=jnp.int32), top_k=4)
+    np.testing.assert_array_equal(np.asarray(selected.positions), [[0, 1, 2, 3], [0, 1, -1, -1]])
     np.testing.assert_array_equal(np.asarray(selected.valid_counts), [4, 2])
 
 
@@ -355,14 +343,10 @@ def test_distributed_selection_matches_flat_including_ties_and_group_order() -> 
         [[10.0, 10.0, 8.0, 8.0, 7.0, 7.0, 6.0, 6.0]],
         dtype=jnp.float32,
     )
-    expected = exact_topk(
-        flat_scores, jnp.asarray([8], dtype=jnp.int32), top_k=5
-    )
+    expected = exact_topk(flat_scores, jnp.asarray([8], dtype=jnp.int32), top_k=5)
     # Two striped context owners, deliberately presented in reverse owner order.
     shard_positions = jnp.asarray([[1, 3, 5, 7], [0, 2, 4, 6]], dtype=jnp.int32)
-    shard_scores = jnp.stack(
-        (flat_scores[:, [1, 3, 5, 7]], flat_scores[:, [0, 2, 4, 6]]), axis=0
-    )
+    shard_scores = jnp.stack((flat_scores[:, [1, 3, 5, 7]], flat_scores[:, [0, 2, 4, 6]]), axis=0)
     got = distributed_exact_topk_reference(
         shard_scores,
         shard_positions,
@@ -371,9 +355,7 @@ def test_distributed_selection_matches_flat_including_ties_and_group_order() -> 
         global_context_size=8,
     )
     np.testing.assert_array_equal(np.asarray(got.positions), np.asarray(expected.positions))
-    np.testing.assert_array_equal(
-        np.asarray(got.valid_counts), np.asarray(expected.valid_counts)
-    )
+    np.testing.assert_array_equal(np.asarray(got.valid_counts), np.asarray(expected.valid_counts))
 
 
 def test_local_candidate_width_keeps_hot_shard_winners() -> None:
@@ -400,24 +382,14 @@ def test_local_ties_use_global_position_not_input_order() -> None:
 
 
 def test_merge_is_invariant_to_candidate_concatenation_order() -> None:
-    scores = jnp.asarray(
-        [[[5.0, 4.0, 3.0]], [[5.0, 4.0, 3.0]]], dtype=jnp.float32
-    )
-    positions = jnp.asarray(
-        [[[1, 3, 5]], [[0, 2, 4]]], dtype=jnp.int32
-    )
+    scores = jnp.asarray([[[5.0, 4.0, 3.0]], [[5.0, 4.0, 3.0]]], dtype=jnp.float32)
+    positions = jnp.asarray([[[1, 3, 5]], [[0, 2, 4]]], dtype=jnp.int32)
     valid = jnp.asarray([6], dtype=jnp.int32)
-    first = merge_topk_candidates(
-        scores, positions, valid, top_k=4, global_context_size=6
-    )
-    second = merge_topk_candidates(
-        scores[::-1], positions[::-1], valid, top_k=4, global_context_size=6
-    )
+    first = merge_topk_candidates(scores, positions, valid, top_k=4, global_context_size=6)
+    second = merge_topk_candidates(scores[::-1], positions[::-1], valid, top_k=4, global_context_size=6)
     np.testing.assert_array_equal(np.asarray(first.positions), [[0, 1, 2, 3]])
     np.testing.assert_array_equal(np.asarray(second.positions), np.asarray(first.positions))
-    scored = merge_topk_candidates_with_scores(
-        scores, positions, valid, top_k=4, global_context_size=6
-    )
+    scored = merge_topk_candidates_with_scores(scores, positions, valid, top_k=4, global_context_size=6)
     np.testing.assert_array_equal(np.asarray(scored.positions), [[0, 1, 2, 3]])
     np.testing.assert_array_equal(np.asarray(scored.scores), [[5.0, 5.0, 4.0, 4.0]])
 

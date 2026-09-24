@@ -13,7 +13,19 @@ from typing import Any, Mapping, Sequence
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.exceptions import CheckpointValidationError
 from glm_tpu.model_loader.placement import RuntimePlacementReport, placements_for_source_tensor
-from glm_tpu.model_loader.sharded_state.format import RUNTIME_ARTIFACT_KIND, RUNTIME_FORMAT_VERSION, RUNTIME_PLAN_ID, RUNTIME_SLOT_RECORD_KIND, RuntimeFilePlan, RuntimePackConfig, _destination_record, _digest, _mapping_hash, _sha256_file, build_runtime_file_plans
+from glm_tpu.model_loader.sharded_state.format import (
+    RUNTIME_ARTIFACT_KIND,
+    RUNTIME_FORMAT_VERSION,
+    RUNTIME_PLAN_ID,
+    RUNTIME_SLOT_RECORD_KIND,
+    RuntimeFilePlan,
+    RuntimePackConfig,
+    _destination_record,
+    _digest,
+    _mapping_hash,
+    _sha256_file,
+    build_runtime_file_plans,
+)
 from glm_tpu.model_loader.sharded_state.verify import RuntimeMetadata, _verify_runtime_files, _verify_runtime_value
 from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory
 
@@ -21,9 +33,7 @@ from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory
 def _verify_source_header(root: Path, record: SourceFile) -> None:
     path = root / record.filename
     if not path.is_file() or path.stat().st_size != record.file_bytes:
-        raise CheckpointValidationError(
-            f"WS32 source file size drifted for {record.filename!r}"
-        )
+        raise CheckpointValidationError(f"WS32 source file size drifted for {record.filename!r}")
     with path.open("rb", buffering=0) as stream:
         prefix = stream.read(8)
         if len(prefix) != 8:
@@ -31,9 +41,7 @@ def _verify_source_header(root: Path, record: SourceFile) -> None:
         length = struct.unpack("<Q", prefix)[0]
         raw = stream.read(length)
     if 8 + length != record.header_bytes or sha256(raw).hexdigest() != record.header_sha256:
-        raise CheckpointValidationError(
-            f"WS32 source header identity drifted for {record.filename!r}"
-        )
+        raise CheckpointValidationError(f"WS32 source header identity drifted for {record.filename!r}")
 
 
 def _flat_contiguous_offset(
@@ -44,24 +52,17 @@ def _flat_contiguous_offset(
     extents = tuple(stop - start for start, stop in zip(starts, stops, strict=True))
     partial = [
         index
-        for index, (dimension, start, stop) in enumerate(
-            zip(shape, starts, stops, strict=True)
-        )
+        for index, (dimension, start, stop) in enumerate(zip(shape, starts, stops, strict=True))
         if start != 0 or stop != dimension
     ]
     if partial:
         first = partial[0]
         if prod(extents[:first]) != 1 or any(
-            starts[index] != 0 or stops[index] != shape[index]
-            for index in range(first + 1, len(shape))
+            starts[index] != 0 or stops[index] != shape[index] for index in range(first + 1, len(shape))
         ):
-            raise CheckpointValidationError(
-                "WS32 destination placement is not one contiguous interval"
-            )
+            raise CheckpointValidationError("WS32 destination placement is not one contiguous interval")
     strides = tuple(prod(shape[index + 1 :]) for index in range(len(shape)))
-    flat_start = sum(
-        start * stride for start, stride in zip(starts, strides, strict=True)
-    )
+    flat_start = sum(start * stride for start, stride in zip(starts, strides, strict=True))
     return flat_start, prod(extents)
 
 
@@ -88,10 +89,7 @@ def _write_slot_files(
         raise CheckpointValidationError("WS32 slot pack selection is invalid")
     plan_by_slot = {plan.device_slot: plan for plan in plans}
     source_files = {record.filename: record for record in inventory.files}
-    partial_paths = {
-        plan.device_slot: config.output_dir / f".{plan.filename}.partial"
-        for plan in plans
-    }
+    partial_paths = {plan.device_slot: config.output_dir / f".{plan.filename}.partial" for plan in plans}
     handles: dict[int, Any] = {}
     try:
         for plan in plans:
@@ -99,11 +97,7 @@ def _write_slot_files(
             handles[plan.device_slot] = handle
             handle.write(plan.header)
             handle.truncate(plan.file_bytes)
-        tensor_by_slot_name = {
-            (plan.device_slot, tensor.name): tensor
-            for plan in plans
-            for tensor in plan.tensors
-        }
+        tensor_by_slot_name = {(plan.device_slot, tensor.name): tensor for plan in plans for tensor in plan.tensors}
         bytes_written = {key: 0 for key in tensor_by_slot_name}
         for source in inventory.tensors:
             if source.layer_id is not None and source.layer_id >= geometry.num_layers:
@@ -139,48 +133,33 @@ def _write_slot_files(
                     )
                     raw = mapped[slices].tobytes(order="C")
                     if len(raw) != placement.byte_count:
-                        raise CheckpointValidationError(
-                            f"WS32 source slice size drifted for {source.name!r}"
-                        )
-                    tensor = tensor_by_slot_name[
-                        (placement.slot, placement.destination_name)
-                    ]
+                        raise CheckpointValidationError(f"WS32 source slice size drifted for {source.name!r}")
+                    tensor = tensor_by_slot_name[(placement.slot, placement.destination_name)]
                     flat_start, element_count = _flat_contiguous_offset(
                         placement.destination_shape,
                         placement.destination_starts,
                         placement.destination_stops,
                     )
                     if element_count * element_bytes != len(raw):
-                        raise CheckpointValidationError(
-                            "WS32 source/destination element size drifted"
-                        )
+                        raise CheckpointValidationError("WS32 source/destination element size drifted")
                     plan = plan_by_slot[placement.slot]
                     _pwrite_all(
                         handles[placement.slot].fileno(),
                         raw,
-                        len(plan.header)
-                        + tensor.data_offset_start
-                        + flat_start * element_bytes,
+                        len(plan.header) + tensor.data_offset_start + flat_start * element_bytes,
                     )
                     key = (placement.slot, placement.destination_name)
                     bytes_written[key] += len(raw)
             finally:
                 del mapped
-        if any(
-            bytes_written[key] != tensor.byte_count
-            for key, tensor in tensor_by_slot_name.items()
-        ):
-            raise CheckpointValidationError(
-                "WS32 destination tensor coverage has a gap or overlap"
-            )
+        if any(bytes_written[key] != tensor.byte_count for key, tensor in tensor_by_slot_name.items()):
+            raise CheckpointValidationError("WS32 destination tensor coverage has a gap or overlap")
         for plan in plans:
             handle = handles.pop(plan.device_slot)
             handle.flush()
             os.fsync(handle.fileno())
             handle.close()
-            partial_paths[plan.device_slot].replace(
-                config.output_dir / plan.filename
-            )
+            partial_paths[plan.device_slot].replace(config.output_dir / plan.filename)
     finally:
         for handle in handles.values():
             handle.close()
@@ -210,21 +189,12 @@ def pack_runtime_slots(
     if (
         not slots
         or len(set(slots)) != len(slots)
-        or any(
-            not isinstance(slot, int)
-            or isinstance(slot, bool)
-            or not 0 <= slot < 32
-            for slot in slots
-        )
+        or any(not isinstance(slot, int) or isinstance(slot, bool) or not 0 <= slot < 32 for slot in slots)
     ):
         raise ValueError("WS32 slot subset is invalid")
     if config.output_dir.exists():
-        raise FileExistsError(
-            f"append-only WS32 slot destination exists: {config.output_dir}"
-        )
-    report, all_plans = build_runtime_file_plans(
-        inventory, geometry, mesh_hash=config.mesh_hash
-    )
+        raise FileExistsError(f"append-only WS32 slot destination exists: {config.output_dir}")
+    report, all_plans = build_runtime_file_plans(inventory, geometry, mesh_hash=config.mesh_hash)
     for record in inventory.files:
         _verify_source_header(config.source_root, record)
     config.output_dir.mkdir(parents=True)
@@ -274,9 +244,7 @@ def _build_runtime_manifest(
     source_file_sha256: Mapping[str, str],
 ) -> dict[str, Any]:
     if set(source_file_sha256) != {record.filename for record in inventory.files}:
-        raise CheckpointValidationError(
-            "WS32 source SHA-256 ledger must cover every source file"
-        )
+        raise CheckpointValidationError("WS32 source SHA-256 ledger must cover every source file")
     source_records = []
     for record in inventory.files:
         digest = _digest(
@@ -304,9 +272,7 @@ def _build_runtime_manifest(
         },
         "tensor_schema": [item.schema_dict() for item in plans[0].tensors],
     }
-    manifest["manifest_sha256"] = _mapping_hash(
-        manifest, field="manifest_sha256"
-    )
+    manifest["manifest_sha256"] = _mapping_hash(manifest, field="manifest_sha256")
     by_slot = _verify_runtime_value(
         config.output_dir,
         manifest,
@@ -350,9 +316,7 @@ def finalize_runtime_checkpoint(
 
     if not config.output_dir.is_dir():
         raise FileNotFoundError("WS32 packed slot directory is unavailable")
-    report, plans = build_runtime_file_plans(
-        inventory, geometry, mesh_hash=config.mesh_hash
-    )
+    report, plans = build_runtime_file_plans(inventory, geometry, mesh_hash=config.mesh_hash)
     manifest = _build_runtime_manifest(
         config=config,
         inventory=inventory,
@@ -378,17 +342,12 @@ def pack_runtime_checkpoint(
     if chunk_bytes <= 0:
         raise ValueError("WS32 pack chunk size must be positive")
     if config.output_dir.exists():
-        raise FileExistsError(
-            f"append-only WS32 destination exists: {config.output_dir}"
-        )
-    report, plans = build_runtime_file_plans(
-        inventory, geometry, mesh_hash=config.mesh_hash
-    )
+        raise FileExistsError(f"append-only WS32 destination exists: {config.output_dir}")
+    report, plans = build_runtime_file_plans(inventory, geometry, mesh_hash=config.mesh_hash)
     for record in inventory.files:
         _verify_source_header(config.source_root, record)
     source_file_sha256 = {
-        record.filename: _sha256_file(config.source_root / record.filename)
-        for record in inventory.files
+        record.filename: _sha256_file(config.source_root / record.filename) for record in inventory.files
     }
     config.output_dir.mkdir(parents=True)
     files = _write_slot_files(

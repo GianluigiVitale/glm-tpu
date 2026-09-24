@@ -6,12 +6,13 @@ path bitwise, BF16-resident path within rtol 0.02 / atol 0.0625). That oracle is
 ``archive/research-20260922``; its final green run is recorded in the S2f commit message, and the
 reference model (``tests/reference``, ``VALIDATION.md``) plus the G1/G3 goldens carry the evidence.
 """
+
 import os
 import subprocess
 import sys
 
 
-CODE = r'''
+CODE = r"""
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
@@ -58,7 +59,7 @@ jax.block_until_ready((plain,donated))
 for expected,actual in zip(jax.tree.leaves(plain),jax.tree.leaves(donated)):
     np.testing.assert_array_equal(np.asarray(expected),np.asarray(actual))
 print('Exclusive prefill state donation preserves every output leaf')
-'''
+"""
 
 
 def test_prefill_program_health_selector_refusal_and_donation_cpu32():

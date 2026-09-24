@@ -1,5 +1,6 @@
 """G4: checkpoint and format identities from code, incl. the geometry and placement hashes and all
 32 owner-file header SHA-256s of the live GLM-5.3 checkpoint (copied at S0)."""
+
 import pytest
 
 from tools.equivalence.common import DATA, read_json

@@ -32,30 +32,20 @@ _HIGHEST = lax.Precision.HIGHEST
 
 
 @partial(jax.jit, static_argnames=("block_shape",))
-def _dequantize(
-    bits: jax.Array, scale_inv: jax.Array, *, block_shape: tuple[int, int]
-) -> jax.Array:
-    return dequantize_fp8_bits_block_weight(
-        bits, scale_inv, block_shape=block_shape, output_dtype=jnp.bfloat16
-    )
+def _dequantize(bits: jax.Array, scale_inv: jax.Array, *, block_shape: tuple[int, int]) -> jax.Array:
+    return dequantize_fp8_bits_block_weight(bits, scale_inv, block_shape=block_shape, output_dtype=jnp.bfloat16)
 
 
-def dequantize(
-    bits: Any, scale_inv: Any, *, block_shape: tuple[int, int] = FP8_BLOCK
-) -> jax.Array:
+def dequantize(bits: Any, scale_inv: Any, *, block_shape: tuple[int, int] = FP8_BLOCK) -> jax.Array:
     """Dequantize raw E4M3FN bits (``uint8``) with FP32 block scales to BF16.
 
     One compiled program per shape (a table lookup and one FP32 product per element,
     no accumulation), so compiling changes no value.
     """
-    return _dequantize(
-        jnp.asarray(bits), jnp.asarray(scale_inv), block_shape=tuple(block_shape)
-    )
+    return _dequantize(jnp.asarray(bits), jnp.asarray(scale_inv), block_shape=tuple(block_shape))
 
 
-def project(
-    x: jax.Array, weight_out_in: jax.Array, *, dtype: Any = jnp.bfloat16
-) -> jax.Array:
+def project(x: jax.Array, weight_out_in: jax.Array, *, dtype: Any = jnp.bfloat16) -> jax.Array:
     """``x @ weight.T`` (checkpoint ``[out, in]`` weight), FP32 accumulation, one rounding."""
     result = lax.dot_general(
         x.astype(jnp.float32),
@@ -123,9 +113,7 @@ def linear(
             f"input={hidden_states.shape[-1]} weight={weight_out_in.shape}"
         )
     if bias is not None and bias.shape != (weight_out_in.shape[0],):
-        raise ValueError(
-            f"linear bias must have shape {(weight_out_in.shape[0],)}, got {bias.shape}"
-        )
+        raise ValueError(f"linear bias must have shape {(weight_out_in.shape[0],)}, got {bias.shape}")
     if not jnp.issubdtype(hidden_states.dtype, jnp.inexact):
         raise ValueError("linear input must have an inexact dtype")
     if not jnp.issubdtype(weight_out_in.dtype, jnp.inexact):
@@ -166,9 +154,7 @@ def dense_swiglu(
         raise ValueError("dense gate and up projection shapes must match")
     intermediate = gate_weight_out_in.shape[0]
     if down_weight_out_in.shape != (hidden_states.shape[-1], intermediate):
-        raise ValueError(
-            "dense down projection must map intermediate width back to hidden width"
-        )
+        raise ValueError("dense down projection must map intermediate width back to hidden width")
     gate = linear(hidden_states, gate_weight_out_in)
     up = linear(hidden_states, up_weight_out_in)
     return linear(silu(gate) * up, down_weight_out_in)

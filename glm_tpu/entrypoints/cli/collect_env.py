@@ -9,9 +9,7 @@ from typing import Callable
 
 
 def environment_manifest() -> dict:
-    return json.loads(
-        resources.files("glm_tpu").joinpath("environment.json").read_text()
-    )
+    return json.loads(resources.files("glm_tpu").joinpath("environment.json").read_text())
 
 
 def environment_report(
@@ -31,11 +29,7 @@ def environment_report(
     }
     if profile not in groups:
         raise ValueError("unknown environment profile")
-    expected = {
-        name: pin
-        for group in groups[profile]
-        for name, pin in manifest["profiles"][group].items()
-    }
+    expected = {name: pin for group in groups[profile] for name, pin in manifest["profiles"][group].items()}
     rows = []
     for name, pin in sorted(expected.items()):
         try:
@@ -47,16 +41,10 @@ def environment_report(
                 package=name,
                 expected=pin,
                 installed=actual,
-                status=(
-                    "match"
-                    if actual == pin
-                    else "missing" if actual is None else "mismatch"
-                ),
+                status=("match" if actual == pin else "missing" if actual is None else "mismatch"),
             )
         )
-    major, minor = (
-        python_version if python_version is not None else sys.version_info[:2]
-    )
+    major, minor = python_version if python_version is not None else sys.version_info[:2]
     python = f"{major}.{minor}"
     return dict(
         schema="glm_tpu_environment_report_v1",
@@ -64,7 +52,6 @@ def environment_report(
         python=python,
         expected_python=manifest["python"],
         packages=rows,
-        passed=python == manifest["python"]
-        and all(row["status"] == "match" for row in rows),
+        passed=python == manifest["python"] and all(row["status"] == "match" for row in rows),
         scope="distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or launch authorization",
     )

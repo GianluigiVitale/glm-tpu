@@ -1,4 +1,5 @@
 """The GLM_TPU_ environment registry: lazy, documented, one definition per variable."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -84,8 +85,9 @@ def test_unknown_names_are_errors():
 
 
 def test_describe_never_reveals_a_secret(monkeypatch):
-    monkeypatch.setitem(envs.environment_variables, "GLM_TPU_EXAMPLE_TOKEN",
-                        envs.EnvVar(lambda: "value", "example secret", secret=True))
+    monkeypatch.setitem(
+        envs.environment_variables, "GLM_TPU_EXAMPLE_TOKEN", envs.EnvVar(lambda: "value", "example secret", secret=True)
+    )
     monkeypatch.setenv("GLM_TPU_EXAMPLE_TOKEN", "do-not-print")
     monkeypatch.setenv("GLM_TPU_RUN_ROOT", "/runs")
     described = envs.describe()

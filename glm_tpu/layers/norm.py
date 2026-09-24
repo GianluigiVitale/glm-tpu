@@ -3,6 +3,7 @@
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).
 """
+
 from __future__ import annotations
 
 from typing import Any, Callable, Literal
@@ -45,23 +46,16 @@ def sharded_rms_norm(
         or global_hidden_size % hidden_local.shape[-1]
     ):
         raise ValueError("WS32 RMSNorm global hidden geometry is invalid")
-    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (
-        epsilon <= 0
-    ):
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (epsilon <= 0):
         raise ValueError("WS32 RMSNorm epsilon must be positive")
 
     value = hidden_local.astype(jnp.float32)
     local_square_sum = jnp.sum(lax.square(value), axis=-1, keepdims=True)
     with jax.named_scope("greenfield_ws32_rmsnorm/feature_square_reduce"):
         square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
-    inverse = lax.rsqrt(
-        square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon)
-    )
+    inverse = lax.rsqrt(square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon))
     normalized = value * inverse
-    return (
-        normalized.astype(hidden_local.dtype)
-        * weight_local.astype(hidden_local.dtype)
-    ).astype(hidden_local.dtype)
+    return (normalized.astype(hidden_local.dtype) * weight_local.astype(hidden_local.dtype)).astype(hidden_local.dtype)
 
 
 def sharded_fused_add_rms_norm(
@@ -83,15 +77,11 @@ def sharded_fused_add_rms_norm(
 
     if hidden_update_local.shape != carried_residual_local.shape:
         raise ValueError("WS32 split residual shapes differ")
-    if hidden_update_local.dtype != jnp.bfloat16 or (
-        carried_residual_local.dtype != jnp.bfloat16
-    ):
+    if hidden_update_local.dtype != jnp.bfloat16 or (carried_residual_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 split residual inputs must be bfloat16")
     if hidden_update_local.ndim < 1 or hidden_update_local.shape[-1] <= 0:
         raise ValueError("WS32 split residual requires a nonempty hidden shard")
-    if weight_local.shape != (hidden_update_local.shape[-1],) or (
-        weight_local.dtype != jnp.bfloat16
-    ):
+    if weight_local.shape != (hidden_update_local.shape[-1],) or (weight_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 split RMSNorm weight must match the hidden shard")
     if (
         not isinstance(global_hidden_size, int)
@@ -100,21 +90,15 @@ def sharded_fused_add_rms_norm(
         or global_hidden_size % hidden_update_local.shape[-1]
     ):
         raise ValueError("WS32 split RMSNorm global hidden geometry is invalid")
-    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (
-        epsilon <= 0
-    ):
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (epsilon <= 0):
         raise ValueError("WS32 split RMSNorm epsilon must be positive")
 
-    summed = hidden_update_local.astype(jnp.float32) + (
-        carried_residual_local.astype(jnp.float32)
-    )
+    summed = hidden_update_local.astype(jnp.float32) + (carried_residual_local.astype(jnp.float32))
     carried = summed.astype(jnp.bfloat16)
     local_square_sum = jnp.sum(lax.square(summed), axis=-1, keepdims=True)
     with jax.named_scope("greenfield_ws32_fused_rmsnorm/feature_square_reduce"):
         square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
-    inverse = lax.rsqrt(
-        square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon)
-    )
+    inverse = lax.rsqrt(square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon))
     normalized = summed * inverse
     output = (normalized.astype(jnp.bfloat16) * weight_local).astype(jnp.bfloat16)
     if _observe is not None:
@@ -145,9 +129,7 @@ def affine_key_layer_norm(
 ) -> Any:
     """Apply one selectable FP32 index-key LayerNorm association."""
 
-    if value.ndim != 2 or weight.shape != (value.shape[1],) or (
-        bias.shape != weight.shape
-    ):
+    if value.ndim != 2 or weight.shape != (value.shape[1],) or (bias.shape != weight.shape):
         raise ValueError("index-key LayerNorm shapes drifted")
     value_f32 = value.astype(jnp.float32)
     mean = jnp.mean(value_f32, axis=-1, keepdims=True)
@@ -160,10 +142,7 @@ def affine_key_layer_norm(
         normalized = centered * lax.rsqrt(denominator)
     else:
         raise ValueError(f"unsupported index-key LayerNorm mode {mode!r}")
-    return (
-        normalized * weight.astype(jnp.float32)
-        + bias.astype(jnp.float32)
-    ).astype(jnp.float32)
+    return (normalized * weight.astype(jnp.float32) + bias.astype(jnp.float32)).astype(jnp.float32)
 
 
 def _accepted_schedule_normalized(value: jax.Array, epsilon: float) -> jax.Array:
@@ -226,10 +205,7 @@ def rms_norm(
     else:
         variance = jnp.mean(lax.square(value), axis=-1, keepdims=True)
         normalized = value * lax.rsqrt(variance + jnp.float32(epsilon))
-    return (
-        normalized.astype(activation_dtype)
-        * weight.astype(activation_dtype)
-    ).astype(activation_dtype)
+    return (normalized.astype(activation_dtype) * weight.astype(activation_dtype)).astype(activation_dtype)
 
 
 def final_norm(
@@ -241,9 +217,7 @@ def final_norm(
 ) -> jax.Array:
     """Named final-decoder boundary; arithmetic is the same RMSNorm contract."""
 
-    return rms_norm(
-        hidden_states, weight, epsilon=epsilon, accepted_schedule=accepted_schedule
-    )
+    return rms_norm(hidden_states, weight, epsilon=epsilon, accepted_schedule=accepted_schedule)
 
 
 def _affine_layer_norm(
@@ -268,7 +242,4 @@ def _affine_layer_norm(
         normalized = (value_f32 - mean) * lax.rsqrt(denominator)
     else:
         raise ValueError(f"unknown key LayerNorm association {mode!r}")
-    return (
-        normalized * weight.astype(jnp.float32)
-        + bias.astype(jnp.float32)
-    )
+    return normalized * weight.astype(jnp.float32) + bias.astype(jnp.float32)

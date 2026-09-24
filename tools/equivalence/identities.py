@@ -66,10 +66,12 @@ def live_manifest_path() -> Path | None:
 def _site_pins(site: Any) -> dict[str, str]:
     """The site binding's content pins under their 181c013e names (configs/glm53-site.json keys)."""
     checkpoint = site.checkpoint
-    return dict(source_inventory_sha256=checkpoint.source_inventory_sha256,
-                checkpoint_manifest_sha256=checkpoint.manifest_sha256,
-                checkpoint_success_sha256=checkpoint.success_sha256,
-                source_complete_sha256=checkpoint.source_complete_sha256)
+    return dict(
+        source_inventory_sha256=checkpoint.source_inventory_sha256,
+        checkpoint_manifest_sha256=checkpoint.manifest_sha256,
+        checkpoint_success_sha256=checkpoint.success_sha256,
+        source_complete_sha256=checkpoint.source_complete_sha256,
+    )
 
 
 @contextmanager
@@ -170,15 +172,36 @@ def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = Non
         count = width[dtype]
         for dimension in shape:
             count *= dimension
-        tensors.append(SourceTensor(name=name, filename="synthetic.safetensors", dtype=dtype, shape=shape,
-                                    data_offset_start=offset, data_offset_end=offset + count))
+        tensors.append(
+            SourceTensor(
+                name=name,
+                filename="synthetic.safetensors",
+                dtype=dtype,
+                shape=shape,
+                data_offset_start=offset,
+                data_offset_end=offset + count,
+            )
+        )
         offset += count
-    source = SourceFile(filename="synthetic.safetensors", file_bytes=offset + 8, header_bytes=8,
-                        payload_bytes=offset, tensor_count=len(tensors), header_sha256="0" * 64)
-    fields = dict(model_id=model.MODEL_ID, source_revision=model.REVISION,
-                  index_filename="model.safetensors.index.json", index_sha256=model.INDEX_SHA,
-                  config_filename="config.json", config_sha256=model.CONFIG_SHA,
-                  declared_payload_bytes=offset, files=(source,), tensors=tuple(tensors))
+    source = SourceFile(
+        filename="synthetic.safetensors",
+        file_bytes=offset + 8,
+        header_bytes=8,
+        payload_bytes=offset,
+        tensor_count=len(tensors),
+        header_sha256="0" * 64,
+    )
+    fields = dict(
+        model_id=model.MODEL_ID,
+        source_revision=model.REVISION,
+        index_filename="model.safetensors.index.json",
+        index_sha256=model.INDEX_SHA,
+        config_filename="config.json",
+        config_sha256=model.CONFIG_SHA,
+        declared_payload_bytes=offset,
+        files=(source,),
+        tensors=tuple(tensors),
+    )
     if pinned is None:
         return SourceInventory(**fields)
 
@@ -195,8 +218,9 @@ def synthetic_file_plans() -> tuple[Any, Any]:
     """``(placement report, 32 file plans)`` for the pinned synthetic GLM-5.3 inventory."""
     from glm_tpu.model_loader.sharded_state.format import build_runtime_file_plans
 
-    return build_runtime_file_plans(synthetic_inventory(pinned=inventory_pin()), production_geometry(),
-                                         mesh_hash=MESH_PIN)
+    return build_runtime_file_plans(
+        synthetic_inventory(pinned=inventory_pin()), production_geometry(), mesh_hash=MESH_PIN
+    )
 
 
 # ----------------------------------------------------------------------------- G4 record
@@ -207,9 +231,17 @@ def _synthetic_topology() -> Any:
     for device_id in range(32):
         x, rest = divmod(device_id, 16)
         y, z = divmod(rest, 4)
-        devices.append(PhysicalDevice(device_id=device_id, process_index=device_id // 4,
-                                      local_device_id=device_id % 4, coordinates=(x, y, z), core_on_chip=0,
-                                      platform="tpu", device_kind="TPU v4"))
+        devices.append(
+            PhysicalDevice(
+                device_id=device_id,
+                process_index=device_id // 4,
+                local_device_id=device_id % 4,
+                coordinates=(x, y, z),
+                core_on_chip=0,
+                platform="tpu",
+                device_kind="TPU v4",
+            )
+        )
     return PhysicalTopology(slice_name="example-v4-64", topology_shape=(2, 4, 4), devices=tuple(devices))
 
 
@@ -229,35 +261,66 @@ def _tiny_pack() -> dict[str, Any]:
     from glm_tpu.config.model import ModelGeometry
 
     geometry = replace(
-        ModelGeometry.from_hf_config(config_json()), num_layers=1, first_dense_layers=1, hidden_size=8,
-        dense_intermediate_size=16, num_routed_experts=8, routed_top_k=2, moe_intermediate_size=4, dsa_top_k=8,
-        dsa_indexer_heads=8, dsa_indexer_head_dim=2, index_share_group_size=1, attention_heads=8, kv_heads=8,
-        kv_lora_rank=4, q_lora_rank=8, qk_nope_head_dim=2, qk_rope_head_dim=2, v_head_dim=2,
-        max_position_embeddings=64, vocab_size=16, fp8_block_shape=(2, 2), mlp_layer_types=("dense",),
-        indexer_types=("full",))
+        ModelGeometry.from_hf_config(config_json()),
+        num_layers=1,
+        first_dense_layers=1,
+        hidden_size=8,
+        dense_intermediate_size=16,
+        num_routed_experts=8,
+        routed_top_k=2,
+        moe_intermediate_size=4,
+        dsa_top_k=8,
+        dsa_indexer_heads=8,
+        dsa_indexer_head_dim=2,
+        index_share_group_size=1,
+        attention_heads=8,
+        kv_heads=8,
+        kv_lora_rank=4,
+        q_lora_rank=8,
+        qk_nope_head_dim=2,
+        qk_rope_head_dim=2,
+        v_head_dim=2,
+        max_position_embeddings=64,
+        vocab_size=16,
+        fp8_block_shape=(2, 2),
+        mlp_layer_types=("dense",),
+        indexer_types=("full",),
+    )
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-pack-") as scratch:
         root = Path(scratch)
         source = root / "source"
         source.mkdir()
         embedding = torch.arange(16 * 8, dtype=torch.float32).reshape(16, 8).to(torch.bfloat16)
         save_file({"model.embed_tokens.weight": embedding}, source / "model.safetensors")
-        (source / "model.safetensors.index.json").write_text(json.dumps(
-            {"metadata": {"total_size": embedding.numel() * embedding.element_size()},
-             "weight_map": {"model.embed_tokens.weight": "model.safetensors"}}))
-        inventory = read_source_inventory(source, model_id=geometry.model_id, source_revision="unit-fixture",
-                                          config_filename=None)
+        (source / "model.safetensors.index.json").write_text(
+            json.dumps(
+                {
+                    "metadata": {"total_size": embedding.numel() * embedding.element_size()},
+                    "weight_map": {"model.embed_tokens.weight": "model.safetensors"},
+                }
+            )
+        )
+        inventory = read_source_inventory(
+            source, model_id=geometry.model_id, source_revision="unit-fixture", config_filename=None
+        )
         output = root / "packed"
         # The packer only admits source URIs under the site's approved prefix; derive it from the
         # model source pinned at 181c013e instead of repeating the bucket name here.
         source_uri = _fixture_source_uri()
-        config = RuntimePackConfig(source_root=source, source_uri=source_uri, output_dir=output,
-                                       code_hash="a" * 40, mesh_hash="b" * 64)
+        config = RuntimePackConfig(
+            source_root=source, source_uri=source_uri, output_dir=output, code_hash="a" * 40, mesh_hash="b" * 64
+        )
         manifest = pack_runtime_checkpoint(config, inventory, geometry)
-        files = {path.name: sha256(path.read_bytes()).hexdigest() for path in sorted(output.iterdir())
-                 if path.is_file()}
-    return dict(inventory_sha256=inventory.inventory_sha256, manifest_sha256=manifest["manifest_sha256"],
-                files_digest=digest_json(files), file_count=len(files),
-                file_names_digest=digest_json(sorted(files)))
+        files = {
+            path.name: sha256(path.read_bytes()).hexdigest() for path in sorted(output.iterdir()) if path.is_file()
+        }
+    return dict(
+        inventory_sha256=inventory.inventory_sha256,
+        manifest_sha256=manifest["manifest_sha256"],
+        files_digest=digest_json(files),
+        file_count=len(files),
+        file_names_digest=digest_json(sorted(files)),
+    )
 
 
 def _loader_geometry() -> Any:
@@ -271,12 +334,31 @@ def _loader_geometry() -> Any:
     from .fixture import config_json
 
     return replace(
-        ModelGeometry.from_hf_config(config_json()), num_layers=2, first_dense_layers=1, hidden_size=8,
-        dense_intermediate_size=16, num_routed_experts=8, routed_top_k=2, moe_intermediate_size=4, dsa_top_k=8,
-        dsa_indexer_heads=8, dsa_indexer_head_dim=2, index_share_group_size=2, attention_heads=8, kv_heads=8,
-        kv_lora_rank=4, q_lora_rank=8, qk_nope_head_dim=2, qk_rope_head_dim=2, v_head_dim=2,
-        max_position_embeddings=64, vocab_size=16, fp8_block_shape=(2, 2), mlp_layer_types=("dense", "sparse"),
-        indexer_types=("full", "shared"))
+        ModelGeometry.from_hf_config(config_json()),
+        num_layers=2,
+        first_dense_layers=1,
+        hidden_size=8,
+        dense_intermediate_size=16,
+        num_routed_experts=8,
+        routed_top_k=2,
+        moe_intermediate_size=4,
+        dsa_top_k=8,
+        dsa_indexer_heads=8,
+        dsa_indexer_head_dim=2,
+        index_share_group_size=2,
+        attention_heads=8,
+        kv_heads=8,
+        kv_lora_rank=4,
+        q_lora_rank=8,
+        qk_nope_head_dim=2,
+        qk_rope_head_dim=2,
+        v_head_dim=2,
+        max_position_embeddings=64,
+        vocab_size=16,
+        fp8_block_shape=(2, 2),
+        mlp_layer_types=("dense", "sparse"),
+        indexer_types=("full", "shared"),
+    )
 
 
 def _write_loader_source(source: Path, geometry: Any) -> None:
@@ -291,8 +373,9 @@ def _write_loader_source(source: Path, geometry: Any) -> None:
     tensors = {}
     for name, dtype, shape in synthetic_tensors(geometry):
         if dtype == "F8_E4M3":
-            bits = rng.integers(0, 0x7F, size=shape, dtype=np.uint8) | (rng.integers(0, 2, size=shape,
-                                                                                    dtype=np.uint8) << 7)
+            bits = rng.integers(0, 0x7F, size=shape, dtype=np.uint8) | (
+                rng.integers(0, 2, size=shape, dtype=np.uint8) << 7
+            )
             tensors[name] = torch.from_numpy(bits).view(torch.float8_e4m3fn)
         elif dtype == "F32":
             tensors[name] = torch.from_numpy(rng.uniform(0.5, 1.5, size=shape).astype(np.float32))
@@ -300,8 +383,9 @@ def _write_loader_source(source: Path, geometry: Any) -> None:
             tensors[name] = torch.from_numpy(rng.normal(0.0, 0.1, size=shape).astype(np.float32)).to(torch.bfloat16)
     save_file(tensors, source / "model.safetensors")
     total = sum(tensor.numel() * tensor.element_size() for tensor in tensors.values())
-    (source / "model.safetensors.index.json").write_text(json.dumps(
-        {"metadata": {"total_size": total}, "weight_map": {name: "model.safetensors" for name in tensors}}))
+    (source / "model.safetensors.index.json").write_text(
+        json.dumps({"metadata": {"total_size": total}, "weight_map": {name: "model.safetensors" for name in tensors}})
+    )
 
 
 def _seal(root: Path, manifest: dict[str, Any], topology_hash: str) -> str:
@@ -310,15 +394,24 @@ def _seal(root: Path, manifest: dict[str, Any], topology_hash: str) -> str:
 
     source = manifest["source"]
     value: dict[str, Any] = {
-        "artifact_kind": "greenfield_ws32_runtime_checkpoint_success", "code_hash": manifest["code_hash"],
-        "file_count": 32, "format_version": manifest["format_version"],
+        "artifact_kind": "greenfield_ws32_runtime_checkpoint_success",
+        "code_hash": manifest["code_hash"],
+        "file_count": 32,
+        "format_version": manifest["format_version"],
         "manifest_file_sha256": sha256((root / "manifest.json").read_bytes()).hexdigest(),
-        "manifest_sha256": manifest["manifest_sha256"], "mesh_hash": manifest["mesh_hash"],
-        "packed_payload_bytes": manifest["packed_payload_bytes"], "performance_claim": False,
-        "post_census_sha256": "d" * 64, "remote_preflight_sha256": "e" * 64, "remote_terminal_sha256": "f" * 64,
-        "source_file_count": len(source["files"]), "source_inventory_sha256": source["inventory_sha256"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "mesh_hash": manifest["mesh_hash"],
+        "packed_payload_bytes": manifest["packed_payload_bytes"],
+        "performance_claim": False,
+        "post_census_sha256": "d" * 64,
+        "remote_preflight_sha256": "e" * 64,
+        "remote_terminal_sha256": "f" * 64,
+        "source_file_count": len(source["files"]),
+        "source_inventory_sha256": source["inventory_sha256"],
         "tag": "greenfield_ws32_runtime_pack_" + "20000101T" + "0" * 15 + "Z",
-        "topology_hash": topology_hash, "tpu_initialized": False}
+        "topology_hash": topology_hash,
+        "tpu_initialized": False,
+    }
     value["success_sha256"] = sha256(canonical_json(value).encode()).hexdigest()
     (root / "SUCCESS").write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     return value["success_sha256"]
@@ -354,10 +447,14 @@ def loader_record() -> dict[str, Any]:
     topology = _synthetic_topology()
     physical = build_physical_mesh(topology)
     by_id = {int(device.id): device for device in jax.devices()}
-    mesh = Mesh(np.asarray([[by_id[i] for i in row] for row in physical.device_ids], dtype=object),
-                ("expert", "feature"))
-    owned = [slot for slot, device in enumerate(physical.flattened_device_ids)
-             if device in {d.device_id for d in topology.devices if d.process_index == 0}]
+    mesh = Mesh(
+        np.asarray([[by_id[i] for i in row] for row in physical.device_ids], dtype=object), ("expert", "feature")
+    )
+    owned = [
+        slot
+        for slot, device in enumerate(physical.flattened_device_ids)
+        if device in {d.device_id for d in topology.devices if d.process_index == 0}
+    ]
     out: dict[str, Any] = dict(geometry_sha256=geometry.geometry_hash, owned_slots=owned)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-loader-") as scratch:
         base = Path(scratch)
@@ -372,16 +469,26 @@ def loader_record() -> dict[str, Any]:
         source, root, local = base / "source", base / "packed", base / "local"
         source.mkdir()
         _write_loader_source(source, geometry)
-        inventory = read_source_inventory(source, model_id=geometry.model_id, source_revision="unit-fixture",
-                                          config_filename=None)
-        config = RuntimePackConfig(source_root=source, source_uri=_fixture_source_uri(), output_dir=root,
-                                       code_hash="a" * 40,
-                                       mesh_hash=physical.mesh_hash)
+        inventory = read_source_inventory(
+            source, model_id=geometry.model_id, source_revision="unit-fixture", config_filename=None
+        )
+        config = RuntimePackConfig(
+            source_root=source,
+            source_uri=_fixture_source_uri(),
+            output_dir=root,
+            code_hash="a" * 40,
+            mesh_hash=physical.mesh_hash,
+        )
         manifest = pack_runtime_checkpoint(config, inventory, geometry)
         success = _seal(root, manifest, topology.topology_hash)
-        pins = dict(expected_manifest_sha256=manifest["manifest_sha256"], expected_success_sha256=success,
-                    expected_mesh_hash=physical.mesh_hash, expected_topology_hash=topology.topology_hash,
-                    inventory=inventory, geometry=geometry)
+        pins = dict(
+            expected_manifest_sha256=manifest["manifest_sha256"],
+            expected_success_sha256=success,
+            expected_mesh_hash=physical.mesh_hash,
+            expected_topology_hash=topology.topology_hash,
+            inventory=inventory,
+            geometry=geometry,
+        )
         verified = verify_runtime_checkpoint(root, verify_file_hashes=True, **pins)
         local.mkdir()
         for name in ("manifest.json", "SUCCESS", *(f"device_slot_{slot:02d}.safetensors" for slot in owned)):
@@ -393,31 +500,51 @@ def loader_record() -> dict[str, Any]:
         rows = []
         for plan in tensors:
             array = loaded.arrays[plan.name]
-            rows.append([plan.name, str(array.dtype), str(canonical_spec(array.sharding.spec)),
-                         leaf_digest(jax.device_get(array))])
+            rows.append(
+                [
+                    plan.name,
+                    str(array.dtype),
+                    str(canonical_spec(array.sharding.spec)),
+                    leaf_digest(jax.device_get(array)),
+                ]
+            )
         out.update(
-            inventory_sha256=inventory.inventory_sha256, manifest_sha256=manifest["manifest_sha256"],
-            success_sha256=success, files_digest=digest_json([r["sha256"] for r in manifest["files"]]),
-            verified=dict(plans=len(verified.plans), slots=sorted(verified.records_by_slot),
-                          local_plans=len(local_verified.plans)),
-            loaded=dict(count=len(rows), names_equal_plan=sorted(loaded.arrays) == sorted(r[0] for r in rows),
-                        digest=sha256_hex("\n".join(r[3] for r in rows)),
-                        arrays=[[name, dtype, spec, digest[:16]] for name, dtype, spec, digest in rows]),
+            inventory_sha256=inventory.inventory_sha256,
+            manifest_sha256=manifest["manifest_sha256"],
+            success_sha256=success,
+            files_digest=digest_json([r["sha256"] for r in manifest["files"]]),
+            verified=dict(
+                plans=len(verified.plans), slots=sorted(verified.records_by_slot), local_plans=len(local_verified.plans)
+            ),
+            loaded=dict(
+                count=len(rows),
+                names_equal_plan=sorted(loaded.arrays) == sorted(r[0] for r in rows),
+                digest=sha256_hex("\n".join(r[3] for r in rows)),
+                arrays=[[name, dtype, spec, digest[:16]] for name, dtype, spec, digest in rows],
+            ),
             local_device_slots=[[r["device_id"], r["device_slot"]] for r in loaded.local_device_slots],
-            local_file_digest=digest_json([r["file_sha256"] for r in loaded.local_device_slots]))
+            local_file_digest=digest_json([r["file_sha256"] for r in loaded.local_device_slots]),
+        )
         del loaded
         refusals: dict[str, str] = {}
-        refusals["wrong_manifest_pin"] = attempt(lambda: verify_runtime_checkpoint(
-            root, verify_file_hashes=True, **dict(pins, expected_manifest_sha256="0" * 64)))
-        refusals["wrong_topology_pin"] = attempt(lambda: verify_runtime_checkpoint(
-            root, verify_file_hashes=True, **dict(pins, expected_topology_hash="0" * 64)))
+        refusals["wrong_manifest_pin"] = attempt(
+            lambda: verify_runtime_checkpoint(
+                root, verify_file_hashes=True, **dict(pins, expected_manifest_sha256="0" * 64)
+            )
+        )
+        refusals["wrong_topology_pin"] = attempt(
+            lambda: verify_runtime_checkpoint(
+                root, verify_file_hashes=True, **dict(pins, expected_topology_hash="0" * 64)
+            )
+        )
         foreign = next(slot for slot in range(32) if slot not in owned)
         shutil.copy(root / f"device_slot_{foreign:02d}.safetensors", local / f"device_slot_{foreign:02d}.safetensors")
-        refusals["local_foreign_slot"] = attempt(lambda: verify_runtime_checkpoint(local, **local_kwargs,
-                                                                                        **pins))
+        refusals["local_foreign_slot"] = attempt(lambda: verify_runtime_checkpoint(local, **local_kwargs, **pins))
         (local / f"device_slot_{foreign:02d}.safetensors").unlink()
-        for label, directory, slot in (("payload_byte_flipped", root, owned[1]),
-                                       ("local_payload_byte_flipped", local, owned[1])):
+        for label, directory, slot in (
+            ("payload_byte_flipped", root, owned[1]),
+            ("local_payload_byte_flipped", local, owned[1]),
+        ):
             path = directory / f"device_slot_{slot:02d}.safetensors"
             with path.open("r+b") as stream:
                 stream.seek(-1, 2)
@@ -426,8 +553,9 @@ def loader_record() -> dict[str, Any]:
                 stream.write(bytes([last ^ 0x01]))
             kwargs = local_kwargs if directory == local else dict(verify_file_hashes=True)
             refusals[label] = attempt(lambda d=directory, k=kwargs: verify_runtime_checkpoint(d, **k, **pins))
-        refusals["loader_after_payload_flip"] = attempt(lambda: load_runtime_checkpoint(
-            verified, mesh=mesh, physical_mesh=physical))
+        refusals["loader_after_payload_flip"] = attempt(
+            lambda: load_runtime_checkpoint(verified, mesh=mesh, physical_mesh=physical)
+        )
         out["refusals"] = refusals
     return out
 
@@ -453,29 +581,45 @@ def ci_record() -> dict[str, Any]:
     physical = build_physical_mesh(topology)
     fixed_mapping = {"b": [1, 2, {"c": None}], "a": "value", "unicode": "café 中文"}
     return dict(
-        geometry=dict(sha256=geometry.geometry_hash, canonical_digest=sha256_hex(canonical_json(geometry.to_dict())),
-                      model_id=geometry.model_id),
-        tensor_names=dict(count=len(names), tree_order_digest=digest_json(names),
-                          sorted_digest=digest_json(sorted(names))),
+        geometry=dict(
+            sha256=geometry.geometry_hash,
+            canonical_digest=sha256_hex(canonical_json(geometry.to_dict())),
+            model_id=geometry.model_id,
+        ),
+        tensor_names=dict(
+            count=len(names), tree_order_digest=digest_json(names), sorted_digest=digest_json(sorted(names))
+        ),
         partition_specs=dict(count=len(pairs), digest=digest_json([[n, list(s)] for n, s in pairs])),
-        placement=dict(sha256=report.placement_sha256, report_digest=digest_json(report.to_dict()),
-                       placement_count=report.placement_count, destination_tensors=report.destination_tensor_count,
-                       source_tensors=report.source_tensor_count),
+        placement=dict(
+            sha256=report.placement_sha256,
+            report_digest=digest_json(report.to_dict()),
+            placement_count=report.placement_count,
+            destination_tensors=report.destination_tensor_count,
+            source_tensors=report.source_tensor_count,
+        ),
         headers=[sha256_hex(plan.header) for plan in plans],
         header_bytes=sorted({len(plan.header) for plan in plans}),
         tensor_schema_digest=digest_json([t.schema_dict() for t in plans[0].tensors]),
         tensors_per_slot=len(plans[0].tensors),
-        key_sets=dict(manifest=sorted(ckpt._MANIFEST_KEYS), file=sorted(ckpt._FILE_RECORD_KEYS),
-                      tensor_schema=sorted(ckpt._TENSOR_SCHEMA_KEYS), success=sorted(ckpt._SUCCESS_KEYS)),
+        key_sets=dict(
+            manifest=sorted(ckpt._MANIFEST_KEYS),
+            file=sorted(ckpt._FILE_RECORD_KEYS),
+            tensor_schema=sorted(ckpt._TENSOR_SCHEMA_KEYS),
+            success=sorted(ckpt._SUCCESS_KEYS),
+        ),
         mapping_hash=ckpt._mapping_hash(fixed_mapping, field="fixture"),
-        canonical_contracts=dict(hash=sha256_hex(ckpt._canonical_json(fixed_mapping)),
-                                 wire=sha256_hex(json_utils.canonical(fixed_mapping))),
+        canonical_contracts=dict(
+            hash=sha256_hex(ckpt._canonical_json(fixed_mapping)), wire=sha256_hex(json_utils.canonical(fixed_mapping))
+        ),
         success_tag=ckpt._SUCCESS_TAG.pattern,
-        artifact_kinds=[ckpt.RUNTIME_ARTIFACT_KIND, ckpt.RUNTIME_SLOT_RECORD_KIND,
-                        ckpt._SUCCESS_ARTIFACT_KIND],
-        plan_id=ckpt.RUNTIME_PLAN_ID, format_version=ckpt.RUNTIME_FORMAT_VERSION,
-        synthetic_topology=dict(topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
-                                device_order_digest=digest_json(list(physical.flattened_device_ids))),
+        artifact_kinds=[ckpt.RUNTIME_ARTIFACT_KIND, ckpt.RUNTIME_SLOT_RECORD_KIND, ckpt._SUCCESS_ARTIFACT_KIND],
+        plan_id=ckpt.RUNTIME_PLAN_ID,
+        format_version=ckpt.RUNTIME_FORMAT_VERSION,
+        synthetic_topology=dict(
+            topology_sha256=topology.topology_hash,
+            mesh_sha256=physical.mesh_hash,
+            device_order_digest=digest_json(list(physical.flattened_device_ids)),
+        ),
         **_packed(),
     )
 
@@ -540,7 +684,7 @@ def launcher_site_literals(source: str) -> dict[str, str | None]:
             if item == "--coordinator-address" and following:
                 found["coordinator"] = following
             elif item and item.startswith("--zone="):
-                found["zone"] = item[len("--zone="):]
+                found["zone"] = item[len("--zone=") :]
             elif item == "ssh" and index and items[index - 1] == "tpu-vm" and following:
                 found["tpu_name"] = following
     return found
@@ -560,11 +704,18 @@ def launcher_constants(site: Any) -> dict[str, Any]:
     module = WORKER_MODULE_181C013E if launch.MODULE == protocol.WORKER_MODULE else launch.MODULE
     literal: dict[str, bool] = {value: True for value in (fleet.coordinator_address, fleet.zone, fleet.tpu_name)}
     literal[LOCK_SPLIT_LITERAL] = (len(site.locks.workload), len(site.locks.sync)) == (2, 2)
-    return dict(python=fleet.worker_python, site=":".join(fleet.worker_pythonpath),
-                binding=str(site.topology.binding_dir), binding_sha=site.topology.binding_sha256,
-                locks=[str(p) for p in (*site.locks.workload, *site.locks.sync)], module=module,
-                run_root=str(site.paths.run_root), tokenizer_root=str(site.paths.model_path),
-                source_uri=site.storage.source_uri, literals=literal)
+    return dict(
+        python=fleet.worker_python,
+        site=":".join(fleet.worker_pythonpath),
+        binding=str(site.topology.binding_dir),
+        binding_sha=site.topology.binding_sha256,
+        locks=[str(p) for p in (*site.locks.workload, *site.locks.sync)],
+        module=module,
+        run_root=str(site.paths.run_root),
+        tokenizer_root=str(site.paths.model_path),
+        source_uri=site.storage.source_uri,
+        literals=literal,
+    )
 
 
 def site_record(requests_dir: Path | None) -> dict[str, Any]:
@@ -589,11 +740,17 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     model.require_inventory(inventory)
     facts["inventory"] = dict(sha256=inventory.inventory_sha256, pinned=inventory.inventory_sha256 == inventory_pin())
     metadata = _read_runtime_metadata(
-        args.checkpoint_root, expected_manifest_sha256=args.checkpoint_manifest_sha256,
-        expected_success_sha256=args.checkpoint_success_sha256, expected_mesh_hash=args.mesh_sha256,
-        expected_topology_hash=args.topology_sha256, inventory=inventory, geometry=production_geometry())
-    facts["checkpoint_metadata"] = dict(ok=True, manifest_sha256=metadata.manifest["manifest_sha256"],
-                                        success_sha256=metadata.success["success_sha256"])
+        args.checkpoint_root,
+        expected_manifest_sha256=args.checkpoint_manifest_sha256,
+        expected_success_sha256=args.checkpoint_success_sha256,
+        expected_mesh_hash=args.mesh_sha256,
+        expected_topology_hash=args.topology_sha256,
+        inventory=inventory,
+        geometry=production_geometry(),
+    )
+    facts["checkpoint_metadata"] = dict(
+        ok=True, manifest_sha256=metadata.manifest["manifest_sha256"], success_sha256=metadata.success["success_sha256"]
+    )
     local = {}
     for plan in metadata.plans:
         path = Path(args.checkpoint_root) / plan.filename
@@ -607,16 +764,24 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     captures = []
     for index in range(8):
         payload = (binding / "captures" / f"topology.rank{index}.json").read_bytes()
-        captures.append((sha256_hex(payload) == value["capture_sha256"][f"topology.rank{index}.json"],
-                         json.loads(payload)))
+        captures.append(
+            (sha256_hex(payload) == value["capture_sha256"][f"topology.rank{index}.json"], json.loads(payload))
+        )
     topology, _, fleet = validate_topology_fleet(
-        tuple(c for _, c in captures), expected_topology_sha256=args.topology_sha256,
-        expected_fleet_sha256=value["fleet_sha256"], slice_name=args.slice_name)
+        tuple(c for _, c in captures),
+        expected_topology_sha256=args.topology_sha256,
+        expected_fleet_sha256=value["fleet_sha256"],
+        slice_name=args.slice_name,
+    )
     physical = build_physical_mesh(topology)
-    facts["topology"] = dict(binding_sha256=sha256_hex(raw) == site.topology.binding_sha256,
-                             captures=all(ok for ok, _ in captures), topology_sha256=topology.topology_hash,
-                             mesh_sha256=physical.mesh_hash, fleet_sha256=fleet,
-                             device_order_digest=digest_json(list(physical.flattened_device_ids)))
+    facts["topology"] = dict(
+        binding_sha256=sha256_hex(raw) == site.topology.binding_sha256,
+        captures=all(ok for ok, _ in captures),
+        topology_sha256=topology.topology_hash,
+        mesh_sha256=physical.mesh_hash,
+        fleet_sha256=fleet,
+        device_order_digest=digest_json(list(physical.flattened_device_ids)),
+    )
     facts["launcher_constants_digest"] = digest_json(launcher_constants(site))
     if requests_dir is not None:
         rows = {}
@@ -634,8 +799,9 @@ def site_check(*, record: bool, requests_dir: Path | None) -> dict[str, Any]:
 
     if live_tpu_run():
         reason = refusal_reason()
-        raise SystemExit("a TPU run is live on this host; run site-check later (fleet idle)" if reason == REFUSAL
-                         else reason)
+        raise SystemExit(
+            "a TPU run is live on this host; run site-check later (fleet idle)" if reason == REFUSAL else reason
+        )
     facts = site_record(requests_dir)
     path = site_baseline_path()
     if record:

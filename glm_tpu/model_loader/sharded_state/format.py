@@ -72,9 +72,7 @@ _FILE_RECORD_KEYS = frozenset(
         "tensor_sha256",
     }
 )
-_TENSOR_SCHEMA_KEYS = frozenset(
-    {"byte_count", "dtype", "global_shape", "local_shape", "name", "partition_spec"}
-)
+_TENSOR_SCHEMA_KEYS = frozenset({"byte_count", "dtype", "global_shape", "local_shape", "name", "partition_spec"})
 _SUCCESS_KEYS = frozenset(
     {
         "artifact_kind",
@@ -98,9 +96,7 @@ _SUCCESS_KEYS = frozenset(
     }
 )
 _SUCCESS_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint_success"
-_SUCCESS_TAG = re.compile(
-    r"greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z"
-)
+_SUCCESS_TAG = re.compile(r"greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z")
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -257,9 +253,7 @@ def build_runtime_file_plans(
                 placement.global_shape,
                 placement.partition_spec,
             ):
-                raise CheckpointValidationError(
-                    f"WS32 destination schema drifted for {key!r}"
-                )
+                raise CheckpointValidationError(f"WS32 destination schema drifted for {key!r}")
     plans = []
     for slot in range(32):
         offset = 0
@@ -267,9 +261,7 @@ def build_runtime_file_plans(
         for (record_slot, name), placement in sorted(schemas.items()):
             if record_slot != slot:
                 continue
-            byte_count = prod(placement.destination_shape) * _DTYPE_BYTES[
-                placement.destination_dtype
-            ]
+            byte_count = prod(placement.destination_shape) * _DTYPE_BYTES[placement.destination_dtype]
             tensors.append(
                 RuntimeTensorPlan(
                     name=name,
@@ -304,13 +296,8 @@ def build_runtime_file_plans(
             )
         )
     reference = tuple(item.schema_dict() for item in plans[0].tensors)
-    if any(
-        tuple(item.schema_dict() for item in plan.tensors) != reference
-        for plan in plans[1:]
-    ):
-        raise CheckpointValidationError(
-            "WS32 final-owner tensor schemas must be identical on all slots"
-        )
+    if any(tuple(item.schema_dict() for item in plan.tensors) != reference for plan in plans[1:]):
+        raise CheckpointValidationError("WS32 final-owner tensor schemas must be identical on all slots")
     if any(plan.payload_bytes != report.bytes_by_slot[plan.device_slot] for plan in plans):
         raise CheckpointValidationError("WS32 file plans disagree with placement bytes")
     return report, tuple(plans)
@@ -350,9 +337,7 @@ def _destination_record(
     with path.open("rb", buffering=0) as stream:
         header = stream.read(len(plan.header))
         if header != plan.header:
-            raise CheckpointValidationError(
-                f"WS32 destination header drifted for {plan.filename!r}"
-            )
+            raise CheckpointValidationError(f"WS32 destination header drifted for {plan.filename!r}")
         file_digest.update(header)
         file_crc32c.update(header)
         for tensor in plan.tensors:
@@ -366,9 +351,7 @@ def _destination_record(
                     requested = alignment
                 raw = stream.read(requested)
                 if len(raw) != requested:
-                    raise CheckpointValidationError(
-                        f"WS32 tensor {tensor.name!r} is truncated"
-                    )
+                    raise CheckpointValidationError(f"WS32 tensor {tensor.name!r} is truncated")
                 _validate_finite_chunk(raw, tensor.dtype)
                 digest.update(raw)
                 file_digest.update(raw)
@@ -376,13 +359,9 @@ def _destination_record(
                 remaining -= len(raw)
             tensor_hashes.append(digest.hexdigest())
         if stream.read(1):
-            raise CheckpointValidationError(
-                f"WS32 destination {plan.filename!r} has trailing bytes"
-            )
+            raise CheckpointValidationError(f"WS32 destination {plan.filename!r} has trailing bytes")
     if path.stat().st_size != plan.file_bytes:
-        raise CheckpointValidationError(
-            f"WS32 destination size drifted for {plan.filename!r}"
-        )
+        raise CheckpointValidationError(f"WS32 destination size drifted for {plan.filename!r}")
     return {
         "device_slot": plan.device_slot,
         "crc32c": base64.b64encode(file_crc32c.digest()).decode("ascii"),

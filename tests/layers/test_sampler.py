@@ -7,7 +7,7 @@ import sys
 
 
 def test_ws32_io_matches_forced_32_reference_without_vocab_gather() -> None:
-    program = r'''
+    program = r"""
 import json
 
 import jax
@@ -233,13 +233,11 @@ print(json.dumps({
         for item in parse_hlo_module(sample_compiled.as_text()).collectives
     ),
 }, sort_keys=True))
-'''
+"""
     environment = dict(os.environ)
     environment["JAX_PLATFORMS"] = "cpu"
     existing = environment.get("XLA_FLAGS", "").strip()
-    environment["XLA_FLAGS"] = (
-        f"{existing} --xla_force_host_platform_device_count=32".strip()
-    )
+    environment["XLA_FLAGS"] = f"{existing} --xla_force_host_platform_device_count=32".strip()
     completed = subprocess.run(
         [sys.executable, "-c", program],
         env=environment,
@@ -266,7 +264,5 @@ print(json.dumps({
     assert result["tie_token"] == [0]
     assert [item["group"] for item in result["embedding_collectives"]] == [8]
     assert [item["group"] for item in result["logits_collectives"]] == [4]
-    assert max(
-        item["group"] for item in result["sample_collectives"]
-    ) <= 8
+    assert max(item["group"] for item in result["sample_collectives"]) <= 8
     assert not result["sample_has_full_vocab_gather"]

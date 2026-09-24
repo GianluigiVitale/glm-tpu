@@ -20,19 +20,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     inputs.add_argument("question", nargs="?")
     inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
     ask.add_argument("--context", choices=("8k", "32k", "128k", "256k"), default="32k")
-    ask.add_argument("--keep-loaded", action="store_true",
-                     help="retain the ordinary model and fleet leases after answering; explicit stop required")
-    ask.add_argument("--concurrent", action="store_true",
-                     help="batch up to four conversations; requires --context 32k")
-    ask.add_argument("--max-new-tokens", type=int,
-                     help="optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space")
+    ask.add_argument(
+        "--keep-loaded",
+        action="store_true",
+        help="retain the ordinary model and fleet leases after answering; explicit stop required",
+    )
+    ask.add_argument("--concurrent", action="store_true", help="batch up to four conversations; requires --context 32k")
+    ask.add_argument(
+        "--max-new-tokens",
+        type=int,
+        help="optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space",
+    )
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
-    ask.add_argument("--site", type=Path,
-                     help="site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)")
-    doctor = sub.add_parser(
-        "doctor", help="check installed version metadata without initializing TPU"
+    ask.add_argument(
+        "--site", type=Path, help="site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)"
     )
+    doctor = sub.add_parser("doctor", help="check installed version metadata without initializing TPU")
     doctor.add_argument(
         "--profile",
         choices=("core", "runtime", "tpu", "benchmark", "dev"),
@@ -47,16 +51,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("--repo", type=Path, required=True)
     prepare.add_argument("--tokenizer-root", type=Path, required=True)
     prepare.add_argument("--request-id", required=True)
-    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "ordinary-greedy-128k"),
-                         default="ordinary-greedy-8k")
+    prepare.add_argument(
+        "--profile", choices=("ordinary-greedy-8k", "ordinary-greedy-128k"), default="ordinary-greedy-8k"
+    )
     prepare.add_argument("--max-new-tokens", type=int, required=True)
     args = parser.parse_args(argv)
     if args.command == "ask":
         from glm_tpu.entrypoints.cli.ask import main as ask_main
+
         return ask_main(args)
     if args.command == "prepare-request":
         try:
             from glm_tpu.engine.request import prepare_file
+
             extra = {} if args.profile == "ordinary-greedy-8k" else dict(context_capacity=166912)
             report = prepare_file(
                 messages_path=args.messages,
@@ -70,9 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (ValueError, OSError, ImportError) as exc:
             # Do not print private input, tokenizer exception text or file contents.
             print(
-                json.dumps(
-                    dict(error=type(exc).__name__, status="request preparation refused")
-                ),
+                json.dumps(dict(error=type(exc).__name__, status="request preparation refused")),
                 file=sys.stderr,
             )
             return 1

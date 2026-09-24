@@ -97,12 +97,7 @@ def compare_leaf(candidate: np.ndarray, baseline: np.ndarray) -> dict[str, Any]:
     nonzero = np.abs(base[finite]) > 1e-6
     return dict(
         kind="float",
-        ok=bool(
-            same_specials
-            and not np.isnan(cand).any()
-            and not np.isnan(base).any()
-            and np.all(diff <= bound)
-        ),
+        ok=bool(same_specials and not np.isnan(cand).any() and not np.isnan(base).any() and np.all(diff <= bound)),
         max_abs=float(diff.max(initial=0.0)),
         max_rel=float((diff[nonzero] / np.abs(base[finite])[nonzero]).max(initial=0.0)),
         bound_ratio=float((diff / bound).max(initial=0.0)),
@@ -124,12 +119,8 @@ def compare_selection(
     """
     cand, base = candidate[0].reshape(-1), baseline[0].reshape(-1)
     cand_scores, base_scores = candidate[1].reshape(-1), baseline[1].reshape(-1)
-    cand_by = {
-        int(p): float(v) for p, v in zip(cand, cand_scores, strict=True) if p >= 0
-    }
-    base_by = {
-        int(p): float(v) for p, v in zip(base, base_scores, strict=True) if p >= 0
-    }
+    cand_by = {int(p): float(v) for p, v in zip(cand, cand_scores, strict=True) if p >= 0}
+    base_by = {int(p): float(v) for p, v in zip(base, base_scores, strict=True) if p >= 0}
     common = set(cand_by) & set(base_by)
     noise = max((abs(cand_by[p] - base_by[p]) for p in common), default=0.0)
     only_base, only_cand = (
@@ -150,9 +141,7 @@ def compare_selection(
     )
 
 
-def compare_record(
-    candidate: dict[str, Any], baseline: dict[str, Any], *, top_k: int
-) -> dict[str, Any]:
+def compare_record(candidate: dict[str, Any], baseline: dict[str, Any], *, top_k: int) -> dict[str, Any]:
     leaves = {
         name: compare_leaf(candidate["leaves"][name], value)
         for name, value in baseline["leaves"].items()
@@ -171,9 +160,7 @@ def compare_record(
         tokens=dict(candidate=candidate["next_token"], baseline=baseline["next_token"]),
         leaves=leaves,
         selections=selections,
-        rows_error=rows_error(
-            candidate["leaves"], baseline["leaves"], baseline["rows"]
-        ),
+        rows_error=rows_error(candidate["leaves"], baseline["leaves"], baseline["rows"]),
         # Rows at positions < top_k attend to every earlier position (no DSA choice).
         decision_free_rows=(
             rows_error(
@@ -185,25 +172,19 @@ def compare_record(
             else None
         ),
         logits=dict(candidate=candidate.get("logits"), baseline=baseline.get("logits")),
-        decisions=dict(
-            candidate=candidate.get("decisions"), baseline=baseline.get("decisions")
-        ),
+        decisions=dict(candidate=candidate.get("decisions"), baseline=baseline.get("decisions")),
         first_excess=first_excess(
             candidate["leaves"],
             baseline["leaves"],
             baseline["rows"],
-            decisions=(reference["decisions"], reference["rows"])
-            if reference
-            else (None, None),
+            decisions=(reference["decisions"], reference["rows"]) if reference else (None, None),
         ),
     )
 
 
 def written_rows(value: np.ndarray, rows: tuple[int, int]) -> np.ndarray:
     """``[layers or slots, rows written in this call, width]`` of a cache leaf (FP64)."""
-    return value.reshape(value.shape[0], -1, value.shape[-1])[
-        :, rows[0] : rows[1]
-    ].astype(np.float64)
+    return value.reshape(value.shape[0], -1, value.shape[-1])[:, rows[0] : rows[1]].astype(np.float64)
 
 
 def rows_error(
@@ -226,9 +207,7 @@ def rows_error(
         )
         diff = np.abs(cand - base)
         out[name] = [float(x) for x in diff.max(axis=(1, 2))]
-        out[name + "_bound_ratio"] = [
-            float(x) for x in (diff / (ATOL + RTOL * np.abs(base))).max(axis=(1, 2))
-        ]
+        out[name + "_bound_ratio"] = [float(x) for x in (diff / (ATOL + RTOL * np.abs(base))).max(axis=(1, 2))]
     return out
 
 
@@ -266,9 +245,7 @@ def first_excess(
         if margins is not None and 0 <= index < margin_rows[1] - margin_rows[0]:
             for kind in ("router", "dsa"):
                 entry[kind + "_margins"] = {
-                    name: values[index]
-                    for name, values in margins[kind + "_margin_rows"].items()
-                    if int(name) < layer
+                    name: values[index] for name, values in margins[kind + "_margin_rows"].items() if int(name) < layer
                 }
         out.append(entry)
     return out
@@ -339,18 +316,14 @@ class Engine:
         for start in range(0, len(self.prompt), BLOCK_ROWS):
             chunk = list(self.prompt[start : start + BLOCK_ROWS])
             result = jax.block_until_ready(self.prefill(state, chunk))
-            on_record(
-                "prefill", self.prefill_record(result, (start, start + len(chunk)))
-            )
+            on_record("prefill", self.prefill_record(result, (start, start + len(chunk))))
             state = result.state
         decoder_state, token = self.finish(result)
         token = int(np.asarray(token)[0])
         for step in range(steps):
             token_in = token if tokens_in is None else tokens_in[step]
             position = len(self.prompt) + step
-            out, _ = self.decode(
-                self.put(np.asarray([token_in], np.int32)), decoder_state
-            )
+            out, _ = self.decode(self.put(np.asarray([token_in], np.int32)), decoder_state)
             out = jax.block_until_ready(out)
             leaves = {name: host(getattr(out.state, name)) for name in DECODER_FIELDS}
             leaves.update(
@@ -408,9 +381,7 @@ class Production(Engine):
         self.initial = programs.cache_init.fn(put(np.int32(len(prompt))))
 
     def block_rows(self, count: int) -> int:
-        return (
-            TAIL_ROWS if count <= TAIL_ROWS else BLOCK_ROWS
-        )  # OrdinaryRuntime.generate's rule
+        return TAIL_ROWS if count <= TAIL_ROWS else BLOCK_ROWS  # OrdinaryRuntime.generate's rule
 
     def run_prefill(self, tokens: Any, count: int, state: Any) -> Any:
         return self.programs[int(tokens.shape[0])](
@@ -451,9 +422,7 @@ class Reference:
         self.weights = model.load_weights(frozen.arrays, self.config)
         self.rope = model.rope_table(self.config)
 
-    def record(
-        self, result: Any, rows: tuple[int, int], *, final: bool, decode: bool
-    ) -> dict[str, Any]:
+    def record(self, result: Any, rows: tuple[int, int], *, final: bool, decode: bool) -> dict[str, Any]:
         import jax.numpy as jnp
 
         engine = self.engine_config
@@ -463,9 +432,7 @@ class Reference:
             state.kv_cache,
             ((0, 0), (0, 0), (0, engine.packed_cache_width - state.kv_cache.shape[-1])),
         )
-        index = host(
-            state.index_cache.reshape(state.index_cache.shape[0], pages, page, -1)
-        )
+        index = host(state.index_cache.reshape(state.index_cache.shape[0], pages, page, -1))
         carried = result.selections[-1]
         token = int(result.next_token) if final or decode else -1
         leaves = dict(
@@ -497,28 +464,20 @@ class Reference:
         decisions = dict(
             router_margin={
                 str(layer): float(np.min(host(r.margin)))
-                for layer, r in zip(
-                    self.config.sparse_layers, result.routes, strict=True
-                )
+                for layer, r in zip(self.config.sparse_layers, result.routes, strict=True)
             },
             dsa_margin={
                 str(layer): float(host(s.margin)[-1])
-                for layer, s in zip(
-                    self.config.full_layers, result.selections, strict=True
-                )
+                for layer, s in zip(self.config.full_layers, result.selections, strict=True)
             },
             # Every row of the call, for the per-row root cause (``first_excess``).
             router_margin_rows={
                 str(layer): [float(m) for m in host(r.margin)]
-                for layer, r in zip(
-                    self.config.sparse_layers, result.routes, strict=True
-                )
+                for layer, r in zip(self.config.sparse_layers, result.routes, strict=True)
             },
             dsa_margin_rows={
                 str(layer): [float(m) for m in host(s.margin)]
-                for layer, s in zip(
-                    self.config.full_layers, result.selections, strict=True
-                )
+                for layer, s in zip(self.config.full_layers, result.selections, strict=True)
             },
         )
         return dict(
@@ -528,36 +487,26 @@ class Reference:
             selections=selections,
             next_token=token,
             decisions=decisions,
-            logits=dict(
-                top=[int(i) for i in top], values=[float(logits[i]) for i in top]
-            ),
+            logits=dict(top=[int(i) for i in top], values=[float(logits[i]) for i in top]),
         )
 
     def run(self, steps: int, tokens_in: list[int] | None, on_record: Any) -> None:
         state = self.model.initial_state(self.config)
         for start in range(0, len(self.prompt), self.block_rows):
             chunk = list(self.prompt[start : start + self.block_rows])
-            result = self.model.forward(
-                self.config, self.weights, state, chunk, rope=self.rope
-            )
+            result = self.model.forward(self.config, self.weights, state, chunk, rope=self.rope)
             final = start + len(chunk) == len(self.prompt)
             on_record(
                 "prefill",
-                self.record(
-                    result, (start, start + len(chunk)), final=final, decode=False
-                ),
+                self.record(result, (start, start + len(chunk)), final=final, decode=False),
             )
             state = result.state
         token = int(result.next_token)
         for step in range(steps):
             token_in = token if tokens_in is None else tokens_in[step]
             position = state.length
-            result = self.model.forward(
-                self.config, self.weights, state, [token_in], rope=self.rope
-            )
-            record = self.record(
-                result, (position, position + 1), final=False, decode=True
-            )
+            result = self.model.forward(self.config, self.weights, state, [token_in], rope=self.rope)
+            record = self.record(result, (position, position + 1), final=False, decode=True)
             record["token_in"] = token_in
             on_record("decode", record)
             state, token = result.state, int(result.next_token)
@@ -574,11 +523,7 @@ def production_wk(mesh: Any, raw: Any, config: Any) -> tuple[Any, ...]:
     tables = []
     for layer_id in config.full_index_slots:
         dsa = raw.layers[layer_id].dsa
-        tables.append(
-            jax.block_until_ready(
-                promote(decode(dsa.wk_bits_local, dsa.wk_scale_local))
-            )
-        )
+        tables.append(jax.block_until_ready(promote(decode(dsa.wk_bits_local, dsa.wk_scale_local))))
     return tuple(tables)
 
 
@@ -617,9 +562,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
             sha256=sha256_hex(np.asarray(prompt, np.int32).tobytes()),
         ),
         steps=steps,
-        fixture=dict(
-            version=fixture.VERSION, checkpoint=tree_record(frozen.arrays)["digest"]
-        ),
+        fixture=dict(version=fixture.VERSION, checkpoint=tree_record(frozen.arrays)["digest"]),
         tolerances=dict(rtol=RTOL, atol=ATOL),
     )
     with tpu_v4_info():
@@ -656,9 +599,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
         lap("build")
 
         baseline: dict[str, list[dict[str, Any]]] = dict(prefill=[], decode=[])
-        systems[baseline_name].run(
-            steps, None, lambda kind, record: baseline[kind].append(record)
-        )
+        systems[baseline_name].run(steps, None, lambda kind, record: baseline[kind].append(record))
         lap("baseline")
         tokens_in = [record["token_in"] for record in baseline["decode"]]
         by_position = {record["position"]: record for record in baseline["prefill"]}
@@ -668,14 +609,10 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
         def on_candidate(kind: str, record: dict[str, Any]) -> None:
             if kind == "decode":
                 compared["decode"].append(
-                    compare_record(
-                        record, baseline["decode"][len(compared["decode"])], top_k=top_k
-                    )
+                    compare_record(record, baseline["decode"][len(compared["decode"])], top_k=top_k)
                 )
             elif record["position"] in by_position:  # a common prefill boundary
-                compared["prefill"].append(
-                    compare_record(record, by_position[record["position"]], top_k=top_k)
-                )
+                compared["prefill"].append(compare_record(record, by_position[record["position"]], top_k=top_k))
 
         systems[candidate_name].run(steps, tokens_in, on_candidate)
         lap("candidate")
@@ -747,9 +684,7 @@ def summarize(
         logits = record["logits"]["candidate"]
         if record["tokens"]["candidate"] == record["tokens"]["baseline"]:
             return True
-        return logits is not None and logits["values"][0] - logits["values"][
-            1
-        ] <= bf16_ulp(logits["values"][0])
+        return logits is not None and logits["values"][0] - logits["values"][1] <= bf16_ulp(logits["values"][0])
 
     prefill, decode = compared["prefill"], compared["decode"]
     selections = [v for r in decode for v in r["selections"].values()]
@@ -758,11 +693,8 @@ def summarize(
     return dict(
         prefill_integer_leaves_equal=ok(prefill, ("exact", "shape")),
         prefill_float_leaves_within=ok(prefill, ("float", "shape")),
-        prefill_next_token_equal=prefill[-1]["tokens"]["candidate"]
-        == prefill[-1]["tokens"]["baseline"],
-        decode_tokens_equal=all(
-            r["tokens"]["candidate"] == r["tokens"]["baseline"] for r in decode
-        ),
+        prefill_next_token_equal=prefill[-1]["tokens"]["candidate"] == prefill[-1]["tokens"]["baseline"],
+        decode_tokens_equal=all(r["tokens"]["candidate"] == r["tokens"]["baseline"] for r in decode),
         decode_integer_leaves_equal=ok(decode, ("exact", "shape")),
         decode_float_leaves_within=ok(decode, ("float", "shape")),
         decode_selections_ordered_equal=all(s["ordered_equal"] for s in selections),
@@ -771,20 +703,14 @@ def summarize(
         decode_integer_state_equal=ok(decode, ("exact", "shape"), ordered_only),
         decision_free_within=all(decision_free(r) <= 1.0 for r in records),
         decision_free_bound_ratio=max(decision_free(r) for r in records),
-        decision_free_rows_compared=sum(
-            r["decision_free_rows"] is not None for r in records
-        ),
+        decision_free_rows_compared=sum(r["decision_free_rows"] is not None for r in records),
         tokens_equal_or_tied=all(tied(r) for r in decode),
         selections_explained=all(s["explained"] for s in selections),
         decode_selections_compared=len(selections),
         decode_selections_set_unequal=sum(not s["set_equal"] for s in selections),
-        decode_selection_order_mismatches=sum(
-            s["order_mismatches"] for s in selections
-        ),
-        baseline_tokens=[prefill[-1]["tokens"]["baseline"]]
-        + [r["tokens"]["baseline"] for r in decode],
-        candidate_tokens=[prefill[-1]["tokens"]["candidate"]]
-        + [r["tokens"]["candidate"] for r in decode],
+        decode_selection_order_mismatches=sum(s["order_mismatches"] for s in selections),
+        baseline_tokens=[prefill[-1]["tokens"]["baseline"]] + [r["tokens"]["baseline"] for r in decode],
+        candidate_tokens=[prefill[-1]["tokens"]["candidate"]] + [r["tokens"]["candidate"] for r in decode],
         prefill_max_abs=worst(prefill, "max_abs"),
         prefill_bound_ratio=worst(prefill, "bound_ratio"),
         prefill_outside_fraction=worst(prefill, "outside_fraction"),
@@ -800,12 +726,8 @@ def summarize(
                 layer=e["layer"],
                 bound_ratio=round(e["bound_ratio"], 3),
                 previous_layer_ratio=e["previous_layer_ratio"],
-                router_margin_before=min(
-                    e.get("router_margins", {}).values(), default=None
-                ),
-                router_margin_layer_before=e.get("router_margins", {}).get(
-                    str(e["layer"] - 1)
-                ),
+                router_margin_before=min(e.get("router_margins", {}).values(), default=None),
+                router_margin_layer_before=e.get("router_margins", {}).get(str(e["layer"] - 1)),
                 dsa_margin_before=min(e.get("dsa_margins", {}).values(), default=None),
             )
             for phase, records in (("prefill", prefill), ("decode", decode))

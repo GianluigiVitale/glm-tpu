@@ -70,9 +70,7 @@ def _strict_json(raw: bytes, *, label: str) -> Any:
         result: dict[str, Any] = {}
         for key, value in pairs:
             if key in result:
-                raise CheckpointValidationError(
-                    f"{label} contains duplicate JSON key {key!r}"
-                )
+                raise CheckpointValidationError(f"{label} contains duplicate JSON key {key!r}")
             result[key] = value
         return result
 
@@ -92,9 +90,7 @@ def _require_nonempty(value: object, *, field: str) -> str:
 
 def _require_nonnegative(value: object, *, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise CheckpointValidationError(
-            f"{field} must be a non-negative integer"
-        )
+        raise CheckpointValidationError(f"{field} must be a non-negative integer")
     return value
 
 
@@ -104,37 +100,23 @@ def _require_digest(value: object, *, field: str) -> str:
         or len(value) != 64
         or any(character not in "0123456789abcdef" for character in value)
     ):
-        raise CheckpointValidationError(
-            f"{field} must be a lowercase SHA-256 digest"
-        )
+        raise CheckpointValidationError(f"{field} must be a lowercase SHA-256 digest")
     return value
 
 
 def _safe_source_filename(value: object) -> str:
     filename = _require_nonempty(value, field="source filename")
     pure = PurePath(filename)
-    if (
-        pure.is_absolute()
-        or len(pure.parts) != 1
-        or pure.name != filename
-        or pure.suffix != ".safetensors"
-    ):
-        raise CheckpointValidationError(
-            f"unsafe or unsupported source filename {filename!r}"
-        )
+    if pure.is_absolute() or len(pure.parts) != 1 or pure.name != filename or pure.suffix != ".safetensors":
+        raise CheckpointValidationError(f"unsafe or unsupported source filename {filename!r}")
     return filename
 
 
 def _shape(value: object, *, name: str) -> tuple[int, ...]:
     if not isinstance(value, list) or any(
-        not isinstance(dimension, int)
-        or isinstance(dimension, bool)
-        or dimension < 0
-        for dimension in value
+        not isinstance(dimension, int) or isinstance(dimension, bool) or dimension < 0 for dimension in value
     ):
-        raise CheckpointValidationError(
-            f"tensor {name!r} has invalid safetensors shape"
-        )
+        raise CheckpointValidationError(f"tensor {name!r} has invalid safetensors shape")
     return tuple(value)
 
 
@@ -160,26 +142,17 @@ class SourceTensor:
         _require_nonempty(self.name, field="tensor name")
         _safe_source_filename(self.filename)
         if self.dtype not in _DTYPE_BYTES:
-            raise CheckpointValidationError(
-                f"tensor {self.name!r} has unsupported dtype {self.dtype!r}"
-            )
+            raise CheckpointValidationError(f"tensor {self.name!r} has unsupported dtype {self.dtype!r}")
         object.__setattr__(self, "shape", tuple(self.shape))
         _shape(list(self.shape), name=self.name)
-        start = _require_nonnegative(
-            self.data_offset_start, field=f"{self.name}.data_offset_start"
-        )
-        end = _require_nonnegative(
-            self.data_offset_end, field=f"{self.name}.data_offset_end"
-        )
+        start = _require_nonnegative(self.data_offset_start, field=f"{self.name}.data_offset_start")
+        end = _require_nonnegative(self.data_offset_end, field=f"{self.name}.data_offset_end")
         if end < start:
-            raise CheckpointValidationError(
-                f"tensor {self.name!r} has descending data offsets"
-            )
+            raise CheckpointValidationError(f"tensor {self.name!r} has descending data offsets")
         logical_bytes = _element_count(self.shape) * _DTYPE_BYTES[self.dtype]
         if end - start != logical_bytes:
             raise CheckpointValidationError(
-                f"tensor {self.name!r} byte mismatch: offsets={end - start}, "
-                f"shape/dtype={logical_bytes}"
+                f"tensor {self.name!r} byte mismatch: offsets={end - start}, shape/dtype={logical_bytes}"
             )
 
     @property
@@ -219,9 +192,7 @@ class SourceTensor:
             data_offset_end=offsets[1],
         )
         if value.get("byte_count") != tensor.byte_count:
-            raise CheckpointValidationError(
-                f"tensor {tensor.name!r} recorded byte_count is inconsistent"
-            )
+            raise CheckpointValidationError(f"tensor {tensor.name!r} recorded byte_count is inconsistent")
         return tensor
 
 
@@ -247,9 +218,7 @@ class SourceFile:
             _require_nonnegative(getattr(self, field), field=field)
         _require_digest(self.header_sha256, field="header_sha256")
         if self.file_bytes != self.header_bytes + self.payload_bytes:
-            raise CheckpointValidationError(
-                f"source file {self.filename!r} does not reconcile header and payload"
-            )
+            raise CheckpointValidationError(f"source file {self.filename!r} does not reconcile header and payload")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -287,25 +256,15 @@ class SourceInventory:
         _require_nonempty(self.index_filename, field="index_filename")
         _require_digest(self.index_sha256, field="index_sha256")
         if (self.config_filename is None) != (self.config_sha256 is None):
-            raise CheckpointValidationError(
-                "config filename and digest must either both exist or both be null"
-            )
+            raise CheckpointValidationError("config filename and digest must either both exist or both be null")
         if self.config_filename is not None:
             _require_nonempty(self.config_filename, field="config_filename")
             _require_digest(self.config_sha256, field="config_sha256")
-        _require_nonnegative(
-            self.declared_payload_bytes, field="declared_payload_bytes"
-        )
+        _require_nonnegative(self.declared_payload_bytes, field="declared_payload_bytes")
         if self.format_version != FORMAT_VERSION:
-            raise CheckpointValidationError(
-                f"unsupported source inventory format {self.format_version}"
-            )
-        object.__setattr__(
-            self, "files", tuple(sorted(self.files, key=lambda item: item.filename))
-        )
-        object.__setattr__(
-            self, "tensors", tuple(sorted(self.tensors, key=lambda item: item.name))
-        )
+            raise CheckpointValidationError(f"unsupported source inventory format {self.format_version}")
+        object.__setattr__(self, "files", tuple(sorted(self.files, key=lambda item: item.filename)))
+        object.__setattr__(self, "tensors", tuple(sorted(self.tensors, key=lambda item: item.name)))
         if not self.files or not self.tensors:
             raise CheckpointValidationError("source inventory must not be empty")
         file_names = [item.filename for item in self.files]
@@ -316,9 +275,7 @@ class SourceInventory:
             raise CheckpointValidationError("source inventory has duplicate tensor names")
         known_files = set(file_names)
         if any(tensor.filename not in known_files for tensor in self.tensors):
-            raise CheckpointValidationError(
-                "source tensor references a file absent from the inventory"
-            )
+            raise CheckpointValidationError("source tensor references a file absent from the inventory")
         payload = sum(item.payload_bytes for item in self.files)
         tensor_bytes = sum(item.byte_count for item in self.tensors)
         if payload != tensor_bytes or payload != self.declared_payload_bytes:
@@ -331,9 +288,7 @@ class SourceInventory:
         for tensor in self.tensors:
             counts[tensor.filename] += 1
         if any(item.tensor_count != counts[item.filename] for item in self.files):
-            raise CheckpointValidationError(
-                "source file tensor counts do not reconcile"
-            )
+            raise CheckpointValidationError("source file tensor counts do not reconcile")
 
     @property
     def payload_bytes(self) -> int:
@@ -379,9 +334,7 @@ class SourceInventory:
             config_sha256=value.get("config_sha256"),
             declared_payload_bytes=value.get("declared_payload_bytes"),
             files=tuple(SourceFile.from_dict(item) for item in value.get("files", ())),
-            tensors=tuple(
-                SourceTensor.from_dict(item) for item in value.get("tensors", ())
-            ),
+            tensors=tuple(SourceTensor.from_dict(item) for item in value.get("tensors", ())),
             format_version=value.get("format_version"),
         )
         if value.get("inventory_sha256") != inventory.inventory_sha256:
@@ -399,9 +352,7 @@ class SourceInventory:
             if tensor.layer_id is None:
                 non_layer_bytes += tensor.byte_count
             else:
-                layer_bytes[tensor.layer_id] = (
-                    layer_bytes.get(tensor.layer_id, 0) + tensor.byte_count
-                )
+                layer_bytes[tensor.layer_id] = layer_bytes.get(tensor.layer_id, 0) + tensor.byte_count
         return {
             "dtype_bytes": dict(sorted(dtype_bytes.items())),
             "dtype_leaves": dict(sorted(dtype_leaves.items())),
@@ -409,9 +360,7 @@ class SourceInventory:
             "file_count": len(self.files),
             "header_bytes": self.header_bytes,
             "inventory_sha256": self.inventory_sha256,
-            "layer_bytes": {
-                str(layer): layer_bytes[layer] for layer in sorted(layer_bytes)
-            },
+            "layer_bytes": {str(layer): layer_bytes[layer] for layer in sorted(layer_bytes)},
             "leaf_count": len(self.tensors),
             "non_layer_bytes": non_layer_bytes,
             "payload_bytes": self.payload_bytes,
@@ -423,26 +372,18 @@ def _header_entries(
 ) -> tuple[SourceFile, tuple[SourceTensor, ...]]:
     decoded = _strict_json(raw_header, label=f"safetensors header {filename}")
     if not isinstance(decoded, Mapping):
-        raise CheckpointValidationError(
-            f"safetensors header {filename!r} must contain an object"
-        )
+        raise CheckpointValidationError(f"safetensors header {filename!r} must contain an object")
     entries = []
     for name, metadata in decoded.items():
         if name == "__metadata__":
             if not isinstance(metadata, Mapping):
-                raise CheckpointValidationError(
-                    f"safetensors metadata in {filename!r} must be an object"
-                )
+                raise CheckpointValidationError(f"safetensors metadata in {filename!r} must be an object")
             continue
         if not isinstance(metadata, Mapping):
-            raise CheckpointValidationError(
-                f"tensor metadata for {name!r} must be an object"
-            )
+            raise CheckpointValidationError(f"tensor metadata for {name!r} must be an object")
         offsets = metadata.get("data_offsets")
         if not isinstance(offsets, list) or len(offsets) != 2:
-            raise CheckpointValidationError(
-                f"tensor {name!r} requires two data offsets"
-            )
+            raise CheckpointValidationError(f"tensor {name!r} requires two data offsets")
         entries.append(
             SourceTensor(
                 name=name,
@@ -500,21 +441,15 @@ def read_source_inventory(
     try:
         raw_index = index_path.read_bytes()
     except OSError as exc:
-        raise CheckpointValidationError(
-            f"cannot read source index {index_path}"
-        ) from exc
+        raise CheckpointValidationError(f"cannot read source index {index_path}") from exc
     decoded = _strict_json(raw_index, label="safetensors index")
     if not isinstance(decoded, Mapping):
         raise CheckpointValidationError("safetensors index must contain an object")
     metadata = decoded.get("metadata")
     weight_map = decoded.get("weight_map")
     if not isinstance(metadata, Mapping) or not isinstance(weight_map, Mapping):
-        raise CheckpointValidationError(
-            "safetensors index requires metadata and weight_map objects"
-        )
-    declared = _require_nonnegative(
-        metadata.get("total_size"), field="index metadata.total_size"
-    )
+        raise CheckpointValidationError("safetensors index requires metadata and weight_map objects")
+    declared = _require_nonnegative(metadata.get("total_size"), field="index metadata.total_size")
     if not weight_map:
         raise CheckpointValidationError("safetensors weight_map must not be empty")
     normalized_map: dict[str, str] = {}
@@ -531,60 +466,44 @@ def read_source_inventory(
             with path.open("rb") as stream:
                 prefix = stream.read(8)
                 if len(prefix) != 8:
-                    raise CheckpointValidationError(
-                        f"source file {filename!r} lacks a safetensors header length"
-                    )
+                    raise CheckpointValidationError(f"source file {filename!r} lacks a safetensors header length")
                 header_length = struct.unpack("<Q", prefix)[0]
                 if header_length > file_bytes - 8:
-                    raise CheckpointValidationError(
-                        f"source file {filename!r} declares an oversized header"
-                    )
+                    raise CheckpointValidationError(f"source file {filename!r} declares an oversized header")
                 raw_header = stream.read(header_length)
                 if len(raw_header) != header_length:
-                    raise CheckpointValidationError(
-                        f"source file {filename!r} has a truncated header"
-                    )
+                    raise CheckpointValidationError(f"source file {filename!r} has a truncated header")
         except CheckpointValidationError:
             raise
         except OSError as exc:
-            raise CheckpointValidationError(
-                f"cannot inspect source file {path}"
-            ) from exc
+            raise CheckpointValidationError(f"cannot inspect source file {path}") from exc
         source_file, source_tensors = _header_entries(
             filename=filename,
             raw_header=raw_header,
             file_bytes=file_bytes,
             header_bytes=8 + header_length,
         )
-        expected_names = {
-            name for name, mapped_filename in normalized_map.items()
-            if mapped_filename == filename
-        }
+        expected_names = {name for name, mapped_filename in normalized_map.items() if mapped_filename == filename}
         actual_names = {tensor.name for tensor in source_tensors}
         if actual_names != expected_names:
             missing = sorted(expected_names - actual_names)[:5]
             unexpected = sorted(actual_names - expected_names)[:5]
             raise CheckpointValidationError(
-                f"source file {filename!r} disagrees with weight_map: "
-                f"missing={missing}, unexpected={unexpected}"
+                f"source file {filename!r} disagrees with weight_map: missing={missing}, unexpected={unexpected}"
             )
         files.append(source_file)
         tensors.extend(source_tensors)
 
     actual_names = {tensor.name for tensor in tensors}
     if actual_names != set(normalized_map):
-        raise CheckpointValidationError(
-            "source header leaf set does not equal index weight_map"
-        )
+        raise CheckpointValidationError("source header leaf set does not equal index weight_map")
     config_sha256 = None
     if config_filename is not None:
         config_path = root / config_filename
         try:
             raw_config = config_path.read_bytes()
         except OSError as exc:
-            raise CheckpointValidationError(
-                f"cannot read source config {config_path}"
-            ) from exc
+            raise CheckpointValidationError(f"cannot read source config {config_path}") from exc
         config = _strict_json(raw_config, label="model config")
         if not isinstance(config, Mapping):
             raise CheckpointValidationError("model config must contain an object")
@@ -608,19 +527,13 @@ def write_source_inventory(inventory: SourceInventory, output: Path) -> None:
 
     path = Path(output)
     if path.exists():
-        raise CheckpointValidationError(
-            f"refusing to overwrite source inventory {path}"
-        )
+        raise CheckpointValidationError(f"refusing to overwrite source inventory {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     if temporary.exists():
-        raise CheckpointValidationError(
-            f"stale source inventory temporary exists: {temporary}"
-        )
+        raise CheckpointValidationError(f"stale source inventory temporary exists: {temporary}")
     try:
-        temporary.write_text(
-            json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n"
-        )
+        temporary.write_text(json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n")
         temporary.replace(path)
     except BaseException:
         temporary.unlink(missing_ok=True)
@@ -633,9 +546,7 @@ def inspect_source_inventory(path: Path) -> SourceInventory:
     try:
         raw = Path(path).read_bytes()
     except OSError as exc:
-        raise CheckpointValidationError(
-            f"cannot read source inventory {path}"
-        ) from exc
+        raise CheckpointValidationError(f"cannot read source inventory {path}") from exc
     decoded = _strict_json(raw, label="source inventory")
     if not isinstance(decoded, Mapping):
         raise CheckpointValidationError("source inventory must contain an object")

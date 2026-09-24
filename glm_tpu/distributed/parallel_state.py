@@ -37,12 +37,7 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
     ):
         raise RuntimeError("WS32 runner did not initialize the exact 8x4 TPU runtime")
     captures = tuple(
-        json.loads(
-            (
-                args.topology_capture_root
-                / f"topology.rank{launch_process_id}.json"
-            ).read_text(encoding="utf-8")
-        )
+        json.loads((args.topology_capture_root / f"topology.rank{launch_process_id}.json").read_text(encoding="utf-8"))
         for launch_process_id in range(8)
     )
     topology, ordered_captures, fleet_sha = validate_topology_fleet(
@@ -55,8 +50,7 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
     if (
         launch_capture["hostname"] != socket.gethostname()
         or launch_capture["jax_process_index"] != jax.process_index()
-        or launch_capture["local_device_ids"]
-        != [int(device.id) for device in jax.local_devices()]
+        or launch_capture["local_device_ids"] != [int(device.id) for device in jax.local_devices()]
     ):
         raise RuntimeError("WS32 launch/JAX/topology fleet mapping drifted")
     physical_mesh = build_physical_mesh(topology)
@@ -66,13 +60,14 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
     if set(runtime_by_id) != set(physical_mesh.flattened_device_ids):
         raise ValueError("WS32 runtime device ids differ from physical mesh")
     for captured in topology.devices:
-        if _device_record(
-            runtime_by_id[captured.device_id],
-            local_device_id=captured.local_device_id,
-        ) != captured.to_dict():
-            raise ValueError(
-                f"WS32 runtime topology drifted at {captured.device_id}"
+        if (
+            _device_record(
+                runtime_by_id[captured.device_id],
+                local_device_id=captured.local_device_id,
             )
+            != captured.to_dict()
+        ):
+            raise ValueError(f"WS32 runtime topology drifted at {captured.device_id}")
     mesh = Mesh(
         np.asarray(
             [runtime_by_id[item] for item in physical_mesh.flattened_device_ids],

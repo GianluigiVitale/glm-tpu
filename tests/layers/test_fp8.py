@@ -39,7 +39,7 @@ def test_decode_table_matches_reference_dequantizer_bitwise():
 
 
 def test_bf16_resident_decode_paths_agree_cpu32():
-    code = r'''
+    code = r"""
 import json
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
@@ -81,9 +81,12 @@ for step in range(3):
     assert int(out.state.position[0]) == 4 + step  # prompt (3) + the tokens generated so far
     state, token = out.state, out.next_token
 print(json.dumps(report))
-'''
-    env = dict(os.environ, JAX_PLATFORMS="cpu",
-               XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip())
+"""
+    env = dict(
+        os.environ,
+        JAX_PLATFORMS="cpu",
+        XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip(),
+    )
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=1500)
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout.strip().splitlines()[-1])

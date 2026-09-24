@@ -31,25 +31,49 @@ def site_mapping(base: Path, **overrides: dict[str, Any]) -> dict[str, Any]:
     """A complete site mapping whose paths live under ``base``; ``overrides`` replace keys per table."""
     mapping: dict[str, Any] = dict(
         schema="glm_tpu_site_v1",
-        fleet=dict(tpu_name="example-vm", zone="example-zone1-a", project="", num_hosts=8, chips_per_host=4,
-                   host_rank_regex=r"-w-(\d+)$", coordinator_address=EXAMPLE_COORDINATOR,
-                   worker_python="/opt/example/bin/python3.12", worker_pythonpath=["/opt/example/site-packages"],
-                   helper_python="python3", known_hosts=str(base / "known_hosts")),
-        paths=dict(repo="", run_root=str(base / "runs"), model_path=str(base / "model"),
-                   hlo_dump_root="/dev/shm/glm-tpu-hlo"),
-        checkpoint=dict(namespace=str(base / "checkpoints"), root=str(base / "checkpoints" / "pack"),
-                        inventory_namespace=str(base / "inventories"),
-                        source_inventory=str(base / "inventories" / "tag" / "source_inventory.json"),
-                        source_inventory_sha256=EXAMPLE_HEX, manifest_sha256=EXAMPLE_HEX, success_sha256=EXAMPLE_HEX,
-                        source_complete_sha256=EXAMPLE_HEX),
-        topology=dict(binding_dir=str(base / "binding"), binding_sha256=EXAMPLE_HEX,
-                      capture_root=str(base / "captures"), topology_sha256=EXAMPLE_HEX,
-                      topology_fleet_sha256=EXAMPLE_HEX, mesh_sha256=EXAMPLE_HEX, slice_name="example-vm"),
+        fleet=dict(
+            tpu_name="example-vm",
+            zone="example-zone1-a",
+            project="",
+            num_hosts=8,
+            chips_per_host=4,
+            host_rank_regex=r"-w-(\d+)$",
+            coordinator_address=EXAMPLE_COORDINATOR,
+            worker_python="/opt/example/bin/python3.12",
+            worker_pythonpath=["/opt/example/site-packages"],
+            helper_python="python3",
+            known_hosts=str(base / "known_hosts"),
+        ),
+        paths=dict(
+            repo="", run_root=str(base / "runs"), model_path=str(base / "model"), hlo_dump_root="/dev/shm/glm-tpu-hlo"
+        ),
+        checkpoint=dict(
+            namespace=str(base / "checkpoints"),
+            root=str(base / "checkpoints" / "pack"),
+            inventory_namespace=str(base / "inventories"),
+            source_inventory=str(base / "inventories" / "tag" / "source_inventory.json"),
+            source_inventory_sha256=EXAMPLE_HEX,
+            manifest_sha256=EXAMPLE_HEX,
+            success_sha256=EXAMPLE_HEX,
+            source_complete_sha256=EXAMPLE_HEX,
+        ),
+        topology=dict(
+            binding_dir=str(base / "binding"),
+            binding_sha256=EXAMPLE_HEX,
+            capture_root=str(base / "captures"),
+            topology_sha256=EXAMPLE_HEX,
+            topology_fleet_sha256=EXAMPLE_HEX,
+            mesh_sha256=EXAMPLE_HEX,
+            slice_name="example-vm",
+        ),
         storage=dict(source_uri=EXAMPLE_BUCKET + "models/GLM-5.3-FP8", allowed_source_uri_prefixes=[EXAMPLE_BUCKET]),
-        locks=dict(workload=[str(base / "locks" / "lock0"), str(base / "locks" / "lock1")],
-                   sync=[str(base / "locks" / "lock2"), str(base / "locks" / "lock3")]),
-        launch=dict(allowed_branches=["main", "release/*"], expected_origin="", require_clean=True,
-                    require_pushed=True),
+        locks=dict(
+            workload=[str(base / "locks" / "lock0"), str(base / "locks" / "lock1")],
+            sync=[str(base / "locks" / "lock2"), str(base / "locks" / "lock3")],
+        ),
+        launch=dict(
+            allowed_branches=["main", "release/*"], expected_origin="", require_clean=True, require_pushed=True
+        ),
     )
     for table, values in overrides.items():
         mapping[table] = dict(mapping[table], **values)

@@ -11,6 +11,7 @@ non-ASCII characters. ``hosts`` is ``[socket.gethostname()]`` (rank 0). ``sudo``
 and no TPU is ever touched. This is the test that would have caught F-C1 (post-staging helpers that
 cannot import).
 """
+
 from __future__ import annotations
 
 import base64
@@ -41,25 +42,30 @@ if "--preflight-only" in sys.argv:
 print("STUB " + json.dumps(state), flush=True)
 time.sleep(600)
 '''.replace("{flag}", protocol.WORKER_ENV_FLAG)
-MODULE = protocol.WORKER_MODULE             # the stand-in runs as the real worker module name
-STUB_PATH = protocol.module_path(MODULE)    # glm_tpu/worker/tpu_worker.py in the stub repository
-NO_HOLDER_SUDO = '''#!/bin/sh
+MODULE = protocol.WORKER_MODULE  # the stand-in runs as the real worker module name
+STUB_PATH = protocol.module_path(MODULE)  # glm_tpu/worker/tpu_worker.py in the stub repository
+NO_HOLDER_SUDO = """#!/bin/sh
 # Loopback stand-in for `sudo -n env LC_ALL=C fuser /tmp/libtpu_lockfile`: answers "no holder".
 [ "$*" = "-n env LC_ALL=C fuser /tmp/libtpu_lockfile" ] || exit 99
 if [ -e /tmp/libtpu_lockfile ]; then exit 1; fi
 echo "Specified filename /tmp/libtpu_lockfile does not exist." >&2
 exit 1
-'''
-HOLDER_SUDO = '''#!/bin/sh
+"""
+HOLDER_SUDO = """#!/bin/sh
 # Stand-in reporting one libtpu holder.
 [ "$*" = "-n env LC_ALL=C fuser /tmp/libtpu_lockfile" ] || exit 99
 echo " 4242"
 echo "/tmp/libtpu_lockfile:" >&2
 exit 0
-'''
-GIT_ENV = dict(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="fixture",
-               GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_NAME="fixture",
-               GIT_COMMITTER_EMAIL="fixture@example.invalid")
+"""
+GIT_ENV = dict(
+    GIT_CONFIG_GLOBAL="/dev/null",
+    GIT_CONFIG_NOSYSTEM="1",
+    GIT_AUTHOR_NAME="fixture",
+    GIT_AUTHOR_EMAIL="fixture@example.invalid",
+    GIT_COMMITTER_NAME="fixture",
+    GIT_COMMITTER_EMAIL="fixture@example.invalid",
+)
 SCALE = envs.GLM_TPU_TEST_TIMEOUT_SCALE
 
 
@@ -81,12 +87,24 @@ class Host:
         self.env = dict(PATH=os.pathsep.join([str(tools), os.environ.get("PATH", "")]), HOME=str(self.home))
 
     def run(self, command: str, *, payload: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.run(["bash", "-c", command], cwd=self.home, env=self.env, input=payload,
-                              capture_output=True, timeout=120 * SCALE)
+        return subprocess.run(
+            ["bash", "-c", command],
+            cwd=self.home,
+            env=self.env,
+            input=payload,
+            capture_output=True,
+            timeout=120 * SCALE,
+        )
 
     def start(self, command: str) -> subprocess.Popen[bytes]:
-        return subprocess.Popen(["bash", "-c", command], cwd=self.home, env=self.env, stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return subprocess.Popen(
+            ["bash", "-c", command],
+            cwd=self.home,
+            env=self.env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
 
 @pytest.fixture
@@ -103,8 +121,9 @@ def fleet_run(tmp_path, monkeypatch):
     (repo / STUB_PATH).write_text(STUB)
     for command in (["git", "init", "-q", "-b", "main"], ["git", "add", "-A"], ["git", "commit", "-q", "-m", "stub"]):
         subprocess.run(command, cwd=repo, check=True, capture_output=True)
-    pin = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True,
-                         text=True).stdout.strip()
+    pin = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
     binding = tmp_path / "binding"
     (binding / "captures").mkdir(parents=True)
     digests = {}
@@ -116,10 +135,17 @@ def fleet_run(tmp_path, monkeypatch):
     (binding / "topology_rebinding.json").write_bytes(rebinding)
     extra = tmp_path / "site-packages"
     extra.mkdir()
-    site = SiteConfig.from_mapping(example_mapping(
-        tmp_path, fleet=dict(helper_python=envs.GLM_TPU_TEST_HELPER_PYTHON, worker_python=sys.executable,
-                             worker_pythonpath=[str(extra)]),
-        topology=dict(binding_dir=str(binding), binding_sha256=sha256(rebinding).hexdigest())))
+    site = SiteConfig.from_mapping(
+        example_mapping(
+            tmp_path,
+            fleet=dict(
+                helper_python=envs.GLM_TPU_TEST_HELPER_PYTHON,
+                worker_python=sys.executable,
+                worker_pythonpath=[str(extra)],
+            ),
+            topology=dict(binding_dir=str(binding), binding_sha256=sha256(rebinding).hexdigest()),
+        )
+    )
     root = tmp_path / "runs with space 'single' \"double\" ünïcödé 日本" / "run_20260923T000000000000Z"
     root.mkdir(parents=True, mode=0o700)
     return dict(repo=repo, pin=pin, site=site, root=root, hosts=[socket.gethostname()], extra=extra)
@@ -150,13 +176,15 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
 
     # stage_bundle on worker_python: a wrong digest refuses before extraction, the right one extracts
     bundle, manifest_sha = staging.stage_bundle(fleet_run["repo"], pin, root, b'{"request": "loopback"}\n', site)
-    wrong = host.run(remote.command(fleet, "stage_bundle", dict(root=str(root), digest="0" * 64, hosts=hosts)),
-                     payload=bundle)
+    wrong = host.run(
+        remote.command(fleet, "stage_bundle", dict(root=str(root), digest="0" * 64, hosts=hosts)), payload=bundle
+    )
     assert wrong.returncode != 0 and b"staging transport differs" in wrong.stderr
     assert not (root / "source").exists()
-    staged = host.run(remote.command(fleet, "stage_bundle",
-                                     dict(root=str(root), digest=sha256(bundle).hexdigest(), hosts=hosts)),
-                      payload=bundle)
+    staged = host.run(
+        remote.command(fleet, "stage_bundle", dict(root=str(root), digest=sha256(bundle).hexdigest(), hosts=hosts)),
+        payload=bundle,
+    )
     assert staged.returncode == 0, staged.stderr.decode()[-2000:]
     assert (root / "source" / STUB_PATH).read_text() == STUB
     assert sha256((root / "source_manifest.json").read_bytes()).hexdigest() == manifest_sha
@@ -169,22 +197,38 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     assert preflight.returncode == 0, preflight.stderr.decode()[-2000:]
     state = json.loads(preflight.stdout)
     source = str(root / "source")
-    assert state == dict(cwd=source, jax="cpu", flag="1", pythonpath=f"{source}:{fleet_run['extra']}",
-                         argv=[*worker_argv, "--preflight-only"])
+    assert state == dict(
+        cwd=source,
+        jax="cpu",
+        flag="1",
+        pythonpath=f"{source}:{fleet_run['extra']}",
+        argv=[*worker_argv, "--preflight-only"],
+    )
 
     # start_worker: the marker first, then execv into the stub (this process becomes the worker)
-    start = remote.command(fleet, "start_worker", dict(
-        root=str(root), hosts=hosts, pin=pin, worker_python=fleet.worker_python,
-        pythonpath=list(fleet.worker_pythonpath), module=MODULE,
-        env={"JAX_PLATFORMS": "cpu", protocol.WORKER_ENV_FLAG: "1"}, argv=worker_argv))
+    start = remote.command(
+        fleet,
+        "start_worker",
+        dict(
+            root=str(root),
+            hosts=hosts,
+            pin=pin,
+            worker_python=fleet.worker_python,
+            pythonpath=list(fleet.worker_pythonpath),
+            module=MODULE,
+            env={"JAX_PLATFORMS": "cpu", protocol.WORKER_ENV_FLAG: "1"},
+            argv=worker_argv,
+        ),
+    )
     process = host.start(start)
     try:
         marker = root / protocol.worker_started_file(0)
         _wait_for(marker.exists, "the start marker")
         line = process.stdout.readline().decode()
         assert line.startswith("STUB "), process.stderr.read().decode()[-2000:] if process.poll() else line
-        assert json.loads(line[5:]) == dict(cwd=source, jax="cpu", flag="1",
-                                            pythonpath=f"{source}:{fleet_run['extra']}", argv=worker_argv)
+        assert json.loads(line[5:]) == dict(
+            cwd=source, jax="cpu", flag="1", pythonpath=f"{source}:{fleet_run['extra']}", argv=worker_argv
+        )
         owner = json.loads(marker.read_text())
         assert sorted(owner) == ["boot_id", "code_hash", "hostname", "pid", "start_ticks"]
         assert owner["code_hash"] == pin and owner["hostname"] == hostname
@@ -196,17 +240,18 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
         assert live.returncode != 0 and b"request worker is live" in live.stderr
 
         # cleanup refuses an identity or argv that differs, and leaves the process alone
-        other_pin = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin="b" * 40,
-                                                                   module=MODULE)))
+        other_pin = host.run(
+            remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin="b" * 40, module=MODULE))
+        )
         assert other_pin.returncode != 0 and b"cleanup identity differs" in other_pin.stderr
-        other_module = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
-                                                                      module="other_worker")))
+        other_module = host.run(
+            remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin, module="other_worker"))
+        )
         assert other_module.returncode != 0 and b"cleanup argv differs" in other_module.stderr
         assert process.poll() is None
 
         # authenticated cleanup kills exactly this worker
-        cleanup = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
-                                                                 module=MODULE)))
+        cleanup = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin, module=MODULE)))
         assert cleanup.returncode == 0, cleanup.stderr.decode()[-2000:]
         process.wait(timeout=30 * SCALE)
         assert process.returncode in (-9, 137)
@@ -218,10 +263,17 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     # fetch: base64 records round-trip, names derived from the rank
     record = b'{"complete": true, "rank": 0}\n'
     (root / protocol.runner_file(0)).write_bytes(record)
-    fetched = host.run(remote.command(fleet, "fetch", dict(dir=str(root), hosts=hosts,
-                                                           names=["runner.rank{rank}.json",
-                                                                  "worker_started.rank{rank}.json",
-                                                                  "missing.rank{rank}.json"])))
+    fetched = host.run(
+        remote.command(
+            fleet,
+            "fetch",
+            dict(
+                dir=str(root),
+                hosts=hosts,
+                names=["runner.rank{rank}.json", "worker_started.rank{rank}.json", "missing.rank{rank}.json"],
+            ),
+        )
+    )
     assert fetched.returncode == 0, fetched.stderr.decode()[-2000:]
     files = {name: base64.b64decode(data) for name, data in json.loads(fetched.stdout).items()}
     assert files == {"runner.rank0.json": record, "worker_started.rank0.json": marker.read_bytes()}
@@ -231,8 +283,10 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     assert after.returncode == 0, after.stderr.decode()[-2000:]
     assert after.stdout.decode() == f"IDLE {hostname}\n"
     # a second cleanup finds nothing to do (process gone)
-    assert host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
-                                                          module=MODULE))).returncode == 0
+    assert (
+        host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin, module=MODULE))).returncode
+        == 0
+    )
 
 
 def test_the_idle_probe_refuses_a_libtpu_holder_and_a_host_outside_the_fleet(tmp_path, fleet_run):
@@ -246,6 +300,10 @@ def test_the_idle_probe_refuses_a_libtpu_holder_and_a_host_outside_the_fleet(tmp
 
 
 def test_the_helper_interpreter_is_at_least_python_310():
-    result = subprocess.run([envs.GLM_TPU_TEST_HELPER_PYTHON, "-c", "import sys; print(sys.version_info[:2])"],
-                            capture_output=True, text=True, timeout=60 * SCALE)
+    result = subprocess.run(
+        [envs.GLM_TPU_TEST_HELPER_PYTHON, "-c", "import sys; print(sys.version_info[:2])"],
+        capture_output=True,
+        text=True,
+        timeout=60 * SCALE,
+    )
     assert result.returncode == 0 and tuple(json.loads(result.stdout.replace("(", "[").replace(")", "]"))) >= (3, 10)

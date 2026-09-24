@@ -24,14 +24,17 @@ from tests.reference.linear import dense_swiglu, embedding_lookup, linear, vocab
 
 
 def test_resident_projection_rejects_raw_bits_or_scales():
-    lhs = jnp.ones((2,128),jnp.bfloat16)
-    for weight, scale in ((jnp.ones((128,128),jnp.uint8),None),
-                          (jnp.ones((128,128),jnp.bfloat16),jnp.ones((1,1),jnp.float32))):
-        with pytest.raises(ValueError): resident.resident_matmul(lhs,weight,scale)
+    lhs = jnp.ones((2, 128), jnp.bfloat16)
+    for weight, scale in (
+        (jnp.ones((128, 128), jnp.uint8), None),
+        (jnp.ones((128, 128), jnp.bfloat16), jnp.ones((1, 1), jnp.float32)),
+    ):
+        with pytest.raises(ValueError):
+            resident.resident_matmul(lhs, weight, scale)
 
 
 def test_bf16_canonical_dense_cpu32():
-    code=r'''
+    code = r"""
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
@@ -58,10 +61,10 @@ for rows in (114,128):
     assert np.asarray(b[-1]).all()
     assert not np.asarray(b[0])[~np.asarray(live)].any()
 print('BF16 canonical B114/B128 output, live masks and health checked')
-'''
-    env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32')
-    p=subprocess.run([sys.executable,'-c',code],env=env,text=True,capture_output=True,timeout=300)
-    assert p.returncode==0,p.stdout+p.stderr
+"""
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    p = subprocess.run([sys.executable, "-c", code], env=env, text=True, capture_output=True, timeout=300)
+    assert p.returncode == 0, p.stdout + p.stderr
 
 
 def test_linear_preserves_checkpoint_out_in_orientation_and_leading_shape() -> None:
@@ -101,9 +104,7 @@ def test_dense_swiglu_residual_embedding_and_logits_are_explicit() -> None:
     activated = gate_value / (1.0 + np.exp(-gate_value))
     expected = (activated * up_value) @ np.asarray(down).T
     np.testing.assert_allclose(np.asarray(got), expected, rtol=2e-7, atol=2e-7)
-    np.testing.assert_array_equal(
-        np.asarray(residual_add(hidden, got)), np.asarray(hidden + got)
-    )
+    np.testing.assert_array_equal(np.asarray(residual_add(hidden, got)), np.asarray(hidden + got))
 
     table = jnp.arange(12, dtype=jnp.bfloat16).reshape(6, 2)
     ids = jnp.asarray([[5, 0]], dtype=jnp.int32)

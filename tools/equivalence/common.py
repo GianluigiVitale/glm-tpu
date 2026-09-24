@@ -49,8 +49,9 @@ def require_cpu() -> None:
 
 
 def git(*args: str, cwd: Path | None = None) -> str:
-    return subprocess.check_output(["git", *args], cwd=cwd or HARNESS_REPO, text=True,
-                                   stderr=subprocess.DEVNULL).strip()
+    return subprocess.check_output(
+        ["git", *args], cwd=cwd or HARNESS_REPO, text=True, stderr=subprocess.DEVNULL
+    ).strip()
 
 
 def source_record() -> dict[str, Any]:
@@ -60,8 +61,12 @@ def source_record() -> dict[str, Any]:
     try:
         head = git("rev-parse", "HEAD")
         if REPO == HARNESS_REPO:
-            same = subprocess.run(["git", "diff", "--quiet", BASELINE_COMMIT, "--", *PRODUCTION_PATHS],
-                                  cwd=HARNESS_REPO, check=False).returncode == 0
+            same = (
+                subprocess.run(
+                    ["git", "diff", "--quiet", BASELINE_COMMIT, "--", *PRODUCTION_PATHS], cwd=HARNESS_REPO, check=False
+                ).returncode
+                == 0
+            )
         else:
             same = _tree_equals_baseline(REPO)
     except (OSError, subprocess.CalledProcessError):
@@ -75,14 +80,24 @@ def _tree_equals_baseline(root: Path) -> bool:
     for line in git("ls-tree", "-r", BASELINE_COMMIT, "--", *PRODUCTION_PATHS).splitlines():
         meta, path = line.split("\t", 1)
         expected[path] = meta.split()[2]
-    files = sorted(path for name in PRODUCTION_PATHS if (root / name).exists()
-                   for path in (root / name).rglob("*")
-                   if (path.is_file() or path.is_symlink()) and "__pycache__" not in path.parts)
+    files = sorted(
+        path
+        for name in PRODUCTION_PATHS
+        if (root / name).exists()
+        for path in (root / name).rglob("*")
+        if (path.is_file() or path.is_symlink()) and "__pycache__" not in path.parts
+    )
     relative = [str(path.relative_to(root)) for path in files]
     if set(relative) != set(expected):
         return False
-    hashes = subprocess.run(["git", "hash-object", "--no-filters", "--stdin-paths"], cwd=HARNESS_REPO, check=True,
-                            input="\n".join(str(path) for path in files), capture_output=True, text=True).stdout.split()
+    hashes = subprocess.run(
+        ["git", "hash-object", "--no-filters", "--stdin-paths"],
+        cwd=HARNESS_REPO,
+        check=True,
+        input="\n".join(str(path) for path in files),
+        capture_output=True,
+        text=True,
+    ).stdout.split()
     return dict(zip(relative, hashes, strict=True)) == expected
 
 
@@ -117,10 +132,18 @@ def static_environment(xla_flags: str = "") -> dict[str, Any]:
             return None
 
     # torch and safetensors write G4's tiny-pack source; recorded for every static gate, bound by G4.
-    return dict(jax=installed("jax"), jaxlib=installed("jaxlib"), numpy=installed("numpy"),
-                ml_dtypes=installed("ml_dtypes"), torch=installed("torch"), safetensors=installed("safetensors"),
-                python=".".join(map(str, sys.version_info[:3])), xla_flags=xla_flags, jax_platforms="cpu",
-                device_count=None)
+    return dict(
+        jax=installed("jax"),
+        jaxlib=installed("jaxlib"),
+        numpy=installed("numpy"),
+        ml_dtypes=installed("ml_dtypes"),
+        torch=installed("torch"),
+        safetensors=installed("safetensors"),
+        python=".".join(map(str, sys.version_info[:3])),
+        xla_flags=xla_flags,
+        jax_platforms="cpu",
+        device_count=None,
+    )
 
 
 def version_mismatch(recorded: dict[str, Any], names: tuple[str, ...] = ("jax", "jaxlib")) -> str | None:
@@ -138,8 +161,9 @@ def version_mismatch(recorded: dict[str, Any], names: tuple[str, ...] = ("jax", 
     return None
 
 
-def child_env(devices: int = CPU_DEVICES, extra: dict[str, str] | None = None,
-              source_root: Path | None = None) -> dict[str, str]:
+def child_env(
+    devices: int = CPU_DEVICES, extra: dict[str, str] | None = None, source_root: Path | None = None
+) -> dict[str, str]:
     root = Path(source_root or REPO)
     env = dict(os.environ)
     env.update(
@@ -150,16 +174,23 @@ def child_env(devices: int = CPU_DEVICES, extra: dict[str, str] | None = None,
     )
     path = env.get("PYTHONPATH", "")
     # The tree under test first (glm_tpu), then the harness (tools.equivalence).
-    env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(
-        [str(root), str(HARNESS_REPO), *(p for p in path.split(os.pathsep) if p)]))
+    env["PYTHONPATH"] = os.pathsep.join(
+        dict.fromkeys([str(root), str(HARNESS_REPO), *(p for p in path.split(os.pathsep) if p)])
+    )
     if extra:
         env.update(extra)
     return env
 
 
-def run_child(module: str, *args: str, devices: int = CPU_DEVICES, timeout: float = 3600.0,
-              extra_env: dict[str, str] | None = None, source_root: Path | None = None,
-              prefix: tuple[str, ...] = ()) -> Any:
+def run_child(
+    module: str,
+    *args: str,
+    devices: int = CPU_DEVICES,
+    timeout: float = 3600.0,
+    extra_env: dict[str, str] | None = None,
+    source_root: Path | None = None,
+    prefix: tuple[str, ...] = (),
+) -> Any:
     """Run ``python -B -m module args`` on a forced CPU mesh; return the last stdout JSON line."""
     scale = float(os.environ.get("GLM_TPU_TEST_TIMEOUT_SCALE", "1"))
     result = subprocess.run(

@@ -64,10 +64,9 @@ class RoutedProjectionConfig:
 
     def __post_init__(self) -> None:
         if self.write_empty_slot is not True:
-            raise ValueError('optimized release always initializes empty route slots')
+            raise ValueError("optimized release always initializes empty route slots")
         if len(self.block_shape) != 2 or any(
-            not isinstance(v, int) or isinstance(v, bool) or v <= 0
-            for v in self.block_shape
+            not isinstance(v, int) or isinstance(v, bool) or v <= 0 for v in self.block_shape
         ):
             raise ValueError("routed FP8 block shape must contain two positive integers")
         for name in ("output_tile", "contraction_tile"):
@@ -77,13 +76,9 @@ class RoutedProjectionConfig:
         if self.output_tile % self.block_shape[0]:
             raise ValueError("output_tile must be a multiple of the output scale block")
         if self.contraction_tile % self.block_shape[1]:
-            raise ValueError(
-                "contraction_tile must be a multiple of the contraction scale block"
-            )
+            raise ValueError("contraction_tile must be a multiple of the contraction scale block")
         if 8 % self.blocks_per_contraction_tile:
-            raise ValueError(
-                "contraction_tile may span 1, 2, 4 or 8 scale blocks (one VMEM slab)"
-            )
+            raise ValueError("contraction_tile may span 1, 2, 4 or 8 scale blocks (one VMEM slab)")
         if self.blocks_per_output_tile > 128:
             raise ValueError("output_tile may span at most 128 scale blocks")
 
@@ -99,8 +94,7 @@ class RoutedProjectionConfig:
     def frozen_tiles(cls, block_shape: tuple[int, int]) -> "RoutedProjectionConfig":
         """The frozen kernel's geometry: one scale block per grid step."""
 
-        return cls(block_shape=block_shape, output_tile=block_shape[0],
-                   contraction_tile=block_shape[1])
+        return cls(block_shape=block_shape, output_tile=block_shape[0], contraction_tile=block_shape[1])
 
 
 def _scale_entry(scale_slab: Any, block_row: Any, block_column: Any) -> Any:
@@ -172,18 +166,14 @@ def fp8_routed_projection(
         raise ValueError("routed FP8 weight/input geometry disagrees")
     bn, bk = config.block_shape
     if output % config.output_tile or contraction % config.contraction_tile:
-        raise ValueError(
-            "routed FP8 requires N/K divisible by the output/contraction tiles"
-        )
+        raise ValueError("routed FP8 requires N/K divisible by the output/contraction tiles")
     output_blocks, k_blocks = output // bn, contraction // bk
     for bits, scale in weights:
         if bits.shape != (experts, output, contraction) or bits.dtype != jnp.uint8:
             raise ValueError("routed FP8 weight tables must share [E, N, K] uint8")
         if scale.shape != (experts, output_blocks, k_blocks) or scale.dtype != jnp.float32:
             raise ValueError("routed FP8 scales must be [E, N/bn, K/bk] float32")
-    if local_expert_ids.shape != (slots,) or not jnp.issubdtype(
-        local_expert_ids.dtype, jnp.integer
-    ):
+    if local_expert_ids.shape != (slots,) or not jnp.issubdtype(local_expert_ids.dtype, jnp.integer):
         raise ValueError("routed FP8 expert ids must be one integer per slot")
     if owned.shape != (slots,) or owned.dtype != jnp.bool_:
         raise ValueError("routed FP8 ownership must be one boolean per slot")
@@ -202,9 +192,7 @@ def fp8_routed_projection(
     owned_count = jnp.sum(owned.astype(jnp.int32))
     active = jnp.maximum(owned_count, 1)
     metadata = jnp.concatenate((slot_of_step, expert_of_step, owned_count[None]))
-    scale_tables = tuple(
-        _routed_scale_table(scale, contraction_blocks=k_blocks) for _, scale in weights
-    )
+    scale_tables = tuple(_routed_scale_table(scale, contraction_blocks=k_blocks) for _, scale in weights)
 
     def kernel(meta_ref, lhs_ref, *refs):
         weight_refs = refs[:tables]
@@ -239,10 +227,7 @@ def fp8_routed_projection(
                         # scale, round to BF16, MXU dot with FP32 accumulation.
                         bits = weight_refs[t][pl.ds(i * bn, bn), pl.ds(j * bk, bk)]
                         decoded = (
-                            lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(
-                                jnp.float32
-                            )
-                            * scale_value
+                            lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32) * scale_value
                         ).astype(jnp.bfloat16)
                         update = lax.dot_general(
                             x_block,
@@ -291,21 +276,14 @@ def fp8_routed_projection(
             in_specs=tuple(in_specs),
             out_specs=out_spec,
             grid=(active, n_tiles, k_tiles),
-            scratch_shapes=tuple(
-                pltpu.VMEM((8, tn), jnp.float32) for _ in range(tables)
-            ),
+            scratch_shapes=tuple(pltpu.VMEM((8, tn), jnp.float32) for _ in range(tables)),
         ),
         # metadata, lhs, weights..., scales..., initial -> the initial zero
         # buffer is donated to the output so unvisited slots read as zeros.
         input_output_aliases={2 + 2 * tables: 0},
-        compiler_params=pltpu.CompilerParams(
-            dimension_semantics=("arbitrary", "parallel", "arbitrary")
-        ),
+        compiler_params=pltpu.CompilerParams(dimension_semantics=("arbitrary", "parallel", "arbitrary")),
         interpret=interpret,
-        name=(
-            f"{KERNEL_NAMES['fp8_routed_projection']}_s{slots}_t{tables}"
-            f"_k{contraction}_n{output}_tn{tn}_tk{tk}"
-        ),
+        name=(f"{KERNEL_NAMES['fp8_routed_projection']}_s{slots}_t{tables}_k{contraction}_n{output}_tn{tn}_tk{tk}"),
         cost_estimate=pl.CostEstimate(
             flops=2 * slots * tables * contraction * output,
             bytes_accessed=(

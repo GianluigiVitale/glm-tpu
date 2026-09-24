@@ -16,18 +16,10 @@ from glm_tpu.entrypoints.cli.main import main
 
 class CliTests(unittest.TestCase):
     def test_complete_metadata(self):
-        pins = {
-            name: value
-            for group in environment_manifest()["profiles"].values()
-            for name, value in group.items()
-        }
-        result = environment_report(
-            "benchmark", version=pins.__getitem__, python_version=(3, 12)
-        )
+        pins = {name: value for group in environment_manifest()["profiles"].values() for name, value in group.items()}
+        result = environment_report("benchmark", version=pins.__getitem__, python_version=(3, 12))
         self.assertTrue(result["passed"])
-        self.assertTrue(
-            any(row["expected"] == "2.10.0+cpu" for row in result["packages"])
-        )
+        self.assertTrue(any(row["expected"] == "2.10.0+cpu" for row in result["packages"]))
 
     def test_missing_and_wrong_versions_refuse(self):
         def lookup(name):
@@ -37,17 +29,11 @@ class CliTests(unittest.TestCase):
 
         result = environment_report("core", version=lookup, python_version=(3, 12))
         self.assertFalse(result["passed"])
-        self.assertEqual(
-            {row["status"] for row in result["packages"]}, {"missing", "mismatch"}
-        )
+        self.assertEqual({row["status"] for row in result["packages"]}, {"missing", "mismatch"})
 
     def test_wrong_python_refuses(self):
         pins = environment_manifest()["profiles"]["core"]
-        self.assertFalse(
-            environment_report(
-                "core", version=pins.__getitem__, python_version=(3, 13)
-            )["passed"]
-        )
+        self.assertFalse(environment_report("core", version=pins.__getitem__, python_version=(3, 13))["passed"])
 
     def test_unknown_profile_refuses(self):
         with self.assertRaises(ValueError):
@@ -71,9 +57,7 @@ main(["doctor", "--profile", "tpu"])
 for name in ("jax", "jaxlib", "libtpu", "torch", "transformers"):
     assert name not in sys.modules, name
 """
-        result = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, text=True
-        )
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_manifest_matches_declared_dependencies(self):
@@ -81,15 +65,8 @@ for name in ("jax", "jaxlib", "libtpu", "torch", "transformers"):
         project = tomllib.loads((repo / "pyproject.toml").read_text())["project"]
         profiles = environment_manifest()["profiles"]
         for group, pins in profiles.items():
-            declared = (
-                project["dependencies"]
-                if group == "core"
-                else project["optional-dependencies"][group]
-            )
-            expected = {
-                f"{name}=={pin.split('+')[0] if name == 'torch' else pin}"
-                for name, pin in pins.items()
-            }
+            declared = project["dependencies"] if group == "core" else project["optional-dependencies"][group]
+            expected = {f"{name}=={pin.split('+')[0] if name == 'torch' else pin}" for name, pin in pins.items()}
             self.assertEqual(set(declared), expected)
 
 

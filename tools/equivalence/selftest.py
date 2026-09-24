@@ -40,20 +40,30 @@ def _same(a: dict[str, Any], b: dict[str, Any]) -> bool:
     """What G1/G2 compare for one program: normalized digest, N8 signature and the compiler options
     bound to the ``Lowered`` by ``jax.jit`` (the ``Lowered.compile`` arguments are recorded by the
     real compile path, outside the normalizer)."""
-    return (a["digest"] == b["digest"] and a["signature_digest"] == b["signature_digest"]
-            and a["jit_compiler_options"] == b["jit_compiler_options"])
+    return (
+        a["digest"] == b["digest"]
+        and a["signature_digest"] == b["signature_digest"]
+        and a["jit_compiler_options"] == b["jit_compiler_options"]
+    )
 
 
 def _case(case: str, kind: str, description: str, a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     same = _same(a, b)
-    return dict(case=case, kind=kind, description=description, passed=same if kind == "invariance" else not same,
-                digest_equal=a["digest"] == b["digest"], signature_equal=a["signature_digest"] == b["signature_digest"],
-                options_equal=a["jit_compiler_options"] == b["jit_compiler_options"])
+    return dict(
+        case=case,
+        kind=kind,
+        description=description,
+        passed=same if kind == "invariance" else not same,
+        digest_equal=a["digest"] == b["digest"],
+        signature_equal=a["signature_digest"] == b["signature_digest"],
+        options_equal=a["jit_compiler_options"] == b["jit_compiler_options"],
+    )
 
 
 # ----------------------------------------------------------------------------- synthetic programs
-def _pallas(const: float = 2.0, *, name: str | None = None, scope: str | None = None,
-            body_name: str = "scale_kernel") -> Any:
+def _pallas(
+    const: float = 2.0, *, name: str | None = None, scope: str | None = None, body_name: str = "scale_kernel"
+) -> Any:
     import jax
     import jax.numpy as jnp
     from jax.experimental import pallas as pl
@@ -87,47 +97,88 @@ def synthetic_cases() -> list[dict[str, Any]]:
         renamed_value: Any
         other: Any
 
-    results.append(_case("iii", "invariance", "result NamedTuple field renamed",
-                         _fingerprint(jax.jit(lambda a: Result(a + 1, a * 2)), x),
-                         _fingerprint(jax.jit(lambda a: Renamed(a + 1, a * 2)), x)))
+    results.append(
+        _case(
+            "iii",
+            "invariance",
+            "result NamedTuple field renamed",
+            _fingerprint(jax.jit(lambda a: Result(a + 1, a * 2)), x),
+            _fingerprint(jax.jit(lambda a: Renamed(a + 1, a * 2)), x),
+        )
+    )
 
     # (iv) named scope renamed in plain JAX
     def scoped(label: str) -> Any:
         def f(a: Any) -> Any:
             with jax.named_scope(label):
                 return jnp.tanh(a) * 3
+
         return jax.jit(f)
 
-    results.append(_case("iv", "invariance", "jax.named_scope renamed (plain JAX)",
-                         _fingerprint(scoped("glm_scope_a"), x), _fingerprint(scoped("renamed_scope"), x)))
+    results.append(
+        _case(
+            "iv",
+            "invariance",
+            "jax.named_scope renamed (plain JAX)",
+            _fingerprint(scoped("glm_scope_a"), x),
+            _fingerprint(scoped("renamed_scope"), x),
+        )
+    )
     # (iv-pallas) the same inside a Pallas kernel body is a tpu.trace_start marker: must be detected
-    results.append(_case("iv-pallas", "sensitivity", "jax.named_scope renamed inside a Pallas kernel "
-                         "(tpu.trace_start marker; design expected invariance)",
-                         _fingerprint(_pallas(scope="glm_kernel_scope"), x),
-                         _fingerprint(_pallas(scope="renamed_scope"), x)))
+    results.append(
+        _case(
+            "iv-pallas",
+            "sensitivity",
+            "jax.named_scope renamed inside a Pallas kernel (tpu.trace_start marker; design expected invariance)",
+            _fingerprint(_pallas(scope="glm_kernel_scope"), x),
+            _fingerprint(_pallas(scope="renamed_scope"), x),
+        )
+    )
 
     # (v) rename the outer jitted function and a nested jitted function
     def nested(outer_name: str, inner_name: str) -> Any:
         def inner(a: Any) -> Any:
             return jnp.sin(a) * 3
+
         inner.__name__ = inner.__qualname__ = inner_name
         inner_jit = jax.jit(inner)
 
         def outer(a: Any) -> Any:
             return inner_jit(a) + inner_jit(a * 2)
+
         outer.__name__ = outer.__qualname__ = outer_name
         return jax.jit(outer)
 
-    results.append(_case("v", "invariance", "outer and nested jitted functions renamed",
-                         _fingerprint(nested("execute", "body"), x), _fingerprint(nested("run_step", "layer"), x)))
+    results.append(
+        _case(
+            "v",
+            "invariance",
+            "outer and nested jitted functions renamed",
+            _fingerprint(nested("execute", "body"), x),
+            _fingerprint(nested("run_step", "layer"), x),
+        )
+    )
 
     # (vi) explicit name= equal to the implicit Pallas name; (vii) explicit name=, body renamed
     implicit = _fingerprint(_pallas(), x)
-    results.append(_case("vi", "invariance", "explicit Pallas name= equal to the implicit name",
-                         implicit, _fingerprint(_pallas(name="scale_kernel"), x)))
-    results.append(_case("vii", "invariance", "explicit Pallas name=, Python kernel body renamed",
-                         _fingerprint(_pallas(name="scale_kernel"), x),
-                         _fingerprint(_pallas(name="scale_kernel", body_name="renamed_body"), x)))
+    results.append(
+        _case(
+            "vi",
+            "invariance",
+            "explicit Pallas name= equal to the implicit name",
+            implicit,
+            _fingerprint(_pallas(name="scale_kernel"), x),
+        )
+    )
+    results.append(
+        _case(
+            "vii",
+            "invariance",
+            "explicit Pallas name=, Python kernel body renamed",
+            _fingerprint(_pallas(name="scale_kernel"), x),
+            _fingerprint(_pallas(name="scale_kernel", body_name="renamed_body"), x),
+        )
+    )
 
     # N1 control: without the location patch, a kernel defined at another line differs
     results.append(n1_control())
@@ -139,15 +190,28 @@ def synthetic_cases() -> list[dict[str, Any]]:
     def accumulate(dtype: Any) -> Any:
         return jax.jit(lambda p, q: lax.dot_general(p, q, (((1,), (0,)), ((), ())), preferred_element_type=dtype))
 
-    results.append(_case("b", "sensitivity", "FP32 accumulation switched to BF16",
-                         _fingerprint(accumulate(jnp.float32), a, b), _fingerprint(accumulate(jnp.bfloat16), a, b)))
+    results.append(
+        _case(
+            "b",
+            "sensitivity",
+            "FP32 accumulation switched to BF16",
+            _fingerprint(accumulate(jnp.float32), a, b),
+            _fingerprint(accumulate(jnp.bfloat16), a, b),
+        )
+    )
 
     # (c) precision default -> highest (as the prefill selector's dot)
     f32a = jax.ShapeDtypeStruct((16, 64), jnp.float32)
     f32b = jax.ShapeDtypeStruct((64, 32), jnp.float32)
-    results.append(_case("c", "sensitivity", "dot precision default -> highest",
-                         _fingerprint(jax.jit(lambda p, q: jnp.dot(p, q, precision="default")), f32a, f32b),
-                         _fingerprint(jax.jit(lambda p, q: jnp.dot(p, q, precision="highest")), f32a, f32b)))
+    results.append(
+        _case(
+            "c",
+            "sensitivity",
+            "dot precision default -> highest",
+            _fingerprint(jax.jit(lambda p, q: jnp.dot(p, q, precision="default")), f32a, f32b),
+            _fingerprint(jax.jit(lambda p, q: jnp.dot(p, q, precision="highest")), f32a, f32b),
+        )
+    )
 
     # (d) two pytree fields swapped (signature)
     class Pair(NamedTuple):
@@ -159,9 +223,15 @@ def synthetic_cases() -> list[dict[str, Any]]:
         left: Any
 
     left, right = jax.ShapeDtypeStruct((4, 8), jnp.float32), jax.ShapeDtypeStruct((8, 4), jnp.float32)
-    results.append(_case("d", "sensitivity", "two input pytree fields swapped",
-                         _fingerprint(jax.jit(lambda p: p.left @ p.right), Pair(left, right)),
-                         _fingerprint(jax.jit(lambda p: p.left @ p.right), Swapped(right, left))))
+    results.append(
+        _case(
+            "d",
+            "sensitivity",
+            "two input pytree fields swapped",
+            _fingerprint(jax.jit(lambda p: p.left @ p.right), Pair(left, right)),
+            _fingerprint(jax.jit(lambda p: p.left @ p.right), Swapped(right, left)),
+        )
+    )
 
     # (n8-spec / d-spec) equivalent PartitionSpec spellings agree (N8 canonical spec); a different
     # placement is still detected by the signature
@@ -174,19 +244,34 @@ def synthetic_cases() -> list[dict[str, Any]]:
     def body(p: Any, q: Any) -> Any:
         return p * 2 + q
 
-    results.append(_case("f", "sensitivity", "donation removed",
-                         _fingerprint(jax.jit(body, donate_argnums=(0,)), x, x), _fingerprint(jax.jit(body), x, x)))
+    results.append(
+        _case(
+            "f",
+            "sensitivity",
+            "donation removed",
+            _fingerprint(jax.jit(body, donate_argnums=(0,)), x, x),
+            _fingerprint(jax.jit(body), x, x),
+        )
+    )
 
     # (k) an XLA option bound to the jit: byte-identical StableHLO, but Lowered.compile hands it to
     # the compiler (G1/G2 compare jit_compiler_options)
     donated = jax.jit(body, donate_argnums=(0,))
     with_option = jax.jit(body, donate_argnums=(0,), compiler_options={"xla_allow_excess_precision": False})
-    results.append(_case("k", "sensitivity", "jit compiler_options added (identical StableHLO text)",
-                         _fingerprint(donated, x, x), _fingerprint(with_option, x, x)))
+    results.append(
+        _case(
+            "k",
+            "sensitivity",
+            "jit compiler_options added (identical StableHLO text)",
+            _fingerprint(donated, x, x),
+            _fingerprint(with_option, x, x),
+        )
+    )
 
     # (g) one constant inside a Pallas kernel body
-    results.append(_case("g", "sensitivity", "constant inside a Pallas kernel body", implicit,
-                         _fingerprint(_pallas(3.0), x)))
+    results.append(
+        _case("g", "sensitivity", "constant inside a Pallas kernel body", implicit, _fingerprint(_pallas(3.0), x))
+    )
 
     # (h) two independent ops reordered
     def ordered(first_sin: bool) -> Any:
@@ -198,10 +283,18 @@ def synthetic_cases() -> list[dict[str, Any]]:
                 c = jnp.cos(q)
                 s = jnp.sin(p)
             return s, c
+
         return jax.jit(f)
 
-    results.append(_case("h", "sensitivity", "two independent ops reordered",
-                         _fingerprint(ordered(True), x, x), _fingerprint(ordered(False), x, x)))
+    results.append(
+        _case(
+            "h",
+            "sensitivity",
+            "two independent ops reordered",
+            _fingerprint(ordered(True), x, x),
+            _fingerprint(ordered(False), x, x),
+        )
+    )
 
     results.extend(kernel_rename_cases())
     return results
@@ -214,11 +307,13 @@ def n1_control() -> dict[str, Any]:
 
     from . import normalize
 
-    source = ("import jax\nfrom jax.experimental import pallas as pl\n"
-              "def kernel(x_ref, o_ref):\n    o_ref[...] = x_ref[...] * 2.0\n"
-              "def build():\n"
-              "    call = pl.pallas_call(kernel, out_shape=jax.ShapeDtypeStruct((8, 128), jax.numpy.float32))\n"
-              "    return jax.jit(lambda x: call(x))\n")
+    source = (
+        "import jax\nfrom jax.experimental import pallas as pl\n"
+        "def kernel(x_ref, o_ref):\n    o_ref[...] = x_ref[...] * 2.0\n"
+        "def build():\n"
+        "    call = pl.pallas_call(kernel, out_shape=jax.ShapeDtypeStruct((8, 128), jax.numpy.float32))\n"
+        "    return jax.jit(lambda x: call(x))\n"
+    )
     x = jax.ShapeDtypeStruct((8, 128), jnp.float32)
     built = []
     for offset in (0, 10):
@@ -231,11 +326,16 @@ def n1_control() -> dict[str, Any]:
         jax.clear_caches()
         text = normalize.stablehlo_text(fn.trace(x).lower(lowering_platforms=("tpu",)))
         raw.append(normalize.normalize(text)[0])
-    return dict(case="n1-control", kind="invariance", description="kernel source at another line: equal under N1 "
-                "(and different without the N1 patch, proving the patch is load-bearing)",
-                passed=_same(*patched) and raw[0] != raw[1], digest_equal=patched[0]["digest"] == patched[1]["digest"],
-                signature_equal=patched[0]["signature_digest"] == patched[1]["signature_digest"],
-                unpatched_differs=raw[0] != raw[1])
+    return dict(
+        case="n1-control",
+        kind="invariance",
+        description="kernel source at another line: equal under N1 "
+        "(and different without the N1 patch, proving the patch is load-bearing)",
+        passed=_same(*patched) and raw[0] != raw[1],
+        digest_equal=patched[0]["digest"] == patched[1]["digest"],
+        signature_equal=patched[0]["signature_digest"] == patched[1]["signature_digest"],
+        unpatched_differs=raw[0] != raw[1],
+    )
 
 
 def spec_spelling_cases() -> list[dict[str, Any]]:
@@ -253,10 +353,22 @@ def spec_spelling_cases() -> list[dict[str, Any]]:
 
     fn = jax.jit(lambda a: jnp.tanh(a) * 2)
     short = _fingerprint(fn, arg(None, "expert"))
-    return [_case("n8-spec", "invariance", "input PartitionSpec spelled with a trailing None (same placement)",
-                  short, _fingerprint(fn, arg(None, "expert", None))),
-            _case("d-spec", "sensitivity", "input PartitionSpec with the sharded axis moved (signature)",
-                  short, _fingerprint(fn, arg("expert", None)))]
+    return [
+        _case(
+            "n8-spec",
+            "invariance",
+            "input PartitionSpec spelled with a trailing None (same placement)",
+            short,
+            _fingerprint(fn, arg(None, "expert", None)),
+        ),
+        _case(
+            "d-spec",
+            "sensitivity",
+            "input PartitionSpec with the sharded axis moved (signature)",
+            short,
+            _fingerprint(fn, arg("expert", None)),
+        ),
+    ]
 
 
 def routed_tile_case() -> dict[str, Any]:
@@ -275,9 +387,13 @@ def routed_tile_case() -> dict[str, Any]:
         config = RoutedProjectionConfig(output_tile=tile, contraction_tile=tile)
         return jax.jit(lambda x, b, s, i, o: fp8_routed_projection(x, ((b, s),), i, o, config=config))
 
-    return _case("e", "sensitivity", "routed FP8 projection tiles 256 -> 128 (production Pallas kernel)",
-                 _fingerprint(build(256), lhs, bits, scale, ids, owned),
-                 _fingerprint(build(128), lhs, bits, scale, ids, owned))
+    return _case(
+        "e",
+        "sensitivity",
+        "routed FP8 projection tiles 256 -> 128 (production Pallas kernel)",
+        _fingerprint(build(256), lhs, bits, scale, ids, owned),
+        _fingerprint(build(128), lhs, bits, scale, ids, owned),
+    )
 
 
 def kernel_rename_cases() -> list[dict[str, Any]]:
@@ -298,8 +414,9 @@ def kernel_rename_cases() -> list[dict[str, Any]]:
         def kernel(x_ref: Any, o_ref: Any) -> None:
             o_ref[...] = x_ref[...] * 2.0
 
-        call = pl.pallas_call(kernel, out_shape=jax.ShapeDtypeStruct((8, 128), jnp.float32),
-                              name=module.KERNEL_NAMES["scale"])
+        call = pl.pallas_call(
+            kernel, out_shape=jax.ShapeDtypeStruct((8, 128), jnp.float32), name=module.KERNEL_NAMES["scale"]
+        )
         return jax.jit(lambda a: call(a))
 
     try:
@@ -315,9 +432,16 @@ def kernel_rename_cases() -> list[dict[str, Any]]:
         patched = _fingerprint(Lazy(), x, renames=table)
     finally:
         sys.modules.pop(module.__name__, None)
-    return [_case("j", "sensitivity", "kernel name= changed without a kernel_renames entry", baseline, unpatched),
-            _case("j-mapped", "invariance", "kernel name= changed with a kernel_renames entry (patched back)",
-                  baseline, patched)]
+    return [
+        _case("j", "sensitivity", "kernel name= changed without a kernel_renames entry", baseline, unpatched),
+        _case(
+            "j-mapped",
+            "invariance",
+            "kernel name= changed with a kernel_renames entry (patched back)",
+            baseline,
+            patched,
+        ),
+    ]
 
 
 # ----------------------------------------------------------------------------- real programs (CPU32 child)
@@ -351,7 +475,7 @@ def fixture_cases() -> dict[str, Any]:
 
         path = REPO / "glm_tpu" / "models" / "glm_moe_dsa" / "model.py"
         source = path.read_text()
-        mutated = source.replace("next_token = jnp.where(active,next_token,token_ids)", "next_token = next_token")
+        mutated = source.replace("next_token = jnp.where(active, next_token, token_ids)", "next_token = next_token")
         if mutated == source:
             raise RuntimeError("self-test mutation site (i) not found; update selftest.py")
         module = types.ModuleType("glm_tpu.models.glm_moe_dsa._equivalence_selftest_unmasked")
@@ -382,24 +506,47 @@ def relocated_decode(workdir: Path) -> dict[str, Any]:
     for relative in ("glm_tpu/kernels/sparse_mla/kernel.py", "glm_tpu/layers/attention/mla.py"):
         path = root / relative
         path.write_text("\n" * 10 + path.read_text())
-    return run_child("tools.equivalence.programs", "--tier", "fixture", "--only", "decode@1536",
-                     source_root=root, timeout=1800)["programs"]["decode@1536"]
+    return run_child(
+        "tools.equivalence.programs", "--tier", "fixture", "--only", "decode@1536", source_root=root, timeout=1800
+    )["programs"]["decode@1536"]
 
 
 def run() -> dict[str, Any]:
     results = synthetic_cases()
     real = run_child("tools.equivalence.selftest", "--fixture-cases", timeout=1800)
-    results.append(_case("a", "sensitivity", "RMS epsilon 1e-5 -> 1e-6 (fixture decode)",
-                         real["decode"], real["epsilon"]))
-    results.append(_case("i", "sensitivity", "finished-lane jnp.where mask removed (fixture batch_decode)",
-                         real["batch"], real["unmasked"]))
+    results.append(
+        _case("a", "sensitivity", "RMS epsilon 1e-5 -> 1e-6 (fixture decode)", real["decode"], real["epsilon"])
+    )
+    results.append(
+        _case(
+            "i",
+            "sensitivity",
+            "finished-lane jnp.where mask removed (fixture batch_decode)",
+            real["batch"],
+            real["unmasked"],
+        )
+    )
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-selftest-") as scratch:
         moved = relocated_decode(Path(scratch))
-    results.append(_case("i+ii", "invariance", "fixture decode from a relocated tree copy with 10 blank lines "
-                         "prepended to a kernel module and a layer module", real["decode"], moved))
+    results.append(
+        _case(
+            "i+ii",
+            "invariance",
+            "fixture decode from a relocated tree copy with 10 blank lines "
+            "prepended to a kernel module and a layer module",
+            real["decode"],
+            moved,
+        )
+    )
     failed = [r["case"] for r in results if not r["passed"]]
-    return dict(gate="G14", status="pass" if not failed else "fail", failed=failed, cases=results,
-                environment=environment(), source=source_record())
+    return dict(
+        gate="G14",
+        status="pass" if not failed else "fail",
+        failed=failed,
+        cases=results,
+        environment=environment(),
+        source=source_record(),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

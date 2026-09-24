@@ -13,7 +13,23 @@ from typing import Any, Mapping, Sequence
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.config.site import approved_source_uri
 from glm_tpu.exceptions import CheckpointValidationError
-from glm_tpu.model_loader.sharded_state.format import RUNTIME_ARTIFACT_KIND, RUNTIME_FORMAT_VERSION, RUNTIME_PLAN_ID, RuntimeFilePlan, _FILE_RECORD_KEYS, _MANIFEST_KEYS, _SUCCESS_ARTIFACT_KIND, _SUCCESS_KEYS, _SUCCESS_TAG, _TENSOR_SCHEMA_KEYS, _destination_record, _digest, _mapping_hash, _sha256_file, build_runtime_file_plans
+from glm_tpu.model_loader.sharded_state.format import (
+    RUNTIME_ARTIFACT_KIND,
+    RUNTIME_FORMAT_VERSION,
+    RUNTIME_PLAN_ID,
+    RuntimeFilePlan,
+    _FILE_RECORD_KEYS,
+    _MANIFEST_KEYS,
+    _SUCCESS_ARTIFACT_KIND,
+    _SUCCESS_KEYS,
+    _SUCCESS_TAG,
+    _TENSOR_SCHEMA_KEYS,
+    _destination_record,
+    _digest,
+    _mapping_hash,
+    _sha256_file,
+    build_runtime_file_plans,
+)
 from glm_tpu.model_loader.source_inventory import SourceInventory
 
 
@@ -52,21 +68,20 @@ def _verify_runtime_value(
 ) -> Mapping[int, Mapping[str, Any]]:
     if set(manifest) != _MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
-    if manifest.get("artifact_kind") != RUNTIME_ARTIFACT_KIND or (
-        manifest.get("format_version") != RUNTIME_FORMAT_VERSION
-    ) or manifest.get("plan_id") != RUNTIME_PLAN_ID:
-        raise CheckpointValidationError("unsupported WS32 runtime checkpoint")
-    if manifest.get("manifest_sha256") != _mapping_hash(
-        manifest, field="manifest_sha256"
+    if (
+        manifest.get("artifact_kind") != RUNTIME_ARTIFACT_KIND
+        or (manifest.get("format_version") != RUNTIME_FORMAT_VERSION)
+        or manifest.get("plan_id") != RUNTIME_PLAN_ID
     ):
+        raise CheckpointValidationError("unsupported WS32 runtime checkpoint")
+    if manifest.get("manifest_sha256") != _mapping_hash(manifest, field="manifest_sha256"):
         raise CheckpointValidationError("WS32 runtime manifest checksum mismatch")
     tensor_schema = manifest.get("tensor_schema")
-    if not isinstance(tensor_schema, list) or any(
-        not isinstance(item, Mapping) or set(item) != _TENSOR_SCHEMA_KEYS
-        for item in tensor_schema
-    ) or tensor_schema != [
-        item.schema_dict() for item in plans[0].tensors
-    ]:
+    if (
+        not isinstance(tensor_schema, list)
+        or any(not isinstance(item, Mapping) or set(item) != _TENSOR_SCHEMA_KEYS for item in tensor_schema)
+        or tensor_schema != [item.schema_dict() for item in plans[0].tensors]
+    ):
         raise CheckpointValidationError("WS32 runtime tensor schema drifted")
     records = manifest.get("files")
     if not isinstance(records, list) or len(records) != 32:
@@ -89,9 +104,7 @@ def _verify_runtime_value(
             "payload_bytes": plan.payload_bytes,
         }
         if any(record.get(field) != value for field, value in expected.items()):
-            raise CheckpointValidationError(
-                f"WS32 runtime file metadata drifted for slot {plan.device_slot}"
-            )
+            raise CheckpointValidationError(f"WS32 runtime file metadata drifted for slot {plan.device_slot}")
         _digest(record.get("sha256"), field=f"slot{plan.device_slot}.sha256")
         _crc32c(record.get("crc32c"), field=f"slot{plan.device_slot}.crc32c")
         hashes = record.get("tensor_sha256")
@@ -99,11 +112,9 @@ def _verify_runtime_value(
             raise CheckpointValidationError("WS32 runtime tensor hash ledger drifted")
         for index, digest in enumerate(hashes):
             _digest(digest, field=f"slot{plan.device_slot}.tensor{index}")
-    if manifest.get("packed_payload_bytes") != sum(
-        plan.payload_bytes for plan in plans
-    ) or manifest.get("packed_file_bytes") != sum(
-        plan.file_bytes for plan in plans
-    ):
+    if manifest.get("packed_payload_bytes") != sum(plan.payload_bytes for plan in plans) or manifest.get(
+        "packed_file_bytes"
+    ) != sum(plan.file_bytes for plan in plans):
         raise CheckpointValidationError("WS32 runtime byte totals drifted")
     return by_slot
 
@@ -115,12 +126,8 @@ def _verify_runtime_files(
     verify_file_hash_slots: frozenset[int] | None,
     local_slot_layout: bool,
 ) -> None:
-    if local_slot_layout and (
-        not verify_file_hashes or verify_file_hash_slots is None
-    ):
-        raise ValueError(
-            "WS32 local slot layout requires hash verification of the owned slots"
-        )
+    if local_slot_layout and (not verify_file_hashes or verify_file_hash_slots is None):
+        raise ValueError("WS32 local slot layout requires hash verification of the owned slots")
     root = metadata.root
     for plan in metadata.plans:
         record = metadata.records_by_slot[plan.device_slot]
@@ -135,22 +142,15 @@ def _verify_runtime_files(
                 )
             continue
         if not path.is_file() or path.stat().st_size != plan.file_bytes:
-            raise CheckpointValidationError(
-                f"WS32 runtime file is missing or truncated: {plan.filename!r}"
-            )
-        if verify_file_hashes and (
-            verify_file_hash_slots is None
-            or plan.device_slot in verify_file_hash_slots
-        ):
+            raise CheckpointValidationError(f"WS32 runtime file is missing or truncated: {plan.filename!r}")
+        if verify_file_hashes and (verify_file_hash_slots is None or plan.device_slot in verify_file_hash_slots):
             observed = _destination_record(
                 path,
                 plan,
                 chunk_bytes=64 * 1024 * 1024,
             )
             if observed != record:
-                raise CheckpointValidationError(
-                    f"WS32 runtime file/tensor checksum drifted: {plan.filename!r}"
-                )
+                raise CheckpointValidationError(f"WS32 runtime file/tensor checksum drifted: {plan.filename!r}")
 
 
 def verify_runtime_checkpoint(
@@ -179,9 +179,7 @@ def verify_runtime_checkpoint(
             not selected_hash_slots
             or len(selected_hash_slots) != len(verify_file_hash_slots)
             or any(
-                not isinstance(slot, int)
-                or isinstance(slot, bool)
-                or not 0 <= slot < 32
+                not isinstance(slot, int) or isinstance(slot, bool) or not 0 <= slot < 32
                 for slot in selected_hash_slots
             )
         ):
@@ -235,22 +233,26 @@ def _read_runtime_metadata(
         raise CheckpointValidationError("WS32 runtime manifest identity drifted")
     if manifest.get("mesh_hash") != expected_mesh_hash:
         raise CheckpointValidationError("WS32 runtime mesh identity drifted")
-    report, plans = build_runtime_file_plans(
-        inventory, geometry, mesh_hash=expected_mesh_hash
-    )
-    if manifest.get("geometry") != geometry.to_dict() or (
-        manifest.get("geometry_sha256") != geometry.geometry_hash
-    ) or manifest.get("placement_report") != report.to_dict():
+    report, plans = build_runtime_file_plans(inventory, geometry, mesh_hash=expected_mesh_hash)
+    if (
+        manifest.get("geometry") != geometry.to_dict()
+        or (manifest.get("geometry_sha256") != geometry.geometry_hash)
+        or manifest.get("placement_report") != report.to_dict()
+    ):
         raise CheckpointValidationError("WS32 runtime geometry/placement drifted")
     source = manifest.get("source")
-    if not isinstance(source, Mapping) or set(source) != {
-        "files",
-        "inventory_sha256",
-        "revision",
-        "uri",
-    } or source.get(
-        "inventory_sha256"
-    ) != inventory.inventory_sha256 or source.get("revision") != inventory.source_revision:
+    if (
+        not isinstance(source, Mapping)
+        or set(source)
+        != {
+            "files",
+            "inventory_sha256",
+            "revision",
+            "uri",
+        }
+        or source.get("inventory_sha256") != inventory.inventory_sha256
+        or source.get("revision") != inventory.source_revision
+    ):
         raise CheckpointValidationError("WS32 runtime source identity drifted")
     if not isinstance(source.get("uri"), str) or not approved_source_uri(source["uri"]):
         raise CheckpointValidationError("WS32 runtime source URI drifted")
@@ -266,9 +268,7 @@ def _read_runtime_metadata(
             raise CheckpointValidationError("WS32 source file record schema drifted")
         for field, value in expected.to_dict().items():
             if observed.get(field) != value:
-                raise CheckpointValidationError(
-                    f"WS32 source ledger drifted for {expected.filename!r}"
-                )
+                raise CheckpointValidationError(f"WS32 source ledger drifted for {expected.filename!r}")
         _digest(observed.get("sha256"), field=f"source:{expected.filename}")
     success_path = root / "SUCCESS"
     if not success_path.is_file():
@@ -277,8 +277,7 @@ def _read_runtime_metadata(
     if not isinstance(success, Mapping) or set(success) != _SUCCESS_KEYS:
         raise CheckpointValidationError("WS32 runtime SUCCESS schema drifted")
     if success.get("success_sha256") != expected_success_sha256 or (
-        success.get("success_sha256")
-        != _mapping_hash(success, field="success_sha256")
+        success.get("success_sha256") != _mapping_hash(success, field="success_sha256")
     ):
         raise CheckpointValidationError("WS32 runtime SUCCESS checksum mismatch")
     exact_success = {

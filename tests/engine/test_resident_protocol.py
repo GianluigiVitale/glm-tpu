@@ -1,4 +1,5 @@
 """G8 contracts: every resident-protocol constant names what the processes really use."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -30,8 +31,9 @@ def test_the_remote_helper_package_constant_is_the_helper_package():
     assert remote.__name__ == protocol.REMOTE_HELPER_PACKAGE
 
 
-@pytest.mark.parametrize(("module", "flag"), [("WORKER_MODULE", "WORKER_ENV_FLAG"),
-                                            ("PACK_WORKER_MODULE", "PACK_WORKER_ENV_FLAG")])
+@pytest.mark.parametrize(
+    ("module", "flag"), [("WORKER_MODULE", "WORKER_ENV_FLAG"), ("PACK_WORKER_MODULE", "PACK_WORKER_ENV_FLAG")]
+)
 def test_a_worker_derives_its_manifest_path_from_its_file_and_checks_its_handshake_flag(module, flag):
     name = getattr(protocol, module)
     worker = importlib.import_module(name)
@@ -39,8 +41,9 @@ def test_a_worker_derives_its_manifest_path_from_its_file_and_checks_its_handsha
     assert worker.REPO == protocol.source_root(worker.__file__, name) == REPO
     assert worker.SELF == protocol.module_path(name)
     text = Path(worker.__file__).read_text()
-    assert "SELF not in manifest" in text and f"'{protocol.module_path(name)}'" not in text
-    assert re.search(rf"os\.environ\.get\(protocol\.{flag}\)\s*!=\s*'1'", text)
+    assert "SELF not in manifest" in text
+    assert all(f"{quote}{protocol.module_path(name)}{quote}" not in text for quote in "'\"")
+    assert re.search(rf"os\.environ\.get\(protocol\.{flag}\)\s*!=\s*[\"']1[\"']", text)
     assert getattr(protocol, flag).startswith("GLM_TPU_")
 
 
@@ -54,10 +57,13 @@ def test_the_controller_starts_and_authenticates_the_worker_module():
     assert inspect.signature(launch.cleanup_owned).parameters["module"].default == protocol.WORKER_MODULE
 
 
-@pytest.mark.parametrize(("argv_module", "accepted"), [
-    (protocol.CONTROLLER_MODULE, True),
-    ("scripts.release.launch_ws32_optimized_request", False),  # D11: no legacy controller acceptance
-])
+@pytest.mark.parametrize(
+    ("argv_module", "accepted"),
+    [
+        (protocol.CONTROLLER_MODULE, True),
+        ("scripts.release.launch_ws32_optimized_request", False),  # D11: no legacy controller acceptance
+    ],
+)
 def test_the_resident_client_accepts_only_the_controller_module(tmp_path, argv_module, accepted):
     from glm_tpu.engine.resident_client import Resident
 
@@ -99,7 +105,8 @@ def test_python_m_help_resolves_for_every_process_module(module):
     env = dict(os.environ, JAX_PLATFORMS="cpu", PYTHONDONTWRITEBYTECODE="1")
     env.pop(protocol.WORKER_ENV_FLAG, None)
     env.pop(protocol.PACK_WORKER_ENV_FLAG, None)
-    result = subprocess.run([sys.executable, "-m", module, "--help"], cwd=REPO, env=env, capture_output=True,
-                            text=True, timeout=300)
+    result = subprocess.run(
+        [sys.executable, "-m", module, "--help"], cwd=REPO, env=env, capture_output=True, text=True, timeout=300
+    )
     assert result.returncode == 0, result.stderr[-2000:]
     assert "usage:" in result.stdout

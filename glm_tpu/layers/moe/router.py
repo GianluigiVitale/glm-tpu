@@ -44,11 +44,7 @@ def route_glm_noaux_tc_logits(
     if router_logits.ndim != 2:
         raise ValueError("router_logits must have shape [tokens, experts]")
     _require_shape("correction_bias", correction_bias, (router_logits.shape[1],))
-    if (
-        not isinstance(top_k, int)
-        or isinstance(top_k, bool)
-        or not (0 < top_k <= router_logits.shape[1])
-    ):
+    if not isinstance(top_k, int) or isinstance(top_k, bool) or not (0 < top_k <= router_logits.shape[1]):
         raise ValueError("top_k must be in [1, num_experts]")
     scores = jax.nn.sigmoid(router_logits.astype(jnp.float32))
     biased_scores = scores + correction_bias.astype(jnp.float32)[None, :]
@@ -83,9 +79,7 @@ def router_from_shards(
 
     if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
         raise ValueError("WS32 router requires one live hidden row")
-    if router_weight_local.ndim != 2 or (
-        router_weight_local.shape[1] != hidden_local.shape[1]
-    ):
+    if router_weight_local.ndim != 2 or (router_weight_local.shape[1] != hidden_local.shape[1]):
         raise ValueError("WS32 router weight geometry drifted")
     local_experts = router_weight_local.shape[0]
     if correction_bias_local.shape != (local_experts,):
@@ -111,9 +105,7 @@ def router_from_shards(
             axis=0,
             tiled=True,
         )
-    return route_glm_noaux_tc_logits(
-        logits, correction_bias, top_k=top_k
-    )
+    return route_glm_noaux_tc_logits(logits, correction_bias, top_k=top_k)
 
 
 def prefill_router(
@@ -133,11 +125,7 @@ def prefill_router(
     """
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("prefill router requires WS32 expert8/feature4 mesh")
-    if (
-        hidden_local.ndim != 2
-        or not 1 <= hidden_local.shape[0] <= 128
-        or hidden_local.dtype != jnp.bfloat16
-    ):
+    if hidden_local.ndim != 2 or not 1 <= hidden_local.shape[0] <= 128 or hidden_local.dtype != jnp.bfloat16:
         raise ValueError("prefill router requires1..128 BF16 feature rows")
     rows = hidden_local.shape[0]
     if live.shape != (rows,) or live.dtype != jnp.bool_:
@@ -164,9 +152,7 @@ def prefill_router(
     with jax.named_scope("greenfield_ws32_prefill_router/expert_gather"):
         logits = lax.all_gather(local_logits, "expert", axis=1, tiled=True)
         bias = lax.all_gather(correction_bias_local, "expert", axis=0, tiled=True)
-    indices, weights = route_glm_noaux_tc_logits(
-        logits, bias, top_k=top_k, _observe=_observe
-    )
+    indices, weights = route_glm_noaux_tc_logits(logits, bias, top_k=top_k, _observe=_observe)
     if _observe is not None:
         _observe(
             "router",

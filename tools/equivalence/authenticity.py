@@ -161,16 +161,28 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
         )
     verdict = bool(rows) and all(row["masked_equal"] and row["decoded_equal"] for row in rows.values())
     if out is not None:
-        out.write_text(json.dumps(dict(columns=["program", "index", "kernel", "decoded_equal", "harness_sha16",
-                                                "original_sha16"], kernels=table), indent=0) + "\n")
-    return dict(gate="adapter-authenticity", status="pass" if verdict else ("fail" if rows else "no-originals"),
-                environment=environment(), source=source_record(), programs=rows)
+        out.write_text(
+            json.dumps(
+                dict(
+                    columns=["program", "index", "kernel", "decoded_equal", "harness_sha16", "original_sha16"],
+                    kernels=table,
+                ),
+                indent=0,
+            )
+            + "\n"
+        )
+    return dict(
+        gate="adapter-authenticity",
+        status="pass" if verdict else ("fail" if rows else "no-originals"),
+        environment=environment(),
+        source=source_record(),
+        programs=rows,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="compare the real runtime's programs with TPU StableHLO originals")
-    parser.add_argument("directories", nargs="+", type=Path,
-                        help="native.rank0 directories of golden runs (read-only)")
+    parser.add_argument("directories", nargs="+", type=Path, help="native.rank0 directories of golden runs (read-only)")
     parser.add_argument("--out", type=Path, help="write the per-kernel table here (outside Git)")
     args = parser.parse_args(argv)
     emit(compare(args.directories, args.out))

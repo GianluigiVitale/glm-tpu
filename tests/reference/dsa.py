@@ -32,7 +32,13 @@ import jax.numpy as jnp
 from jax import lax
 
 from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, _require_shape
-from glm_tpu.layers.attention.dsa_indexer import dsa_scores, _NEGATIVE_INFINITY, _merge_topk_candidates_scored, dsa_index_keys_from_projection, local_topk_candidates
+from glm_tpu.layers.attention.dsa_indexer import (
+    dsa_scores,
+    _NEGATIVE_INFINITY,
+    _merge_topk_candidates_scored,
+    dsa_index_keys_from_projection,
+    local_topk_candidates,
+)
 from glm_tpu.layers.rope import apply_rotary, rotary_cos_sin
 from tests.reference.linear import linear
 
@@ -297,13 +303,9 @@ def distributed_exact_topk_reference(
     if shard_scores.ndim != 3:
         raise ValueError("shard_scores must have shape [local_group, rows, local_context]")
     groups, _, local_context = shard_scores.shape
-    _require_shape(
-        "shard_global_positions", shard_global_positions, (groups, local_context)
-    )
+    _require_shape("shard_global_positions", shard_global_positions, (groups, local_context))
     candidate_scores, candidate_positions = jax.vmap(
-        lambda scores, positions: local_topk_candidates(
-            scores, positions, valid_lengths, top_k=top_k
-        )
+        lambda scores, positions: local_topk_candidates(scores, positions, valid_lengths, top_k=top_k)
     )(shard_scores, shard_global_positions)
     return merge_topk_candidates(
         candidate_scores,

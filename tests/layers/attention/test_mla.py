@@ -9,7 +9,13 @@ import jax
 
 from glm_tpu.kernels.sparse_mla.kernel import pregathered_sparse_mla_pallas, SparseMlaConfig, sparse_mla_attention
 from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
-from glm_tpu.layers.attention.kv_cache import SelectedKvSegment, canonicalize_selected_positions, gather_stage_local_selected_kv, gather_stage_local_selected_kv_aligned, selected_positions_for_owner
+from glm_tpu.layers.attention.kv_cache import (
+    SelectedKvSegment,
+    canonicalize_selected_positions,
+    gather_stage_local_selected_kv,
+    gather_stage_local_selected_kv_aligned,
+    selected_positions_for_owner,
+)
 from tests.reference.attention import gather_paged_selected_kv, stage_local_sparse_mla_reference
 
 
@@ -30,9 +36,7 @@ def test_multirow_sparse_attention_counts_and_scratch_do_not_leak_between_querie
     q = jnp.asarray(rng.normal(size=(rows, heads, latent)), jnp.bfloat16)
     r = jnp.asarray(rng.normal(size=(rows, heads, rope)), jnp.bfloat16)
     cache = jnp.asarray(rng.normal(size=(rows, topk, 16)), jnp.bfloat16)
-    counts = jnp.asarray(
-        [0, 1, 3, 4, 5, 15, 16, 0, 16, 1, 0, 9, 3, 0, 16, 7, 0], jnp.int32
-    )
+    counts = jnp.asarray([0, 1, 3, 4, 5, 15, 16, 0, 16, 1, 0, 9, 3, 0, 16, 7, 0], jnp.int32)
     cache = jnp.where(jnp.arange(topk)[None, :, None] < counts[:, None, None], cache, 0)
 
     def run(q, r, c, n, prefill):
@@ -49,14 +53,9 @@ def test_multirow_sparse_attention_counts_and_scratch_do_not_leak_between_querie
 
     actual = run(q, r, cache, counts, True)
     expected = jnp.concatenate(
-        [
-            run(q[i : i + 1], r[i : i + 1], cache[i : i + 1], counts[i : i + 1], False)
-            for i in range(rows)
-        ]
+        [run(q[i : i + 1], r[i : i + 1], cache[i : i + 1], counts[i : i + 1], False) for i in range(rows)]
     )
-    np.testing.assert_array_equal(
-        np.asarray(actual).view(np.uint16), np.asarray(expected).view(np.uint16)
-    )
+    np.testing.assert_array_equal(np.asarray(actual).view(np.uint16), np.asarray(expected).view(np.uint16))
     assert np.all(np.asarray(actual)[np.asarray(counts) == 0] == 0)
     order = jnp.asarray(rng.permutation(rows))
     permuted = run(q[order], r[order], cache[order], counts[order], True)
@@ -152,9 +151,7 @@ def test_canonical_attention_copy_preserves_state_and_sorts_live_prefix() -> Non
     )
     canonical = canonicalize_selected_positions(selected)
     np.testing.assert_array_equal(np.asarray(selected.positions), [[6, 1, 4, -1]])
-    np.testing.assert_array_equal(
-        np.asarray(canonical.selection.positions), [[1, 4, 6, -1]]
-    )
+    np.testing.assert_array_equal(np.asarray(canonical.selection.positions), [[1, 4, 6, -1]])
     np.testing.assert_array_equal(np.asarray(canonical.contract_valid), [True])
 
 
@@ -171,9 +168,7 @@ def test_paged_gather_maps_absolute_positions_and_zeros_tail() -> None:
         jnp.asarray([8], dtype=jnp.int32),
     )
     np.testing.assert_array_equal(np.asarray(segment.positions), [[1, 4, 6, -1]])
-    np.testing.assert_array_equal(
-        np.asarray(segment.values[0, :3]), np.asarray(token_rows)[[1, 4, 6]]
-    )
+    np.testing.assert_array_equal(np.asarray(segment.values[0, :3]), np.asarray(token_rows)[[1, 4, 6]])
     np.testing.assert_array_equal(np.asarray(segment.values[0, 3]), np.zeros(8))
     np.testing.assert_array_equal(np.asarray(segment.contract_valid), [True])
 
@@ -212,9 +207,7 @@ def test_gather_health_catches_malformed_or_noncausal_state_without_oob_read() -
             ),
             jnp.asarray([invalid_length], dtype=jnp.int32),
         )
-        np.testing.assert_array_equal(
-            np.asarray(invalid.contract_valid), [False]
-        )
+        np.testing.assert_array_equal(np.asarray(invalid.contract_valid), [False])
 
 
 def test_owner_subsets_are_disjoint_and_local_gather_matches_logical_rows() -> None:
@@ -246,9 +239,7 @@ def test_owner_subsets_are_disjoint_and_local_gather_matches_logical_rows() -> N
         )
         count = int(np.asarray(subset.selection.valid_counts[0]))
         positions = np.asarray(segment.positions[0, :count])
-        np.testing.assert_array_equal(
-            np.asarray(segment.values[0, :count]), np.asarray(token_rows)[positions]
-        )
+        np.testing.assert_array_equal(np.asarray(segment.values[0, :count]), np.asarray(token_rows)[positions])
         np.testing.assert_array_equal(np.asarray(segment.contract_valid), [True])
 
 
@@ -323,11 +314,13 @@ def test_aligned_owner_segment_zeros_unowned_rows_and_propagates_health() -> Non
     )
     np.testing.assert_array_equal(invalid.contract_valid, [False])
     mapped = jax.jit(
-        lambda owner: selected_positions_for_owner(
-            selected,
-            layout=layout,
-            owner_index=owner,
-        ).selection.positions
+        lambda owner: (
+            selected_positions_for_owner(
+                selected,
+                layout=layout,
+                owner_index=owner,
+            ).selection.positions
+        )
     )
     np.testing.assert_array_equal(
         np.asarray(mapped(jnp.asarray(1, dtype=jnp.int32))),
@@ -364,15 +357,12 @@ def test_sparse_mla_matches_direct_fp32_selected_attention() -> None:
     v = np.asarray(values)[0, :3, :4]
     k_rope = np.asarray(values)[0, :3, 4:6]
     scores = (
-        np.einsum("hd,kd->hk", np.asarray(q_nope)[0], v)
-        + np.einsum("hd,kd->hk", np.asarray(q_rope)[0], k_rope)
+        np.einsum("hd,kd->hk", np.asarray(q_nope)[0], v) + np.einsum("hd,kd->hk", np.asarray(q_rope)[0], k_rope)
     ) * contract.softmax_scale
     probabilities = np.exp(scores - scores.max(axis=-1, keepdims=True))
     probabilities /= probabilities.sum(axis=-1, keepdims=True)
     expected = np.einsum("hk,kd->hd", probabilities, v)
-    np.testing.assert_allclose(
-        np.asarray(got.output[0]), expected, rtol=2e-7, atol=2e-7
-    )
+    np.testing.assert_allclose(np.asarray(got.output[0]), expected, rtol=2e-7, atol=2e-7)
     np.testing.assert_allclose(
         np.asarray(got.logsumexp[0]),
         np.log(np.exp(scores).sum(axis=-1)),
@@ -415,9 +405,7 @@ def test_bfloat16_attention_rounds_unnormalized_weights_before_pv() -> None:
         [[[0.25, -0.5, 0.75, 1.0], [1.25, 0.5, -0.25, 0.75]]],
         dtype=jnp.bfloat16,
     )
-    q_rope = jnp.asarray(
-        [[[0.5, -0.25], [-0.75, 0.5]]], dtype=jnp.bfloat16
-    )
+    q_rope = jnp.asarray([[[0.5, -0.25], [-0.75, 0.5]]], dtype=jnp.bfloat16)
     got = sparse_mla_attention(q_nope, q_rope, segment, contract=contract)
 
     scores = (
@@ -437,12 +425,15 @@ def test_bfloat16_attention_rounds_unnormalized_weights_before_pv() -> None:
     maximum = jnp.max(scores, axis=-1, keepdims=True)
     unnormalized = jnp.exp(scores - maximum)
     denominator = jnp.sum(unnormalized, axis=-1, keepdims=True)
-    expected = jnp.einsum(
-        "rhk,rkd->rhd",
-        unnormalized.astype(jnp.bfloat16),
-        values[..., :4],
-        preferred_element_type=jnp.float32,
-    ) / denominator
+    expected = (
+        jnp.einsum(
+            "rhk,rkd->rhd",
+            unnormalized.astype(jnp.bfloat16),
+            values[..., :4],
+            preferred_element_type=jnp.float32,
+        )
+        / denominator
+    )
     expected = expected.astype(jnp.bfloat16)
     normalized_first = jnp.einsum(
         "rhk,rkd->rhd",
@@ -560,9 +551,7 @@ def test_attention_shape_and_dtype_contracts_fail_loudly() -> None:
         malformed,
         contract=contract,
     )
-    np.testing.assert_array_equal(
-        np.asarray(malformed_result.contract_valid), [False]
-    )
+    np.testing.assert_array_equal(np.asarray(malformed_result.contract_valid), [False])
     with pytest.raises(ValueError, match="one row"):
         stage_local_sparse_mla_reference(
             jnp.ones((2, 2, 4), dtype=jnp.float32),

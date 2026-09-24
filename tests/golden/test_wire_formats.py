@@ -1,5 +1,6 @@
 """G9: request bytes and request_sha256, TokenEvent lines, worker/controller records and the
 resident protocol, produced by the real code with fakes."""
+
 import pytest
 
 from tools.equivalence import gates, wire

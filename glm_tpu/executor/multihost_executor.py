@@ -28,6 +28,7 @@ without losing the others' records. Nothing is overwritten; a resident failure
 (recorded as failure) is reported only after collection and is never replaced
 by a collection error (recorded as collect_error).
 """
+
 import argparse
 import base64
 from contextlib import ExitStack
@@ -51,281 +52,457 @@ from glm_tpu.executor.fleet import remote_all, require, ssh_commands
 from glm_tpu.executor.staging import stage_bundle
 
 
-REPO=protocol.source_root(__file__,protocol.CONTROLLER_MODULE)  # this controller's checkout
-MODULE=protocol.WORKER_MODULE
+REPO = protocol.source_root(__file__, protocol.CONTROLLER_MODULE)  # this controller's checkout
+MODULE = protocol.WORKER_MODULE
 # After idle_after has verified every host, a local SSH client that has not exited is a stalled
 # transport (no worker of this run is left). Covers the clients' ServerAlive detection (3 x 30 s).
-SSH_CLIENT_EXIT_SECONDS=120
+SSH_CLIENT_EXIT_SECONDS = 120
 
 
-def source_identity(repo,policy):
+def source_identity(repo, policy):
     """The commit to stage: the site's [launch] policy applied to the checkout, which must be this
     controller's own (this launcher's and the glm_tpu package's), so that the proof covers them."""
-    launch_policy.require_controller_checkout(repo,REPO,launch_policy.package_checkout())
-    return launch_policy.source_identity(repo,policy).pin
+    launch_policy.require_controller_checkout(repo, REPO, launch_policy.package_checkout())
+    return launch_policy.source_identity(repo, policy).pin
 
 
-def pinned_helpers(repo,pin):
+def pinned_helpers(repo, pin):
     """The run's remote helper texts, read once: the pinned commit's blobs, each equal to this
     checkout's file (glm_tpu.executor.fleet.HelperTexts.pinned). Every remote command is built from
     them, so an edit of the checkout during the run cannot change what cleanup, fetch or
     idle_after send."""
-    return remote.HelperTexts.pinned(repo,pin)
+    return remote.HelperTexts.pinned(repo, pin)
 
 
-def idle(commands,root,label,fleet,hosts=None,*,helpers):
+def idle(commands, root, label, fleet, hosts=None, *, helpers):
     """``IDLE <host>`` from every host (no libtpu holder, no live worker of this run); before
     staging ``hosts`` is None and the observed hostnames are authenticated here by rank."""
-    remote_all(commands,remote.command(fleet,'idle_probe',dict(root=str(root),hosts=hosts),helpers=helpers),
-               root,label)
-    observed=[]
+    remote_all(
+        commands, remote.command(fleet, "idle_probe", dict(root=str(root), hosts=hosts), helpers=helpers), root, label
+    )
+    observed = []
     for rank in range(8):
-        found=[s[5:] for s in (root/f'{label}.rank{rank}.log').read_text().splitlines() if s.startswith('IDLE ')]
-        require(len(found)==1 and fleet.rank_matches(found[0],rank),'idle observation host differs')
-        observed+=found
-    require(len(set(observed))==8,'idle observations contain duplicate hosts')
-    require(hosts is None or observed==list(hosts),'idle observation host differs')
+        found = [s[5:] for s in (root / f"{label}.rank{rank}.log").read_text().splitlines() if s.startswith("IDLE ")]
+        require(len(found) == 1 and fleet.rank_matches(found[0], rank), "idle observation host differs")
+        observed += found
+    require(len(set(observed)) == 8, "idle observations contain duplicate hosts")
+    require(hosts is None or observed == list(hosts), "idle observation host differs")
     return observed
 
 
-def cleanup_owned(commands,root,pin,*,hosts,fleet,helpers,module=MODULE):
+def cleanup_owned(commands, root, pin, *, hosts, fleet, helpers, module=MODULE):
     """Terminate only this invocation's authenticated process, never an unknown holder."""
-    remote_all(commands,remote.command(fleet,'cleanup',dict(root=str(root),hosts=hosts,pin=pin,module=module),
-                                       helpers=helpers),root,'cleanup_owned',check=False)
+    remote_all(
+        commands,
+        remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin, module=module), helpers=helpers),
+        root,
+        "cleanup_owned",
+        check=False,
+    )
 
 
-def fetch_records(commands,directory,root,label,names,*,hosts,fleet,helpers,check=True):
+def fetch_records(commands, directory, root, label, names, *, hosts, fleet, helpers, check=True):
     """Per rank, the named records of ``directory`` on that host: {name: bytes}. A host may
     return only the requested names. With ``check=False`` a host whose fetch failed (non-zero
     exit, unreadable or unexpected output) gives None instead of refusing every host's records."""
-    command=remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names),helpers=helpers)
+    command = remote.command(fleet, "fetch", dict(dir=str(directory), hosts=hosts, names=names), helpers=helpers)
     if check:  # a resident receipt needs every host: refuse unless every fetch exited 0
-        remote_all(commands,command,root,label);codes=[0]*8
+        remote_all(commands, command, root, label)
+        codes = [0] * 8
     else:
-        codes=remote_all(commands,command,root,label,check=False)
-    fetched=[]
+        codes = remote_all(commands, command, root, label, check=False)
+    fetched = []
     for rank in range(8):
-        expected={template.replace('{rank}',str(rank)) for template in names}
+        expected = {template.replace("{rank}", str(rank)) for template in names}
         try:
-            require(codes[rank]==0,label+' failed on one or more hosts; see private originals')
-            value=json.loads((root/f'{label}.rank{rank}.log').read_text())
-            require(isinstance(value,dict) and set(value)<=expected,
-                    label+' output differs on one or more hosts; see private originals')
-            fetched.append({name:base64.b64decode(data,validate=True) for name,data in value.items()})
-        except (OSError,ValueError,TypeError):  # binascii, JSON, UTF-8: ValueError; a non-text value: TypeError
-            if check:raise
+            require(codes[rank] == 0, label + " failed on one or more hosts; see private originals")
+            value = json.loads((root / f"{label}.rank{rank}.log").read_text())
+            require(
+                isinstance(value, dict) and set(value) <= expected,
+                label + " output differs on one or more hosts; see private originals",
+            )
+            fetched.append({name: base64.b64decode(data, validate=True) for name, data in value.items()})
+        except (OSError, ValueError, TypeError):  # binascii, JSON, UTF-8: ValueError; a non-text value: TypeError
+            if check:
+                raise
             fetched.append(None)
     return fetched
 
 
-def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOST_RANK_REGEX):
-    require(len(rows)==8 and [r['rank'] for r in rows]==list(range(8)),'incomplete fleet result')
-    for rank,row in enumerate(rows):
-        require(row.get('complete') is True and row['code_hash']==pin
-            and row['request_sha256']==request_sha and rank_matches(row['hostname'],rank,host_rank_regex),
-            'worker identity/completion differs')
-    require(len({r['request']['token_sha256'] for r in rows})==1,'worker outputs differ')
-    require(len({r['request']['emitted'] for r in rows})==1,'worker output lengths differ')
+def summarize(rows, pin, request_sha, *, idle_after=True, host_rank_regex=DEFAULT_HOST_RANK_REGEX):
+    require(len(rows) == 8 and [r["rank"] for r in rows] == list(range(8)), "incomplete fleet result")
+    for rank, row in enumerate(rows):
+        require(
+            row.get("complete") is True
+            and row["code_hash"] == pin
+            and row["request_sha256"] == request_sha
+            and rank_matches(row["hostname"], rank, host_rank_regex),
+            "worker identity/completion differs",
+        )
+    require(len({r["request"]["token_sha256"] for r in rows}) == 1, "worker outputs differ")
+    require(len({r["request"]["emitted"] for r in rows}) == 1, "worker output lengths differ")
     for row in rows[1:]:
-        for name,program in rows[0]['programs'].items():
-            require(all(program[k]==row['programs'][name][k] for k in
-                ('stablehlo_sha256','optimized_hlo_sha256')),'worker graph identities differ')
-    return dict(passed=True,code_hash=pin,request=rows[0]['request'],
-        all_ranks_agree=True,all_hosts_idle_after=idle_after,
-        limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
+        for name, program in rows[0]["programs"].items():
+            require(
+                all(program[k] == row["programs"][name][k] for k in ("stablehlo_sha256", "optimized_hlo_sha256")),
+                "worker graph identities differ",
+            )
+    return dict(
+        passed=True,
+        code_hash=pin,
+        request=rows[0]["request"],
+        all_ranks_agree=True,
+        all_hosts_idle_after=idle_after,
+        limits="Retained-site greedy execution; completed answers and capacity coverage require separate checks.",
+    )
 
 
-def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,hosts,fleet,helpers,
-                        host_rank_regex=DEFAULT_HOST_RANK_REGEX):
+def resident_controller(
+    commands,
+    running,
+    root,
+    pin,
+    value,
+    wall_seconds,
+    print_answers,
+    *,
+    hosts,
+    fleet,
+    helpers,
+    host_rank_regex=DEFAULT_HOST_RANK_REGEX,
+):
     """Hold workload leases while serving an owner-only, ordered private inbox."""
-    inbox=root/protocol.INBOX_DIR;inbox.mkdir(mode=0o700)
-    sequence=0;pending=True
-    deadline=time.monotonic()+wall_seconds+60
+    inbox = root / protocol.INBOX_DIR
+    inbox.mkdir(mode=0o700)
+    sequence = 0
+    pending = True
+    deadline = time.monotonic() + wall_seconds + 60
     while True:
-        require(all(p.poll() is None for p in running),'resident worker exited unexpectedly')
-        ready=root/protocol.READY_FILE
-        if pending and ready.exists() and json.loads(ready.read_text())['sequence']==sequence:
-            job=protocol.result_dir(root,sequence)
-            fetched=fetch_records(commands,job,root,f'resident-collect-{sequence:04d}',['runner.rank{rank}.json'],
-                                  hosts=hosts,fleet=fleet,helpers=helpers)
-            require(all(set(files)=={protocol.runner_file(rank)} for rank,files in enumerate(fetched)),
-                    'resident worker record missing')
-            rows=[json.loads(files[protocol.runner_file(rank)]) for rank,files in enumerate(fetched)]
-            result=summarize(rows,pin,value['request_sha256'],idle_after=False,host_rank_regex=host_rank_regex)
-            for rank,row in enumerate(rows):
-                if rank:io_utils.persist(job/protocol.runner_file(rank),row)
-            result.update(model_retained=True,resident_sequence=sequence,
-                          cleanup='intentionally deferred until explicit stop or worker failure')
-            io_utils.persist(job/protocol.MEASUREMENT_FILE,result)
-            print(protocol.STDOUT_RESIDENT_RESULT+str(job/protocol.MEASUREMENT_FILE),flush=True)
+        require(all(p.poll() is None for p in running), "resident worker exited unexpectedly")
+        ready = root / protocol.READY_FILE
+        if pending and ready.exists() and json.loads(ready.read_text())["sequence"] == sequence:
+            job = protocol.result_dir(root, sequence)
+            fetched = fetch_records(
+                commands,
+                job,
+                root,
+                f"resident-collect-{sequence:04d}",
+                ["runner.rank{rank}.json"],
+                hosts=hosts,
+                fleet=fleet,
+                helpers=helpers,
+            )
+            require(
+                all(set(files) == {protocol.runner_file(rank)} for rank, files in enumerate(fetched)),
+                "resident worker record missing",
+            )
+            rows = [json.loads(files[protocol.runner_file(rank)]) for rank, files in enumerate(fetched)]
+            result = summarize(rows, pin, value["request_sha256"], idle_after=False, host_rank_regex=host_rank_regex)
+            for rank, row in enumerate(rows):
+                if rank:
+                    io_utils.persist(job / protocol.runner_file(rank), row)
+            result.update(
+                model_retained=True,
+                resident_sequence=sequence,
+                cleanup="intentionally deferred until explicit stop or worker failure",
+            )
+            io_utils.persist(job / protocol.MEASUREMENT_FILE, result)
+            print(protocol.STDOUT_RESIDENT_RESULT + str(job / protocol.MEASUREMENT_FILE), flush=True)
             if print_answers:
-                for index,item in enumerate(request.requests(value)):
-                    answer_root=job/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else job
-                    print('\n'+item['request_id']+'\n'+(answer_root/'answer.txt').read_text(),flush=True)
-            pending=False
+                for index, item in enumerate(request.requests(value)):
+                    answer_root = job / f"item{index:03d}" if value.get("schema") == request.BATCH_SCHEMA else job
+                    print("\n" + item["request_id"] + "\n" + (answer_root / "answer.txt").read_text(), flush=True)
+            pending = False
         if pending:
-            require(time.monotonic()<=deadline,'resident inference deadline expired')
+            require(time.monotonic() <= deadline, "resident inference deadline expired")
         else:
-            stop=inbox/protocol.STOP_FILE
-            next_input=inbox/protocol.inbox_name(sequence+1)
+            stop = inbox / protocol.STOP_FILE
+            next_input = inbox / protocol.inbox_name(sequence + 1)
             if stop.exists():
                 io_utils.private(stop)
-                require(json.loads(io_utils.read_bounded(stop,1024))=={'stop':True},'invalid resident stop')
+                require(json.loads(io_utils.read_bounded(stop, 1024)) == {"stop": True}, "invalid resident stop")
                 for process in running:
-                    process.stdin.write(protocol.STOP_COMMAND);process.stdin.flush()
+                    process.stdin.write(protocol.STOP_COMMAND)
+                    process.stdin.flush()
                 return
             if next_input.exists():
                 io_utils.private(next_input)
-                raw=io_utils.read_bounded(next_input,request.PAYLOAD_CAP)
-                next_value=json.loads(raw);request.validate_payload(next_value)
-                require(next_value['context_capacity']==value['context_capacity'] and
-                        next_value.get('schema')!=request.CONCURRENT_SCHEMA,
-                        'resident input differs from loaded context/scheduling')
-                sequence+=1;value=next_value
-                command=protocol.encode_command(sequence,value)
+                raw = io_utils.read_bounded(next_input, request.PAYLOAD_CAP)
+                next_value = json.loads(raw)
+                request.validate_payload(next_value)
+                require(
+                    next_value["context_capacity"] == value["context_capacity"]
+                    and next_value.get("schema") != request.CONCURRENT_SCHEMA,
+                    "resident input differs from loaded context/scheduling",
+                )
+                sequence += 1
+                value = next_value
+                command = protocol.encode_command(sequence, value)
                 for process in running:
-                    process.stdin.write(command);process.stdin.flush()
-                pending=True;deadline=time.monotonic()+wall_seconds+60
+                    process.stdin.write(command)
+                    process.stdin.flush()
+                pending = True
+                deadline = time.monotonic() + wall_seconds + 60
         # This is controller process supervision, not model-turn polling.
         time.sleep(2)
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--request',type=Path,required=True)
-    parser.add_argument('--wall-seconds',type=int,default=7200)
-    parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
-    parser.add_argument('--keep-loaded',action='store_true')
-    parser.add_argument('--site',type=Path,help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')
-    parser.add_argument('--repo',type=Path,help='git checkout to stage; must be this controller\'s own (default: the site paths.repo, else this checkout)')
-    args=parser.parse_args(argv)
-    require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
-    site=SiteConfig.load(args.site)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--request", type=Path, required=True)
+    parser.add_argument("--wall-seconds", type=int, default=7200)
+    parser.add_argument("--print-answers", action="store_true", help="print completed local outputs after cleanup")
+    parser.add_argument("--keep-loaded", action="store_true")
+    parser.add_argument(
+        "--site", type=Path, help="site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)"
+    )
+    parser.add_argument(
+        "--repo",
+        type=Path,
+        help="git checkout to stage; must be this controller's own (default: the site paths.repo, else this checkout)",
+    )
+    args = parser.parse_args(argv)
+    require(1 <= args.wall_seconds <= 86400, "wall deadline must be 1..86400 seconds")
+    site = SiteConfig.load(args.site)
     set_current_site(site)
-    repo=launch_policy.resolve_repo(site,args.repo,default=REPO)
-    fleet=site.fleet
+    repo = launch_policy.resolve_repo(site, args.repo, default=REPO)
+    fleet = site.fleet
     io_utils.private(args.request)
-    require(not any(args.request.resolve().is_relative_to(p) for p in (repo,REPO)),'private request must be outside Git')
-    raw=io_utils.read_bounded(args.request,request.PAYLOAD_CAP)
-    value=json.loads(raw);request.validate_payload(value)
-    require(not args.keep_loaded or value.get('schema')!=request.CONCURRENT_SCHEMA,
-            'resident mode currently uses sequential ordinary requests')
-    pin=source_identity(repo,site.launch)
-    helpers=pinned_helpers(repo,pin)
+    require(
+        not any(args.request.resolve().is_relative_to(p) for p in (repo, REPO)), "private request must be outside Git"
+    )
+    raw = io_utils.read_bounded(args.request, request.PAYLOAD_CAP)
+    value = json.loads(raw)
+    request.validate_payload(value)
+    require(
+        not args.keep_loaded or value.get("schema") != request.CONCURRENT_SCHEMA,
+        "resident mode currently uses sequential ordinary requests",
+    )
+    pin = source_identity(repo, site.launch)
+    helpers = pinned_helpers(repo, pin)
     os.umask(0o077)
-    root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    root = site.paths.run_root / ("optimized_request_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
     root.mkdir(mode=0o700)
-    print(protocol.STDOUT_RUN+str(root),flush=True)
-    io_utils.persist(root/protocol.HELPERS_FILE,helpers.record())
+    print(protocol.STDOUT_RUN + str(root), flush=True)
+    io_utils.persist(root / protocol.HELPERS_FILE, helpers.record())
     with ExitStack() as stack:
-        locks=[]
-        for path,blocking in [(p,False) for p in site.locks.workload]+[(p,True) for p in site.locks.sync]:
-            stream=stack.enter_context(open(path,'a'))
+        locks = []
+        for path, blocking in [(p, False) for p in site.locks.workload] + [(p, True) for p in site.locks.sync]:
+            stream = stack.enter_context(open(path, "a"))
             # A live model owner is a refusal. A scheduled source backup only
             # delays staging: wait on its lock without retrying any workload.
-            flags=fcntl.LOCK_EX|(0 if blocking else fcntl.LOCK_NB)
-            fcntl.flock(stream,flags);locks.append(stream)
-        commands=ssh_commands(fleet);hosts=idle(commands,root,'idle_before',fleet,helpers=helpers)
-        require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
-        bundle,manifest_sha=stage_bundle(repo,pin,root,raw,site)
-        site_sha=site.resolved_sha256()
-        remote_all(commands,remote.command(fleet,'stage_bundle',dict(root=str(root),digest=sha256(bundle).hexdigest(),
-            hosts=hosts),helpers=helpers),root,'stage',payload=bundle)
+            flags = fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB)
+            fcntl.flock(stream, flags)
+            locks.append(stream)
+        commands = ssh_commands(fleet)
+        hosts = idle(commands, root, "idle_before", fleet, helpers=helpers)
+        require(hosts[0] == socket.gethostname(), "controller must run on authenticated rank0")
+        bundle, manifest_sha = stage_bundle(repo, pin, root, raw, site)
+        site_sha = site.resolved_sha256()
+        remote_all(
+            commands,
+            remote.command(
+                fleet,
+                "stage_bundle",
+                dict(root=str(root), digest=sha256(bundle).hexdigest(), hosts=hosts),
+                helpers=helpers,
+            ),
+            root,
+            "stage",
+            payload=bundle,
+        )
         # CPU-only preflight on every host precedes the single fleet dispatch.
-        command=[fleet.worker_python,'-m',MODULE,'--output',str(root),'--code-hash',pin,
-            '--source-manifest-sha256',manifest_sha,'--request-file-sha256',sha256(raw).hexdigest(),
-            '--site-sha256',site_sha,
-            '--topology-rebinding-sha256',site.topology.binding_sha256,'--coordinator-address',fleet.coordinator_address,
-            '--wall-seconds',str(args.wall_seconds)]
-        if args.keep_loaded:command.append('--keep-loaded')
-        preflight=remote.preflight_command(fleet,root,command)
-        remote_all(commands,preflight,root,'preflight')
-        environments=[json.loads((root/f'preflight.rank{rank}.log').read_text()) for rank in range(8)]
-        require([r['hostname'] for r in environments]==hosts,'preflight hosts differ')
-        require(len({json.dumps({k:v for k,v in r.items() if k!='hostname'},sort_keys=True)
-            for r in environments})==1,'fleet environments differ')
-        require(environments[0]['jax']==environments[0]['jaxlib']=='0.10.1','retained JAX version differs')
-        io_utils.persist(root/'controller_identity.json',dict(code_hash=pin,source_manifest_sha256=manifest_sha,
-            request_file_sha256=sha256(raw).hexdigest(),request_sha256=value['request_sha256'],site_sha256=site_sha,
-            controller_pid=os.getpid(),controller_start_ticks=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19],
-            automatic_workload_retries=False,hosts=hosts,environment=environments[0]))
-        for stream in locks[len(site.locks.workload):]:fcntl.flock(stream,fcntl.LOCK_UN)
-        wrapper=remote.command(fleet,'start_worker',dict(root=str(root),hosts=hosts,pin=pin,
-            worker_python=fleet.worker_python,pythonpath=list(fleet.worker_pythonpath),module=MODULE,
-            env={'JAX_PLATFORMS':'tpu',protocol.WORKER_ENV_FLAG:'1'},argv=command[3:]),helpers=helpers)
-        running=[]
-        failed=False
-        failure=None
+        command = [
+            fleet.worker_python,
+            "-m",
+            MODULE,
+            "--output",
+            str(root),
+            "--code-hash",
+            pin,
+            "--source-manifest-sha256",
+            manifest_sha,
+            "--request-file-sha256",
+            sha256(raw).hexdigest(),
+            "--site-sha256",
+            site_sha,
+            "--topology-rebinding-sha256",
+            site.topology.binding_sha256,
+            "--coordinator-address",
+            fleet.coordinator_address,
+            "--wall-seconds",
+            str(args.wall_seconds),
+        ]
+        if args.keep_loaded:
+            command.append("--keep-loaded")
+        preflight = remote.preflight_command(fleet, root, command)
+        remote_all(commands, preflight, root, "preflight")
+        environments = [json.loads((root / f"preflight.rank{rank}.log").read_text()) for rank in range(8)]
+        require([r["hostname"] for r in environments] == hosts, "preflight hosts differ")
+        require(
+            len({json.dumps({k: v for k, v in r.items() if k != "hostname"}, sort_keys=True) for r in environments})
+            == 1,
+            "fleet environments differ",
+        )
+        require(environments[0]["jax"] == environments[0]["jaxlib"] == "0.10.1", "retained JAX version differs")
+        io_utils.persist(
+            root / "controller_identity.json",
+            dict(
+                code_hash=pin,
+                source_manifest_sha256=manifest_sha,
+                request_file_sha256=sha256(raw).hexdigest(),
+                request_sha256=value["request_sha256"],
+                site_sha256=site_sha,
+                controller_pid=os.getpid(),
+                controller_start_ticks=Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19],
+                automatic_workload_retries=False,
+                hosts=hosts,
+                environment=environments[0],
+            ),
+        )
+        for stream in locks[len(site.locks.workload) :]:
+            fcntl.flock(stream, fcntl.LOCK_UN)
+        wrapper = remote.command(
+            fleet,
+            "start_worker",
+            dict(
+                root=str(root),
+                hosts=hosts,
+                pin=pin,
+                worker_python=fleet.worker_python,
+                pythonpath=list(fleet.worker_pythonpath),
+                module=MODULE,
+                env={"JAX_PLATFORMS": "tpu", protocol.WORKER_ENV_FLAG: "1"},
+                argv=command[3:],
+            ),
+            helpers=helpers,
+        )
+        running = []
+        failed = False
+        failure = None
         try:
             for rank in range(8):
-                log=stack.enter_context((root/f'run.rank{rank}.log').open('xb'))
-                running.append(subprocess.Popen(commands[rank][:-1]+[wrapper],
-                    stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
-                    stdout=log,stderr=subprocess.STDOUT))
+                log = stack.enter_context((root / f"run.rank{rank}.log").open("xb"))
+                running.append(
+                    subprocess.Popen(
+                        commands[rank][:-1] + [wrapper],
+                        stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                    )
+                )
             if args.keep_loaded:
                 try:
-                    resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
-                                        hosts=hosts,fleet=fleet,helpers=helpers,host_rank_regex=fleet.host_rank_regex)
+                    resident_controller(
+                        commands,
+                        running,
+                        root,
+                        pin,
+                        value,
+                        args.wall_seconds,
+                        args.print_answers,
+                        hosts=hosts,
+                        fleet=fleet,
+                        helpers=helpers,
+                        host_rank_regex=fleet.host_rank_regex,
+                    )
                 except Exception as exc:
                     # A resident failure is reported after cleanup and collection, so every
                     # host's record (e.g. a failure_type rewrite) is preserved first.
-                    failure=exc;failed=True
-            deadline=time.monotonic()+args.wall_seconds+60
+                    failure = exc
+                    failed = True
+            deadline = time.monotonic() + args.wall_seconds + 60
             while failure is None and any(p.poll() is None for p in running):
-                if any(p.poll() not in (None,0) for p in running) or time.monotonic()>deadline:
-                    failed=True;break
+                if any(p.poll() not in (None, 0) for p in running) or time.monotonic() > deadline:
+                    failed = True
+                    break
                 time.sleep(10)
         except BaseException:
-            failed=True;raise
+            failed = True
+            raise
         finally:
-            if failed:cleanup_owned(commands,root,pin,hosts=hosts,fleet=fleet,helpers=helpers)
-            try:idle(commands,root,'idle_after',fleet,hosts,helpers=helpers)
+            if failed:
+                cleanup_owned(commands, root, pin, hosts=hosts, fleet=fleet, helpers=helpers)
+            try:
+                idle(commands, root, "idle_after", fleet, hosts, helpers=helpers)
             except Exception:
-                print('Cleanup unresolved; workload leases retained. Inspect '+str(root),flush=True)
+                print("Cleanup unresolved; workload leases retained. Inspect " + str(root), flush=True)
                 # An operator must authenticate cleanup before ending this
                 # controller. There is no auto-retry or lease-release timeout.
-                while True:time.sleep(30)
+                while True:
+                    time.sleep(30)
         # Every host is verified idle: wait a bounded time for the local SSH clients, then end a
         # stalled one (its code is then the local kill's) instead of holding the leases on it.
-        client_deadline=time.monotonic()+SSH_CLIENT_EXIT_SECONDS
-        while [p for p in running if p.poll() is None] and time.monotonic()<client_deadline:time.sleep(1)
-        stalled=[rank for rank,p in enumerate(running) if p.poll() is None]
-        for rank in stalled:running[rank].kill()
-        codes=[p.wait() for p in running]
+        client_deadline = time.monotonic() + SSH_CLIENT_EXIT_SECONDS
+        while [p for p in running if p.poll() is None] and time.monotonic() < client_deadline:
+            time.sleep(1)
+        stalled = [rank for rank, p in enumerate(running) if p.poll() is None]
+        for rank in stalled:
+            running[rank].kill()
+        codes = [p.wait() for p in running]
         # Host by host: a failed fetch loses only that host's records, never the others' or the
         # resident failure (recorded here, raised below).
-        divergent=[];uncollected=[];collect_error=None;done=False
+        divergent = []
+        uncollected = []
+        collect_error = None
+        done = False
         try:
-            fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
-                                  hosts=hosts,fleet=fleet,helpers=helpers,check=False)
-            for rank in range(1,8):
+            fetched = fetch_records(
+                commands,
+                root,
+                root,
+                "collect",
+                ["runner.rank{rank}.json", "worker_started.rank{rank}.json"],
+                hosts=hosts,
+                fleet=fleet,
+                helpers=helpers,
+                check=False,
+            )
+            for rank in range(1, 8):
                 if fetched[rank] is None:
-                    uncollected.append(rank);continue
-                for name,payload in fetched[rank].items():
-                    io_utils.write_collected(root,name,payload,divergent)
-            done=True
+                    uncollected.append(rank)
+                    continue
+                for name, payload in fetched[rank].items():
+                    io_utils.write_collected(root, name, payload, divergent)
+            done = True
         except Exception as exc:
-            collect_error=exc
+            collect_error = exc
         finally:
-            io_utils.persist(root/protocol.CONTROLLER_TERMINAL_FILE,dict(codes=codes,all_hosts_idle=True,
-                collected=done and not uncollected,divergent_records=divergent,uncollected_ranks=uncollected,
-                stalled_ssh_clients=stalled,
-                failure=None if failure is None else dict(type=type(failure).__name__,message=str(failure)),
-                collect_error=None if collect_error is None else
-                    dict(type=type(collect_error).__name__,message=str(collect_error))))
-        if failure is not None:raise failure
-        if collect_error is not None:raise collect_error
-        require(not any(codes),'request failed; partial originals preserved, no retry')
-        require(not uncollected,'collect failed on one or more hosts; see private originals')
-        rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
-        summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)
-        io_utils.persist(root/protocol.SUMMARY_FILE,summary)
-        print(json.dumps(summary,sort_keys=True),flush=True)
+            io_utils.persist(
+                root / protocol.CONTROLLER_TERMINAL_FILE,
+                dict(
+                    codes=codes,
+                    all_hosts_idle=True,
+                    collected=done and not uncollected,
+                    divergent_records=divergent,
+                    uncollected_ranks=uncollected,
+                    stalled_ssh_clients=stalled,
+                    failure=None if failure is None else dict(type=type(failure).__name__, message=str(failure)),
+                    collect_error=None
+                    if collect_error is None
+                    else dict(type=type(collect_error).__name__, message=str(collect_error)),
+                ),
+            )
+        if failure is not None:
+            raise failure
+        if collect_error is not None:
+            raise collect_error
+        require(not any(codes), "request failed; partial originals preserved, no retry")
+        require(not uncollected, "collect failed on one or more hosts; see private originals")
+        rows = [json.loads((root / f"runner.rank{rank}.json").read_text()) for rank in range(8)]
+        summary = summarize(rows, pin, value["request_sha256"], host_rank_regex=fleet.host_rank_regex)
+        io_utils.persist(root / protocol.SUMMARY_FILE, summary)
+        print(json.dumps(summary, sort_keys=True), flush=True)
         if args.print_answers and not args.keep_loaded:  # the resident loop printed each answer
-            for index,item in enumerate(request.requests(value)):
-                item_root=root/f'item{index:03d}' if value.get('schema') in (request.BATCH_SCHEMA,request.CONCURRENT_SCHEMA) else root
-                print('\n'+item['request_id']+'\n'+(item_root/'answer.txt').read_text(),flush=True)
+            for index, item in enumerate(request.requests(value)):
+                item_root = (
+                    root / f"item{index:03d}"
+                    if value.get("schema") in (request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA)
+                    else root
+                )
+                print("\n" + item["request_id"] + "\n" + (item_root / "answer.txt").read_text(), flush=True)
     return 0
 
 
-if __name__=='__main__':raise SystemExit(main())
+if __name__ == "__main__":
+    raise SystemExit(main())

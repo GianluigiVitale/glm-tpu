@@ -61,9 +61,7 @@ class MoeWeights(NamedTuple):
 def route(normalized: jax.Array, weights: MoeWeights, *, top_k: int) -> Routes:
     """noaux_tc routing of every row, with the margin of its top-k decision."""
     logits = project(normalized, weights.router, dtype=jnp.float32)
-    expert_ids, route_weights = route_glm_noaux_tc_logits(
-        logits, weights.correction_bias, top_k=top_k
-    )
+    expert_ids, route_weights = route_glm_noaux_tc_logits(logits, weights.correction_bias, top_k=top_k)
     if top_k < logits.shape[1]:
         biased = jax.nn.sigmoid(logits) + weights.correction_bias[None, :]
         ranked = lax.top_k(biased, top_k + 1)[0]
@@ -90,17 +88,11 @@ def moe(
     routed = jnp.zeros(normalized.shape, jnp.float32)
     for slot in range(top_k):
         ids = expert_ids[:, slot]
-        gate = einsum(
-            "rh,rih->ri", normalized, jnp.take(weights.expert_gate, ids, axis=0)
-        )
+        gate = einsum("rh,rih->ri", normalized, jnp.take(weights.expert_gate, ids, axis=0))
         up = einsum("rh,rih->ri", normalized, jnp.take(weights.expert_up, ids, axis=0))
         activated = swiglu_activation(gate, up)
-        output = einsum(
-            "ri,rhi->rh", activated, jnp.take(weights.expert_down, ids, axis=0)
-        )
-        weighted = (output * route_weights[:, slot, None].astype(jnp.bfloat16)).astype(
-            jnp.bfloat16
-        )
+        output = einsum("ri,rhi->rh", activated, jnp.take(weights.expert_down, ids, axis=0))
+        weighted = (output * route_weights[:, slot, None].astype(jnp.bfloat16)).astype(jnp.bfloat16)
         routed = routed + weighted.astype(jnp.float32)
     shared = dense_mlp(normalized, weights.shared)
     scale = jnp.asarray(routed_scaling_factor, jnp.bfloat16)
@@ -125,19 +117,14 @@ def dequantize_fp8_block_weight(
     if weight.ndim != 2 or scale.ndim != 2:
         raise ValueError("weight and scale must both be rank two")
     if len(block_shape) != 2 or any(
-        not isinstance(item, int) or isinstance(item, bool) or item <= 0
-        for item in block_shape
+        not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in block_shape
     ):
         raise ValueError("block_shape must contain two positive integers")
     expected_scale = tuple(
-        (dimension + block - 1) // block
-        for dimension, block in zip(weight.shape, block_shape, strict=True)
+        (dimension + block - 1) // block for dimension, block in zip(weight.shape, block_shape, strict=True)
     )
     if scale.shape != expected_scale:
-        raise ValueError(
-            f"scale must have shape {expected_scale} for weight {weight.shape}, "
-            f"got {scale.shape}"
-        )
+        raise ValueError(f"scale must have shape {expected_scale} for weight {weight.shape}, got {scale.shape}")
     expanded = jnp.repeat(scale.astype(jnp.float32), block_shape[0], axis=0)
     expanded = jnp.repeat(expanded, block_shape[1], axis=1)
     expanded = expanded[: weight.shape[0], : weight.shape[1]]

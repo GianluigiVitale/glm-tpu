@@ -84,8 +84,9 @@ def items(run: Path) -> dict[str, dict[str, Any]]:
             # Resident rounds record output_directory relative to the run root
             # (e.g. 'resident-0001'); batch items record it relative to the job.
             item_dir = job / relative if (job / relative / "tokens.jsonl").exists() else run / relative
-            out[reports[0]["request_sha256"]] = dict(job=job, dir=item_dir, reports=reports,
-                                                    tokens=item_dir / "tokens.jsonl", answer=item_dir / "answer.txt")
+            out[reports[0]["request_sha256"]] = dict(
+                job=job, dir=item_dir, reports=reports, tokens=item_dir / "tokens.jsonl", answer=item_dir / "answer.txt"
+            )
     return out
 
 
@@ -103,15 +104,21 @@ def summarize(record: dict[str, Any]) -> dict[str, Any]:
     peaks = [m["peak_bytes_in_use"] for r in reports for m in r["peak_memory"]]
     answer = extract(record["answer"].read_text(), reports[0]["finish_reason"] == "eos")
     return dict(
-        emitted=reports[0]["emitted"], finish_reason=reports[0]["finish_reason"],
-        stop_cause=reports[0].get("stop_cause"), token_sha256=reports[0]["token_sha256"],
-        jsonl_sha256=token_sha(ids), jsonl_len=len(ids),
+        emitted=reports[0]["emitted"],
+        finish_reason=reports[0]["finish_reason"],
+        stop_cause=reports[0].get("stop_cause"),
+        token_sha256=reports[0]["token_sha256"],
+        jsonl_sha256=token_sha(ids),
+        jsonl_len=len(ids),
         ranks_agree=len({(r["token_sha256"], r["emitted"]) for r in reports}) == 1,
         slowest_decode_tps=min((r["decode_tokens_per_second"] or 0) for r in reports),
         slowest_prefill_s=max(r["prefill_seconds"] for r in reports),
-        peak_bytes_max=max(peaks), peak_bytes_min=min(peaks),
+        peak_bytes_max=max(peaks),
+        peak_bytes_min=min(peaks),
         answer_sha256=None if answer is None else hashlib.sha256(answer.encode()).hexdigest(),
-        _answer=answer, _ids=ids)
+        _answer=answer,
+        _ids=ids,
+    )
 
 
 def compare(run: Path, goldens: list[Path], *, speed_tolerance: float = 0.03) -> dict[str, Any]:
@@ -119,8 +126,11 @@ def compare(run: Path, goldens: list[Path], *, speed_tolerance: float = 0.03) ->
     rows, failures = [], []
     for sha, record in items(run).items():
         new = summarize(record)
-        row: dict[str, Any] = dict(request_sha256=sha, request_id=record["reports"][0]["request_id"],
-                                   new={k: v for k, v in new.items() if not k.startswith("_")})
+        row: dict[str, Any] = dict(
+            request_sha256=sha,
+            request_id=record["reports"][0]["request_id"],
+            new={k: v for k, v in new.items() if not k.startswith("_")},
+        )
         old_record = golden.get(sha)
         if old_record is None:
             row["golden"] = None
@@ -128,30 +138,43 @@ def compare(run: Path, goldens: list[Path], *, speed_tolerance: float = 0.03) ->
         else:
             old = summarize(old_record)
             pairs = zip(new["_ids"], old["_ids"], strict=False)
-            first = next((i for i, (a, b) in enumerate(pairs) if a != b),
-                         None if len(new["_ids"]) == len(old["_ids"]) else min(len(new["_ids"]), len(old["_ids"])))
+            first = next(
+                (i for i, (a, b) in enumerate(pairs) if a != b),
+                None if len(new["_ids"]) == len(old["_ids"]) else min(len(new["_ids"]), len(old["_ids"])),
+            )
             ratio = new["slowest_decode_tps"] / old["slowest_decode_tps"] if old["slowest_decode_tps"] else None
             job = old_record["job"]
-            row.update(golden_run=job.parent.name if job.name.startswith("resident-") else job.name,
-                       golden={k: v for k, v in old.items() if not k.startswith("_")},
-                       tokens_identical=new["_ids"] == old["_ids"], first_divergent_index=first,
-                       decode_speed_ratio=ratio, peak_equal=new["peak_bytes_max"] == old["peak_bytes_max"])
+            row.update(
+                golden_run=job.parent.name if job.name.startswith("resident-") else job.name,
+                golden={k: v for k, v in old.items() if not k.startswith("_")},
+                tokens_identical=new["_ids"] == old["_ids"],
+                first_divergent_index=first,
+                decode_speed_ratio=ratio,
+                peak_equal=new["peak_bytes_max"] == old["peak_bytes_max"],
+            )
             checks = dict(
                 tokens=row["tokens_identical"] and new["token_sha256"] == old["token_sha256"],
                 receipt_matches_jsonl=new["jsonl_sha256"] == new["token_sha256"] and new["jsonl_len"] == new["emitted"],
                 ranks_agree=new["ranks_agree"],
                 stop=new["finish_reason"] == old["finish_reason"] and new["stop_cause"] == old["stop_cause"],
                 answer=new["_answer"] == old["_answer"],
-                speed=ratio is None or ratio >= 1 - speed_tolerance)
+                speed=ratio is None or ratio >= 1 - speed_tolerance,
+            )
             row["checks"] = checks
             failures += [[sha, k] for k, v in checks.items() if not v]
         rows.append(row)
     summary_path = run / "summary.json"
     terminal_path = run / "controller_terminal.json"
-    return dict(run=run.name, goldens=[g.name for g in goldens], requests=len(rows), failures=failures,
-                summary_passed=json.loads(summary_path.read_text()).get("passed") if summary_path.exists() else None,
-                controller_terminal=json.loads(terminal_path.read_text()) if terminal_path.exists() else None,
-                status="pass" if rows and not failures else "fail", rows=rows)
+    return dict(
+        run=run.name,
+        goldens=[g.name for g in goldens],
+        requests=len(rows),
+        failures=failures,
+        summary_passed=json.loads(summary_path.read_text()).get("passed") if summary_path.exists() else None,
+        controller_terminal=json.loads(terminal_path.read_text()) if terminal_path.exists() else None,
+        status="pass" if rows and not failures else "fail",
+        rows=rows,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -169,8 +192,14 @@ def main(argv: list[str] | None = None) -> int:
         verdict = "IDENTICAL" if row.get("tokens_identical") else f"DIVERGES@{row.get('first_divergent_index')}"
         failed = [k for k, v in checks.items() if not v]
         speed = f"speed_ratio={row['decode_speed_ratio']:.4f}" if row.get("decode_speed_ratio") else ""
-        print(row["request_id"], verdict, row["new"]["emitted"], row["new"]["token_sha256"][:16], speed,
-              "FAIL:" + ",".join(failed) if failed else ("ok" if checks else "NO-GOLDEN"))
+        print(
+            row["request_id"],
+            verdict,
+            row["new"]["emitted"],
+            row["new"]["token_sha256"][:16],
+            speed,
+            "FAIL:" + ",".join(failed) if failed else ("ok" if checks else "NO-GOLDEN"),
+        )
     print("PASS" if result["status"] == "pass" else f"FAIL ({len(result['failures'])})")
     return 0 if result["status"] == "pass" else 1
 

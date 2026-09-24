@@ -19,15 +19,10 @@ def pytest_configure(config: pytest.Config) -> None:
         config.addinivalue_line("markers", line)
 
 
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
-) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     live = None
     for item in items:
-        if (
-            item.get_closest_marker("cpu32") is not None
-            and "tests/reference/" in item.nodeid
-        ):
+        if item.get_closest_marker("cpu32") is not None and "tests/reference/" in item.nodeid:
             live = live_tpu_run() if live is None else live
             if live:
                 item.add_marker(pytest.mark.skip(reason=REFUSAL))

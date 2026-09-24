@@ -6,6 +6,7 @@ fleet lease (HANDOFF 2026-08: a review pytest did exactly that).  Protected TPU
 work never runs through pytest; every test runs on the CPU platform.  Tests that
 spawn subprocesses set their own environment and inherit this default.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,8 +14,7 @@ import os
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 if os.environ.get("JAX_PLATFORMS") != "cpu":
     raise RuntimeError(
-        "pytest must run with JAX_PLATFORMS=cpu on the pod controller; "
-        f"got {os.environ.get('JAX_PLATFORMS')!r}"
+        f"pytest must run with JAX_PLATFORMS=cpu on the pod controller; got {os.environ.get('JAX_PLATFORMS')!r}"
     )
 
 # Never read the operator's site file from a test: the default site location points at a
@@ -26,5 +26,8 @@ for _name in ("GLM_TPU_SITE_CONFIG", "GLM_TPU_RUN_ROOT", "GLM_TPU_MODEL_PATH", "
 
 
 def pytest_configure(config) -> None:
-    config.addinivalue_line("markers", "site: needs the operator's real site file (GLM_TPU_TEST_SITE) on a fleet "
-                                       "host; skips without it (excluded from G10/G11)")
+    config.addinivalue_line(
+        "markers",
+        "site: needs the operator's real site file (GLM_TPU_TEST_SITE) on a fleet "
+        "host; skips without it (excluded from G10/G11)",
+    )
