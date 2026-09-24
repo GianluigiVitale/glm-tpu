@@ -43,15 +43,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "f4b706aa6a52c7cd9f7f8827917fb36c6c25e0f523ee72b4cdf73768c8f9603f",
+  "closure_map": "cccc7670bc497e5d8807cb07d14dd783b7566ad4aa4a478afec10928a542c5c0",
   "kind": "rename-only",
-  "previous_digest": "8e94f418d76014097579969580cf92ac271934f9c750a4392e9b994070ace4b7",
-  "reason": "S4.1"
+  "previous_digest": "543579e7c23aef93e9c266db1f743081076519e73e44677b2eba4101314ad187",
+  "reason": "S4.2b"
  },
- "recorded_unix": 1790235146,
+ "recorded_unix": 1790273004,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "f1509d198cbad83b543a4bfff0262ab5d1bf765f",
+  "head": "27b1b411d05ba4fa6566b5e6a52d6dc3d9f8c4ff",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -88,7 +88,7 @@
    "third_party": []
   },
   "graph": {
-   "count": 58,
+   "count": 59,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -107,6 +107,7 @@
     "glm_tpu.kernels.fp8_grouped_matmul.kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panel_kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panels",
+    "glm_tpu.kernels.names",
     "glm_tpu.kernels.sparse_mla",
     "glm_tpu.kernels.sparse_mla.kernel",
     "glm_tpu.kernels.sparse_mla.partial_kernel",
@@ -167,7 +168,7 @@
    ]
   },
   "serving": {
-   "count": 78,
+   "count": 79,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -212,6 +213,7 @@
     "glm_tpu.kernels.fp8_grouped_matmul.kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panel_kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panels",
+    "glm_tpu.kernels.names",
     "glm_tpu.kernels.sparse_mla",
     "glm_tpu.kernels.sparse_mla.kernel",
     "glm_tpu.kernels.sparse_mla.partial_kernel",
@@ -296,7 +298,7 @@
    ]
   },
   "worker_main": {
-   "count": 66,
+   "count": 67,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -321,6 +323,7 @@
     "glm_tpu.kernels.fp8_grouped_matmul.kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panel_kernel",
     "glm_tpu.kernels.fp8_grouped_matmul.panels",
+    "glm_tpu.kernels.names",
     "glm_tpu.kernels.sparse_mla",
     "glm_tpu.kernels.sparse_mla.kernel",
     "glm_tpu.kernels.sparse_mla.partial_kernel",

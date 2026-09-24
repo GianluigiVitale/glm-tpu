@@ -12,7 +12,6 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.kernels.names" = "S4.2b: the Pallas kernel names (KERNEL_NAMES, D5), imported by the four kernel modules"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
