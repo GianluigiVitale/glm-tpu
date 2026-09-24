@@ -498,6 +498,9 @@ def _closure_check(gate: str, baseline: dict[str, Any], fresh: dict[str, Any]) -
             renamed += len(result["renamed"])
             if result["removed"]:
                 removed[stage] = result["removed"][:20]
+        from .import_closure import lean_violations
+
+        differing += lean_violations(new["stages"])
         recorded = {closure_map.layering_entry(e, closure_map.ClosureMap()) for e in old["static_layering"]}
         differing += ["static_layering+" + e for e in sorted({closure_map.layering_entry(e, cmap)
                                                               for e in new["static_layering"]} - recorded)]

@@ -6,6 +6,7 @@ heavy, refused while a TPU run is live); ``test_import_closures_static`` is the 
 import pytest
 
 from tools.equivalence.common import DATA, read_json
+from tools.equivalence.import_closure import lean_violations
 
 
 @pytest.mark.golden
@@ -25,3 +26,20 @@ def test_import_closures_static(gate_check):
 @pytest.mark.golden_data("import_closure.json")
 def test_controller_never_imports_jax():
     assert read_json(DATA / "import_closure.json")["stages"]["controller"]["jax_imported"] is False
+
+
+@pytest.mark.golden
+@pytest.mark.golden_data("import_closure.json")
+def test_worker_and_graph_closures_are_lean():
+    """S2f: the worker preflight, worker main and graph closures hold only glm_tpu modules and the
+    launcher/worker entry scripts (G6 enforces it on every fresh record)."""
+    assert lean_violations(read_json(DATA / "import_closure.json")["stages"]) == []
+
+
+def test_lean_allowlist_flags_research_and_tool_modules():
+    stages = dict(worker_main=dict(modules=["glm_tpu", "glm_tpu.optimized.runtime", "scripts.release",
+                                            "scripts.release.ws32_optimized_worker", "scripts.greenfield.x"]),
+                  graph=dict(modules=["tools.x", "glm_tpu.runner.programs"]),
+                  serving=dict(modules=["tests.fixtures.site"]))  # serving is not lean-checked
+    assert lean_violations(stages) == ["stages.worker_main.not_lean+scripts.greenfield.x",
+                                       "stages.graph.not_lean+tools.x"]

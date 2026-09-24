@@ -356,6 +356,10 @@ worker `main` with its real `preflight` and `_initialize_runtime`, `resident_loo
 preflight or runtime initialization is recorded too. The static scan lists every
 `scripts|tools|bench|benchmarks|tests|examples` import inside `glm_tpu` (9 at S0).
 
+From S2f on G6 also asserts the **lean allowlist**: every repository module of the worker preflight,
+worker main and graph closures is a `glm_tpu` module or one of the entry scripts
+`scripts.release.{launch_ws32_optimized_request,ws32_optimized_worker}` (`import_closure.lean_violations`).
+
 The G6 comparison lets every stage closure, its third-party set and the static scan **only shrink**:
 a module or package that is new in a stage fails unless it is reviewed; a stage may not start
 importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the real

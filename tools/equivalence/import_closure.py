@@ -23,7 +23,9 @@ reviewed ``[added]`` entry; JAX may not appear in a stage that did not import it
 
 The static scan lists every import of ``scripts|tools|bench|benchmarks|tests|examples`` from
 ``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and from S2 on it must be
-empty.
+empty. From S2f on the worker preflight, worker main and graph closures must also be lean: every
+repository module in them is a ``glm_tpu`` module or ``scripts.release.{launch_ws32_optimized_request,
+ws32_optimized_worker}`` (``lean_violations``).
 
 ``--light`` runs only the three entry-module stages and the static scan (``G6-static``: no 32-device
 child, no runtime build; allowed while a TPU run is live); the full record adds the exercised
@@ -79,8 +81,20 @@ STAGES: dict[str, tuple[str, ...]] = {
     ),
 }
 EXERCISED = ("graph", "serving")
+# The lean allowlist (S2f on): every repository module the worker (preflight and main) and graph
+# construction load is a glm_tpu module or one of the two process entry scripts.
+LEAN_STAGES = ("worker_preflight", "worker_main", "graph")
+LEAN_SCRIPTS = frozenset({"scripts.release", "scripts.release.launch_ws32_optimized_request",
+                          "scripts.release.ws32_optimized_worker"})
 LAYERING_FORBIDDEN = ("scripts", "tools", "bench", "benchmarks", "tests", "examples")
 HARNESS = "tools.equivalence"
+
+
+def lean_violations(stages: dict[str, Any]) -> list[str]:
+    """Modules of the lean-checked stages outside glm_tpu and the two entry scripts."""
+    return [f"stages.{stage}.not_lean+{module}" for stage in LEAN_STAGES if stage in stages
+            for module in stages[stage]["modules"]
+            if not (module == "glm_tpu" or module.startswith("glm_tpu.") or module in LEAN_SCRIPTS)]
 
 
 def _repo_modules() -> list[str]:
