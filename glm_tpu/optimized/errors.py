@@ -17,17 +17,5 @@ class PlanValidationError(GreenfieldConfigError):
     """An execution plan violates an explicit layout invariant."""
 
 
-class HloContractViolationError(RuntimeError):
-    """Lowered HLO violates an explicit physical execution contract."""
-
-
-class BenchmarkValidationError(GreenfieldConfigError):
-    """A synthetic benchmark does not satisfy its declared proof contract."""
-
-
 class CheckpointValidationError(GreenfieldConfigError):
     """Checkpoint metadata, ownership, or byte reconciliation is invalid."""
-
-
-class PartitioningValidationError(GreenfieldConfigError):
-    """A layer or memory partition cannot satisfy the declared plan."""

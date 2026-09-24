@@ -200,12 +200,22 @@ def _without_import_paths(node: ast.AST) -> str:
     return ast.dump(node)
 
 
+def _pruned_at_s2f(home: str) -> set[str]:
+    """Dead definitions S2f step 5 pruned from ``home`` (the reviewed plan)."""
+    import tomllib
+
+    plan = tomllib.loads((REPO / "tools/migration/keep_symbols.toml").read_text())
+    module = home[:-3].replace("/", ".")
+    return set(plan.get(module, {}).get("prune", []))
+
+
 @pytest.mark.parametrize(("home", "origin"), S2F_WHOLE)
 def test_s2f_moved_file_keeps_every_definition(home, origin):
     base, current = _s2f_base(origin), _current(home)
-    names = _top_level_names(base)
-    # same definitions in the same order (a split may append its definitions to a moved file)
-    assert [n for n in _top_level_names(current) if n in names] == names
+    names = [n for n in _top_level_names(base) if n not in _pruned_at_s2f(home)]
+    # the same definitions in the same order, minus the pruned dead ones (a split may append its
+    # definitions to a moved file)
+    assert [n for n in _top_level_names(current) if n in _top_level_names(base)] == names
     for name in names:
         assert _without_import_paths(_definition(current, name)) == _without_import_paths(_definition(base, name))
 

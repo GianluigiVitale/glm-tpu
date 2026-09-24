@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from . import ws32_decoder as dec, ws32_batched_prefill as pre
+from . import ws32_decoder as dec
 from .admission import inspect_research_hlo, memory_projection
 from .bf16_resident import bf16_resident_weights
 from .request_loop import PackedRequestSession, RequestPolicy

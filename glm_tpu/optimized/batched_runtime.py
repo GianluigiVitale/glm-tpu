@@ -4,7 +4,6 @@ import gc
 import time
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 
 from . import ws32_batched_prefill as pre

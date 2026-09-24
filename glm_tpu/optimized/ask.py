@@ -2,7 +2,6 @@
 from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 
 from glm_tpu import user_request as legacy
 from . import request
