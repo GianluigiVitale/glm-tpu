@@ -1,5 +1,16 @@
 {
  "defaults": {
+  "CacheConfig": {
+   "context_capacity": "<required>",
+   "exact_dsa": false,
+   "geometry": "<required>",
+   "host_main_rope_table": false,
+   "logical_page_size": 512,
+   "packed_cache_width": 640,
+   "rms_norm_epsilon": "1e-05",
+   "sparse_segment_block": 512,
+   "strategy_nd_dense": false
+  },
   "RoutedProjectionConfig": {
    "block_shape": [
     128,
@@ -15,17 +26,6 @@
    "sort_tile": 128,
    "vmem_limit_bytes": null
   },
-  "Ws32DecoderConfig": {
-   "context_capacity": "<required>",
-   "exact_dsa": false,
-   "geometry": "<required>",
-   "host_main_rope_table": false,
-   "logical_page_size": 512,
-   "packed_cache_width": 640,
-   "rms_norm_epsilon": "1e-05",
-   "sparse_segment_block": 512,
-   "strategy_nd_dense": false
-  },
   "Ws32PerfOptions": "<absent>",
   "bf16_resident_weights": {},
   "build_batched_decoder_program": {
@@ -35,6 +35,11 @@
    "sparse_attention_interpret": false
   },
   "build_cache_initializer": {},
+  "build_decoder_program": {
+   "linear_interpret": false,
+   "mask_finished": false,
+   "sparse_attention_interpret": false
+  },
   "build_packed_decoder_program": {
    "linear_interpret": false,
    "sparse_attention_interpret": false
@@ -43,12 +48,7 @@
    "linear_interpret": false,
    "sparse_attention_interpret": false
   },
-  "build_wk_programs": {},
-  "build_ws32_challenger_decoder_program": {
-   "linear_interpret": false,
-   "mask_finished": false,
-   "sparse_attention_interpret": false
-  }
+  "build_wk_programs": {}
  },
  "environment": {
   "device_count": 32,
@@ -64,9 +64,9 @@
  "gate": "G1-protocol",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "S2d"
+  "reason": "S4.2"
  },
- "recorded_unix": 1790198408,
+ "recorded_unix": 1790269273,
  "runtime": {
   "1536": {
    "admissions": [
@@ -1897,7 +1897,7 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "040f73683438a131ed3fb62fa887f34ac76558cf",
+  "head": "48b322822343846aa8a86ca05025c668b2cc6899",
   "production_paths_equal_baseline": false
  },
  "tier": "fixture",
