@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 
 from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
@@ -109,3 +110,28 @@ decode_layer {
 '''
     instruction = parse_hlo_module(text).collectives[0]
     assert instruction.operand_shapes == instruction.result_shapes
+
+
+def test_async_collective_start_counts_once_and_done_is_not_a_collective() -> None:
+    # The TPU graph admission (optimized.admission.inspect_research_hlo) counts
+    # module.collectives by opcode and relies on this normalization of async forms.
+    async_hlo = GOOD_HLO.replace(
+        "all-reduce(x)", "all-reduce-start(x)"
+    ).replace(
+        "  routed = bf16[1,2048]{1,0} slice(local),",
+        "  completed = bf16[1,6144]{1,0} all-reduce-done(local)\n"
+        "  routed = bf16[1,2048]{1,0} slice(completed),",
+    )
+    assert "all-reduce-start(x)" in async_hlo and "all-reduce-done(local)" in async_hlo
+    module = parse_hlo_module(async_hlo)
+    reduction, permute = module.collectives
+    assert reduction.opcode == "all-reduce"
+    assert reduction.raw_opcode == "all-reduce-start"
+    assert reduction.replica_groups == ((0, 1, 2, 3), (4, 5, 6, 7))
+    assert permute.opcode == "collective-permute"
+    (done,) = (op for op in module.instructions if op.raw_opcode == "all-reduce-done")
+    assert not done.is_collective
+    assert Counter(op.opcode for op in module.collectives) == {
+        "all-reduce": 1,
+        "collective-permute": 1,
+    }

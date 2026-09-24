@@ -24,7 +24,7 @@ results/
 *.p12
 *.pfx
 
-# bench data cache + runtime DB (schema lives in bench/provenance.py)
+# bench data cache + runtime DB (the bench/ harness is archived at archive/research-20260922)
 bench/data/
 bench/results.db
 *.db-journal

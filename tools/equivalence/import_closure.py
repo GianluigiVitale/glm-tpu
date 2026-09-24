@@ -22,10 +22,12 @@ closure only shrink: a module or third-party package that is new in a stage fail
 reviewed ``[added]`` entry; JAX may not appear in a stage that did not import it.
 
 The static scan lists every import of ``scripts|tools|bench|benchmarks|tests|examples`` from
-``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and from S2 on it must be
-empty. From S2f on the worker preflight, worker main and graph closures must also be lean: every
-repository module in them is a ``glm_tpu`` module or ``scripts.release.{launch_ws32_optimized_request,
-ws32_optimized_worker}`` (``lean_violations``).
+``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and it must be empty from
+WU-S on (H2: ``ask`` execs the controller module; until then ``glm_tpu/optimized/ask.py ->
+scripts.release`` remains, the one entry recorded at S2f). From S2f on the worker preflight,
+worker main and graph closures must also be lean: every repository module in them is a ``glm_tpu``
+module or ``scripts.release.{launch_ws32_optimized_request,ws32_optimized_worker}``
+(``lean_violations``).
 
 ``--light`` runs only the three entry-module stages and the static scan (``G6-static``: no 32-device
 child, no runtime build; allowed while a TPU run is live); the full record adds the exercised

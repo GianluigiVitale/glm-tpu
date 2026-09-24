@@ -7,7 +7,9 @@ Public distribution still requires completion of the provenance/privacy audit.
 
 ## Hugging Face Transformers reference extracts
 
-The following files retain their original copyright and Apache-2.0 headers:
+This tree no longer contains these extracts: they were archived with the research
+layer at tag `archive/research-20260922`, where the following files retain their
+original copyright and Apache-2.0 headers:
 
 - `reference/configuration_glm_moe_dsa.py`
 - `reference/modeling_glm_moe_dsa.py`
@@ -22,10 +24,11 @@ installed Transformers 5.12.0 distribution under
 distribution's own LICENSE file, unchanged. This is a local distribution
 comparison, not a claim to have established the original upstream commit or
 revalidated downloaded wheel bytes. Hashes and limitations are in
-`docs/release/third-party-reference-check-20260914.json`.
+`docs/release/third-party-reference-check-20260914.json` (at the archive tag).
 
 These extracts are reference material, not the native engine's execution path.
-The current private wheel excludes `reference/`; source checkouts include it.
+The current private wheel excludes `reference/`; source checkouts include
+`reference/hf-glm53/` only.
 
 ## Model repository snapshot and weights
 
@@ -35,10 +38,11 @@ revision `aca966e4e02791568aa6a4ced368624b3d897f42`. Copyright (c) 2026 Z.AI.
 Its [GLM-5.3 license](licenses/GLM-5.3.txt) is retained verbatim. This license is
 distinct from GLM-5.2's MIT license. Tokenizer vocabulary and weights remain
 external; the ordinary request profile pins their model/template identities.
-The historical snapshot below remains unchanged.
+The historical snapshot below is preserved, unchanged, at the archive tag.
 
-`reference/hf-repo/` preserves GLM-5.2-FP8 configuration, tokenizer metadata, chat
-template and historical model-card text. The publisher's
+`reference/hf-repo/` (archived at tag `archive/research-20260922`, not in this
+tree) preserves GLM-5.2-FP8 configuration, tokenizer metadata, chat template and
+historical model-card text. The publisher's
 [MIT license](https://huggingface.co/zai-org/GLM-5.2-FP8/blob/f33c6dc501ee5a2c7e35155653b1b1abbc320951/LICENSE)
 is retained in [GLM-5.2-MIT.txt](licenses/GLM-5.2-MIT.txt):
 Copyright (c) 2026 Zhipu AI.
@@ -48,7 +52,8 @@ On 2026-09-14 the four configuration/template files matched upstream revision
 earlier historical copy, not the benchmark protocol's pinned card; it was not
 overwritten. Use the protocol's original card revision/hash for comparisons.
 The copied license was obtained from that exact revision, not a different GLM
-repository. Details: `docs/release/hf-source-notice-check-20260914.json`.
+repository. Details: `docs/release/hf-source-notice-check-20260914.json` (at the
+archive tag).
 Model weights are external and must never be bundled into Git or the wheel.
 
 ## Legacy patch and external dependencies
@@ -77,7 +82,8 @@ own upstream revision/license-notice reconciliation; removal from this tree does
 not remove it from history or complete public-distribution clearance.
 
 JAX, jaxlib, libtpu, PyTorch, Transformers and other installed dependencies are
-separately distributed packages, not relicensed by this project. Exact observed
-versions are in `requirements/runtime-observed.txt`; dependency installation does
+separately distributed packages, not relicensed by this project. The versions
+observed for the research release are in `requirements/runtime-observed.txt` (at
+the archive tag `archive/research-20260922`); dependency installation does
 not mean all binary redistribution terms have been audited. Do not publish a
 bundled runtime image as though this source notice covered all of its contents.

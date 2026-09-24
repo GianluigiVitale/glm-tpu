@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax import lax
 from jax._src.pallas.mosaic import tpu_info
 
 from glm_tpu.optimized.prefill_expert_panels import (
@@ -79,6 +80,73 @@ def test_invalid_metadata_and_empty_owner_skip_all_work():
         value, valid = run(c, jnp.int32(o))
         assert not bool(valid)
         np.testing.assert_array_equal(value, 0)
+
+
+def _dequantize_and_dot(x, bits, scales, counts, offset, dtype):
+    """Pure-JAX reference: dequantize each local expert to BF16 with its full-K scale table
+    (one scale per N128 x K128 block), contract in increasing K128 order with FP32 accumulation;
+    rows outside the local experts ``[offset, offset + groups)`` are zero."""
+    groups, n, k = bits.shape
+    m = x.shape[0]
+    local = np.repeat(np.arange(counts.size), counts) - offset
+    owned = (local >= 0) & (local < groups)
+    expanded = jnp.repeat(jnp.repeat(scales, 128, axis=1), 128, axis=2)
+    weights = (
+        lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32) * expanded
+    ).astype(jnp.bfloat16)
+    expert = np.clip(local, 0, groups - 1)
+    acc = jnp.zeros((m, n), jnp.float32)
+    for ki in range(k // 128):
+        block = slice(ki * 128, (ki + 1) * 128)
+        partial = jnp.einsum(
+            "mk,gnk->gmn",
+            x[:, block],
+            weights[:, :, block],
+            preferred_element_type=jnp.float32,
+        )
+        acc = acc + partial[expert, np.arange(m)]
+    return jnp.where(owned[:, None], acc, 0).astype(dtype), owned
+
+
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.bfloat16])
+def test_full_k_scales_and_n128_stripes_match_dequantize_and_dot(dtype):
+    # Random operands; the ninth K block catches accidental reuse of a ki%8 scale slab, and the
+    # zero and 3.25 scales sit in that block of two different N128 stripes and experts. Until S2f
+    # this compared with the archived grouped FP8 kernel (archive/research-20260922); on jax
+    # 0.10.1 CPU the kernel, that kernel and this reference are bitwise equal on these inputs.
+    rng = np.random.default_rng(911)
+    counts = np.array([1, 33, 7, 0], np.int32)
+    m, k, n = 41, 1152, 512
+    x = jnp.asarray(rng.normal(0, 0.2, (m, k)), jnp.bfloat16)
+    bits = lax.bitcast_convert_type(
+        jnp.asarray(rng.normal(0, 0.15, (2, n, k)), jnp.float8_e4m3fn), jnp.uint8
+    )
+    scales = jnp.asarray(rng.uniform(0.1, 2.0, (2, 4, 9)), jnp.float32)
+    scales = scales.at[0, 1, 8].set(0).at[1, 3, 8].set(3.25)
+
+    @jax.jit
+    def run(x, bits, scales):
+        plan = build_expert_panels(
+            jnp.asarray(counts), jnp.int32(1), rows=m, local_groups=2
+        )
+        return prefill_panel_fp8_matmul(
+            x, bits, scales, plan, result_dtype=dtype, interpret=True
+        )
+
+    value, ok = run(x, bits, scales)
+    expected, owned = _dequantize_and_dot(x, bits, scales, counts, 1, dtype)
+    assert bool(ok) and int(owned.sum()) == 40
+    assert value.dtype == dtype
+    actual = np.asarray(value).astype(np.float64)
+    reference = np.asarray(expected).astype(np.float64)
+    np.testing.assert_array_equal(actual[~owned], 0)
+    # FP32 accumulation order inside one K128 dot may differ by platform: a few FP32 ulps, at
+    # most one rounding step of the BF16 result. A wrong scale block or stripe moves an owned
+    # value by ~0.1-1 (|value| <= ~7).
+    if dtype == jnp.float32:
+        np.testing.assert_allclose(actual, reference, rtol=1e-5, atol=1e-5)
+    else:
+        np.testing.assert_allclose(actual, reference, rtol=2**-7, atol=2**-9)
 
 
 def test_all_rows_one_expert_capacity_and_scale_zero():

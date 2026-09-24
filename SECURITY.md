@@ -10,8 +10,8 @@ Never commit credentials, service-account keys, local environment files, weights
 runtime databases, private benchmark questions/golds, user prompts or raw user
 responses. Token IDs can reveal prompt contents too. Prepare requests outside
 the checkout; the preparation command creates owner-only output and refuses
-overwrites. `.gitignore` and the release content check add defense in depth, not
-permission to commit sensitive files under different names.
+overwrites. `.gitignore` and the release content check (archived, see below) add
+defense in depth, not permission to commit sensitive files under different names.
 
 Keep credentials in the existing operator-managed authentication environment.
 Do not paste tokens into issues, commit messages, command arguments or logs.
@@ -22,7 +22,14 @@ an automatic cleanup step.
 
 ## Release checks
 
+Both tools below belong to the research release. They were archived with the
+research layer at tag `archive/research-20260922` and are not in this tree; the
+release checks of this tree replace this section in a later stage (S6). Until
+then, the CPU checks of this tree are the equivalence gates
+(`tools/equivalence/README.md`) and `JAX_PLATFORMS=cpu python -m pytest tests`.
+
 ```bash
+# archived at archive/research-20260922; checks the research tree of that tag
 JAX_PLATFORMS=cpu python tools/check_release.py
 ```
 
@@ -32,10 +39,15 @@ runtime/release tests, and isolated offline wheel installation without dependenc
 It does not initialize TPU, download weights, call the model, run cloud commands,
 upgrade the active environment or authorize deployment.
 
-For a one-time history audit when needed:
+For a one-time history audit when needed (history mode scans the local Git
+objects of the repository the tool lives in, so run it from a worktree of the
+tag inside this clone):
 
 ```bash
-python tools/audit_release_content.py --history
+# archived at archive/research-20260922
+git worktree add --detach ../glm-tpu-archive archive/research-20260922
+python ../glm-tpu-archive/tools/audit_release_content.py --history
+git worktree remove ../glm-tpu-archive
 ```
 
 The audit reports locations/object IDs only, not matched credential contents.

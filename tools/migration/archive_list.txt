@@ -20,7 +20,37 @@
 #               kept production module now (moved in S2a/S2d/S2f) or was an import-time execution
 #               declared at S2f; reviewed exceptions are named (S2d fold deletions, fixture v1).
 #  tag    (v)   git cat-file -e archive/research-20260922:<path> succeeds.
-# Paths: 568.
+# Paths: 567. The cut (1101451b) deleted 568; tests/release/test_optimized_prefill_program.py was
+# removed from this list and restored (S2f 6/n): the cut had deleted the production-only version
+# that eab8993f had just written (no oracle; it tests the production prefill program).
+# Mapping actions: 524 paths are "archive" in design/mapping.json (181c013e); 43 carry merge (13),
+# rewrite (9), split (18) or move (3). Every one of the 43 is at the tag (the source to port from);
+# the pre-cut copy (eab8993f) differs only in import paths (tests) or by the S2a/S2d/S2f extractions
+# (glm_tpu/, scripts/). The production parts of the 19 glm_tpu/ and scripts/ paths were extracted
+# before the cut; the 9 docs are read from the tag at S6. The 15 test paths (tests/greenfield/ ->
+# mapped target; S3/S5 write the owed ones on production code):
+#   hlo/fixtures/prefill_layer_schema.json  move    -> tests/fixtures/ (with the 78-layer schema test)
+#   runtime/test_ws32_batched_prefill.py     split   -> tests/models/glm_moe_dsa/test_prefill.py
+#                                                       (78-layer schema), test_prefill_semantics.py
+#                                                       (two-block handoff)
+#   runtime/test_ws32_prefill_window.py      rewrite -> test_prefill_semantics.py (window, rollback
+#                                                       on an unhealthy owner)
+#   runtime/test_ws32_rolled_prefill_tail.py rewrite -> test_prefill_semantics.py (B114 tail near
+#                                                       capacity)
+#   runtime/test_ws32_frozen_tail_padding.py rewrite -> test_prefill_semantics.py (tail padding)
+#   runtime/test_ws32_prefill_dense_canonical.py move -> tests/layers/test_mlp.py
+#   kernels/test_ws32_prefill_attention.py   rewrite -> tests/layers/attention/test_mla.py
+#   kernels/test_ws32_prefill_dsa.py         rewrite -> tests/layers/attention/test_dsa_indexer.py
+#   kernels/test_ws32_prefill_dsa_producer.py merge  -> tests/layers/attention/test_dsa_indexer.py
+#   kernels/test_ws32_prefill_linear.py      rewrite -> tests/layers/test_linear.py
+#   kernels/test_prefill_index.py            split   -> tests/layers/test_fp8.py, test_dsa_indexer.py
+#   tests/release/test_user_request.py       split   -> tests/engine/test_request.py,
+#                                                       tests/utils_/test_{io,json}_utils.py (the
+#                                                       read_bounded refusals are in test_io_utils)
+#   done: runtime/ws32_prefill_cpu_fixture.py (rewrite -> tools/equivalence/fixture.py,
+#   tests/fixtures/tiny_model.py), validation/test_watch_ws32_run.py (split: its libtpu_holders
+#   cases run on the deployed copy in validation/test_ws32_libtpu_holder_guard.py), tests/release/
+#   test_deployment_branch.py (rewrite -> tests/executor/test_launch_policy.py, S1a).
 bench/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
 bench/benchmarks.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 bench/dsa_throughput.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
@@ -566,7 +596,6 @@ tests/release/test_inventory.py	dyn=absent static=absent tests=none trace=none(G
 tests/release/test_loader_import_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 tests/release/test_mirror_template.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 tests/release/test_native_helper_extraction.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
-tests/release/test_optimized_prefill_program.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 tests/release/test_preservation.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 tests/release/test_recovery_wrapper.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
 tests/release/test_release_check.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present

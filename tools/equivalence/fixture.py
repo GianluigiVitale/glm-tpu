@@ -208,8 +208,23 @@ def cpu_mesh() -> Any:
 def historical_equivalence() -> dict[str, Any]:
     """S0 proof that fixture v1 equals the historical fixture leaf for leaf (both geometries).
 
-    Needs the historical fixture module, archived at S2f (``archive/research-20260922``: run it from
-    a checkout of that tag); the result is recorded in ``tests/golden/data/fixture.json``.
+    The result is recorded in ``tests/golden/data/fixture.json``. The historical fixture module and
+    the GLM-5.2 config it reads (``configs/``, relative to the working directory) were archived at
+    S2f. The tag's copy of the module imports the archived ``glm_tpu.greenfield`` homes, so it does
+    not run against this tree; the pre-cut copy at eab8993f differs from it only in those import
+    paths. To re-check the record (``fixture`` gate; ~40 s, fleet idle), from this checkout::
+
+        D=$(mktemp -d) && git archive HEAD | tar -x -C "$D"
+        mkdir -p "$D/tests/greenfield/runtime" "$D/configs"
+        touch "$D/tests/greenfield/__init__.py" "$D/tests/greenfield/runtime/__init__.py"
+        git show eab8993f:tests/greenfield/runtime/ws32_prefill_cpu_fixture.py \\
+            > "$D/tests/greenfield/runtime/ws32_prefill_cpu_fixture.py"
+        git show archive/research-20260922:configs/glm-5.2-fp8-config.json \\
+            > "$D/configs/glm-5.2-fp8-config.json"
+        GLM_EQUIVALENCE_SOURCE_ROOT="$D" JAX_PLATFORMS=cpu python -m tools.equivalence check --gates fixture
+        rm -r "$D"
+
+    (The extracted tree is the tree under test and the child's working directory: ``common.child_env``.)
     """
     import jax
 

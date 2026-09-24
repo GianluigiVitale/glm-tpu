@@ -116,3 +116,10 @@ def test_pregathered_attention_rejects_shape_and_dtype_drift() -> None:
             config=CONFIG,
             interpret=True,
         )
+
+
+def test_sparse_attention_config_refuses_invalid_geometry() -> None:
+    with pytest.raises(ValueError, match="segment_block"):
+        SparseMlaConfig(segment_block=0)
+    with pytest.raises(ValueError, match="sort tiles"):
+        SparseMlaConfig(sort_tile=64)

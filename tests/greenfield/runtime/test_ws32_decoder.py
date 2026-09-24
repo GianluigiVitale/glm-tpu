@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import json
-from pathlib import Path
 
-import jax.numpy as jnp
-import numpy as np
 import pytest
 
 from glm_tpu.optimized.errors import PlanValidationError
+from glm_tpu.optimized.request import AGENT_CAPACITY
 from glm_tpu.optimized.ws32_decoder import (
     Ws32DecoderConfig,
+    Ws32DecoderWeights,
     bind_ws32_decoder_weights,
+    ws32_decode_result_specs,
+    ws32_decoder_state_specs,
     ws32_decoder_weight_names,
     ws32_decoder_weight_specs,
 )
@@ -21,11 +21,60 @@ from glm_tpu.optimized.geometry import ModelGeometry
 from tools.equivalence.fixture import config_json
 
 
-ROOT = Path(__file__).resolve().parents[3]
-
-
 def _geometry() -> ModelGeometry:
     return ModelGeometry.from_hf_config(config_json())
+
+
+def test_ws32_decoder_contract_covers_exact_78_layer_model() -> None:
+    # The production decoder contract at the 256K agent profile (``ask --context 256k``); the G2
+    # program fingerprints cover only the 8,192, 32,768 and 166,912 capacities.
+    assert AGENT_CAPACITY == 262_144
+    geometry = _geometry()
+    config = Ws32DecoderConfig(
+        geometry=geometry, context_capacity=AGENT_CAPACITY
+    )
+    weights = ws32_decoder_weight_specs(config)
+    state = ws32_decoder_state_specs()
+    result = ws32_decode_result_specs()
+
+    assert config.page_count == 512
+    assert config.local_rows_per_page == 64
+    assert config.kv_cache_shape == (78, 512, 512, 640)
+    assert config.index_cache_shape == (21, 512, 512, 128)
+    assert config.full_index_slots == (0, 1, 2, *range(6, 75, 4))
+    assert config.full_index_slot_by_layer[:11] == (
+        0,
+        1,
+        2,
+        None,
+        None,
+        None,
+        3,
+        None,
+        None,
+        None,
+        4,
+    )
+    assert len(weights.layers) == 78
+    assert sum(layer.dense is not None for layer in weights.layers) == 3
+    assert sum(layer.moe is not None for layer in weights.layers) == 75
+    assert sum(layer.dsa is not None for layer in weights.layers) == 21
+    assert isinstance(weights, Ws32DecoderWeights)
+    assert str(weights.embedding_local) == "P('expert', 'feature')"
+    assert str(weights.final_norm_weight_local) == "P('feature',)"
+    assert str(weights.lm_head_local) == "P('expert', 'feature')"
+    assert str(state.kv_cache_local) == "P(None, None, 'expert', None)"
+    assert str(state.index_cache_local) == "P(None, None, 'expert', None)"
+    assert str(result.final_residual_local) == "P(None, 'feature')"
+
+    # Per-chip BF16 cache bytes: each page's rows are split over the 8 'expert' shards.
+    kv_layers, pages, _, kv_width = config.kv_cache_shape
+    index_layers, _, _, index_width = config.index_cache_shape
+    local_kv_bytes = kv_layers * pages * config.local_rows_per_page * kv_width * 2
+    local_index_bytes = index_layers * pages * config.local_rows_per_page * index_width * 2
+    assert local_kv_bytes == 3_271_557_120
+    assert local_index_bytes == 176_160_768
+    assert local_kv_bytes + local_index_bytes == 3_447_717_888
 
 
 def test_ws32_strategy_nd_dense_contract_is_default_off_and_final_layout() -> None:

@@ -271,10 +271,12 @@ Frozen fixture v1 reproduces the RNG call order of the historical
 `{checkpoint tensor name: array}` bound through the production name-based binder;
 `fixture.json` records that all 235 leaves equal the historical fixture's, for panel and
 non-panel geometry, and that the geometries are equal (the GLM-5.2 -> GLM-5.3 config swap is
-inert). Recorded groups: fixture checkpoint; WK decode/promote; resident BF16 weights; RoPE tables
-(1,536 / 8,192 / 32,768 / 166,912); `cache_init(157)`; prompt A (157 = B128 + B114 tail) state,
-token and health after each block; prompt B (114, one block); prompt C (refused prefill on a
-finished state: caches and frontier unchanged, health false, token -1); three packed decode steps;
+inert). The historical fixture was archived at S2f; `fixture.historical_equivalence` documents how
+the `fixture` gate re-checks that record against an extracted tree. Recorded groups: fixture
+checkpoint; WK decode/promote; resident BF16 weights; RoPE tables (1,536 / 8,192 / 32,768 /
+166,912); `cache_init(157)`; prompt A (157 = B128 + B114 tail) state, token and health after
+each block; prompt B (114, one block); prompt C (refused prefill on a finished state: caches and
+frontier unchanged, health false, token -1); three packed decode steps;
 an 8-token `PackedRequestSession` loop with identity votes (tokens and TokenEvent JSONL digest);
 `batch_cache_init` and `batch_insert` through the real `compile_batch`; `batch_generate`: the real
 `generate_concurrent` -> `generate_batch` of the concurrent runtime over four lanes (prompts A, B
