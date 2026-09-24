@@ -1,6 +1,9 @@
-"""BF16-resident non-routed weights: exact decode, same tokens, state within one BF16 ulp.
+"""BF16-resident non-routed weights: exact table decode, frozen partition specs, one decode step.
 
-CPU semantics on the forced 32-device mesh; the pod timing is in docs/perf.
+CPU semantics on the forced 32-device mesh. Until S2f the decode test also stepped the frozen FP8
+decoder beside the release decoder (same tokens and DSA selections, KV within one BF16 ulp on under
+1 % of elements); that oracle is archived at ``archive/research-20260922``, its final green run is
+recorded in the S2f commit message, and ``tests/reference`` (``VALIDATION.md``) carries the evidence.
 """
 
 from __future__ import annotations
@@ -35,63 +38,48 @@ def test_decode_table_matches_reference_dequantizer_bitwise():
         decode_fp8_table(bits.astype(jnp.int8), scale)
 
 
-def test_bf16_resident_step_matches_frozen_tokens_cpu32():
+def test_bf16_resident_decode_paths_agree_cpu32():
     code = r'''
 import json
 import jax, jax.numpy as jnp, numpy as np
-from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import NamedSharding, PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
-from glm_tpu.greenfield.runtime import ws32_batched_prefill as b, ws32_decoder as d
-from glm_tpu.greenfield.runtime.ws32_sampled_request import build_ws32_sampled_prefill_program
-from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig
-from glm_tpu.optimized.bf16_resident import bf16_resident_weights, bf16_weight_specs
+from glm_tpu.optimized.bf16_resident import bf16_weight_specs
 from glm_tpu.optimized.ws32_decoder_challenger import build_ws32_challenger_decoder_program
 from glm_tpu.optimized.request_loop import build_packed_decoder_program
-from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
-mesh = Mesh(np.asarray(jax.devices(), object).reshape(8, 4), ('expert', 'feature'))
-def put(v, spec=P()): return jax.device_put(v, NamedSharding(mesh, spec))
-config, weights, wk = fixture(mesh, panel_geometry=True)
-wk = tuple(put(v) for v in wk)
-rope = put(jnp.asarray(d.build_ws32_main_rope_table(config), jnp.bfloat16))
+from glm_tpu.runner.programs import build_program_set
+from tests.fixtures.tiny_model import cpu_mesh, engine_inputs, prefill
+mesh = cpu_mesh()
+inputs = engine_inputs(mesh, panel_geometry=True)
+config, bf16, rope = inputs.config, inputs.weights, inputs.rope
 interpret = dict(sparse_attention_interpret=True, linear_interpret=True)
-bf16 = bf16_resident_weights(mesh, config, weights)
 # Every leaf keeps the frozen partition spec and shape; only non-routed FP8 tables changed dtype.
 for leaf, spec in zip(jax.tree.leaves(bf16), jax.tree.leaves(bf16_weight_specs(config), is_leaf=lambda x: isinstance(x, P))):
     assert leaf.sharding.is_equivalent_to(NamedSharding(mesh, spec), leaf.ndim), (leaf.shape, leaf.sharding.spec, spec)
-prefill = build_ws32_sampled_prefill_program(mesh, config, sampling=NucleusConfig(), block_rows=2, key_tile=128, **interpret)
-state = b.make_ws32_batched_prefill_state(mesh, config, prompt_length=3)
-first = prefill.execute(put(jnp.array([30, 31], jnp.int32)), put(jnp.int32(2)), state, weights, wk, rope, put(jnp.float32(.5)))
-last = prefill.execute(put(jnp.array([32, -1], jnp.int32)), put(jnp.int32(1)), first.state, weights, wk, rope, put(jnp.float32(.5)))
-ds, token = b.finish_ws32_batched_prefill(last)
-frozen = jax.jit(d.build_ws32_decoder_program(mesh, config, **interpret).execute)
+state, token = prefill(mesh, inputs, build_program_set(mesh, config, interpret=True), [30, 31, 32])
 # the release decoder: 256x256 routed tiles, two-stage DSA, greedy head (the only profile)
 challenger = build_ws32_challenger_decoder_program(mesh, config, **interpret)
 packed = build_packed_decoder_program(mesh, config, **interpret)
 owned_packed = jax.jit(packed.execute,donate_argnums=(1,))
-report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
-ref_state, ch_state, ref_token = ds, ds, token
+report = dict(tokens=[], valid=True)
 for step in range(3):
-    ref = frozen(ref_token, ref_state, weights, rope)
-    out = challenger.execute(ref_token, ch_state, bf16, rope)
-    compact = packed.execute(ref_token, ch_state, bf16, rope)
+    out = challenger.execute(token, state, bf16, rope)
+    compact = packed.execute(token, state, bf16, rope)
     for a, z in zip(jax.tree.leaves(out), jax.tree.leaves(compact.decoded)):
         np.testing.assert_array_equal(np.asarray(a).view(np.uint8), np.asarray(z).view(np.uint8))
     np.testing.assert_array_equal(np.asarray(compact.metadata),
         [int(out.next_token[0]),1,int(out.state.position[0]),int(out.state.context_lengths[0])])
-    owned_state=jax.tree.map(lambda value:jnp.array(value,copy=True),ch_state)
-    donated=owned_packed(ref_token,owned_state,bf16,rope)
+    owned_state=jax.tree.map(lambda value:jnp.array(value,copy=True),state)
+    donated=owned_packed(token,owned_state,bf16,rope)
     jax.block_until_ready(donated)
     for expected,actual in zip(jax.tree.leaves(compact),jax.tree.leaves(donated)):
         np.testing.assert_array_equal(np.asarray(expected).view(np.uint8),np.asarray(actual).view(np.uint8))
-    report['tokens'].append([int(ref.next_token[0]), int(out.next_token[0])])
+    report['tokens'].append(int(out.next_token[0]))
     report['valid'] = report['valid'] and bool(np.asarray(out.state.contract_valid).all())
-    np.testing.assert_array_equal(np.asarray(ref.state.selected_positions), np.asarray(out.state.selected_positions))
-    kv_ref, kv_out = np.asarray(ref.state.kv_cache_local).astype(np.float32), np.asarray(out.state.kv_cache_local).astype(np.float32)
-    report['mismatch_fraction'][f'kv_step{step}'] = float(np.mean(kv_ref != kv_out))
-    report['max_abs'].append(float(np.max(np.abs(kv_ref - kv_out))))
-    ref_state, ch_state, ref_token = ref.state, out.state, ref.next_token
+    assert int(out.state.position[0]) == 4 + step  # prompt (3) + the tokens generated so far
+    state, token = out.state, out.next_token
 print(json.dumps(report))
 '''
     env = dict(os.environ, JAX_PLATFORMS="cpu",
@@ -100,9 +88,4 @@ print(json.dumps(report))
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout.strip().splitlines()[-1])
     assert report["valid"]
-    # Same tokens and the same DSA selections; the KV/latent values differ only by
-    # FP32 accumulation order inside one contraction (at most one BF16 ulp on a
-    # small fraction of elements) because the MXU operands are bit-identical.
-    assert all(a == b for a, b in report["tokens"]), report["tokens"]
-    assert all(fraction < 0.01 for fraction in report["mismatch_fraction"].values()), report
-    assert max(report["max_abs"]) <= 0.0625, report
+    assert all(0 <= t < 256 for t in report["tokens"]), report["tokens"]

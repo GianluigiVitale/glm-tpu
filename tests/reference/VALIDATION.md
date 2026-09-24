@@ -14,6 +14,23 @@ evidence and what each can and cannot show:
    and against the current production composition on the fixture, what agrees exactly, what
    does not, and why.
 
+> **Status after S2f (oracle hand-over, DESIGN 7.6).** The frozen FP8 oracle (the raw-FP8
+> prefill and decoder programs of the research package) was archived at S2f; it is preserved
+> at the tag `archive/research-20260922`. Section 2 below is the historical record of the
+> reference-against-oracle cross-validation. Its final green run (both `cpu32` comparisons, on
+> the tree of commit 2e3c8dd1, after the production definitions moved) is recorded in the S2f
+> oracle hand-over commit message, together with the final runs of the release tests that
+> compared production with the oracle. From S2f on:
+> `test_reference_matches_frozen_fp8_oracle` is archived; `oracle_run.py` runs the systems
+> `reference`, `reference-one-block` and `production` only;
+> `test_reference_matches_production_composition` reads its floors (how far production was
+> from the oracle, per prompt) from `floors.json`, recorded from the oracle's final run and
+> equal to the S2e runs below field for field. The oracle functions this file names under
+> `glm_tpu/greenfield/kernels/reference/` now live in `glm_tpu/optimized/reference/`
+> (moved verbatim at S2f); the transitive-import notes of the last sections describe the
+> pre-S2f layout (importing the reference now loads only `glm_tpu.optimized.reference` and its
+> dependencies).
+
 ## 1. Independent check: the FP64 restatement (fast tier)
 
 ### Why it is needed: functions common to the reference, the FP8 oracle and production

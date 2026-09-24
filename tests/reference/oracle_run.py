@@ -1,4 +1,4 @@
-"""CPU32 child: the unsharded reference against the frozen FP8 oracle and production.
+"""CPU32 child: the unsharded reference against the production composition.
 
 Run as ``python -B -m tests.reference.oracle_run --pair CANDIDATE:BASELINE
 [--prompt a|short] [--steps N]`` with ``JAX_PLATFORMS=cpu`` and 32 forced host
@@ -12,12 +12,14 @@ TPU-v4 chip description):
 * ``reference`` -- :mod:`tests.reference.model`, prefill in 128-row blocks;
   ``reference-one-block`` -- the same with the whole prompt in one block (only
   the accumulation shapes change: the reference's own rounding-noise floor);
-* ``fp8-oracle`` -- the frozen raw-FP8 programs: ``build_ws32_batched_prefill_program``
-  (B128 blocks, the production window options) and ``build_ws32_decoder_program``
-  ``.observe`` (every full indexer's selection);
 * ``production`` -- what ``OrdinaryRuntime._load`` builds (as at 181c013e): BF16-resident
   tables and the B128/B114 prefill, packed decode and cache-initializer programs of
   ``glm_tpu.runner.programs.build_program_set`` (only the carried selection is observable).
+
+Until S2f a third system, ``fp8-oracle`` (the frozen raw-FP8 prefill and decoder programs),
+cross-validated both (VALIDATION.md). It is archived at ``archive/research-20260922``; the
+production-to-oracle distances the acceptance criteria use as floors were recorded from its final
+run in ``floors.json``.
 
 The baseline runs free (it decodes its own greedy tokens); the candidate is
 teacher-forced with the baseline's input token at every step, so every step
@@ -29,7 +31,7 @@ score order and as sets (with the baseline's scores of every disagreeing slot).
 
 Prompts: ``a`` is prompt A of the G3 goldens (157 tokens: a 128-row block and a
 29-row tail, so the tail rows select 128 of up to 157 positions); ``short`` is the
-three-token prompt of the frozen-oracle release tests (every position selected).
+three-token prompt of the release tests (every position selected).
 """
 
 from __future__ import annotations
@@ -48,15 +50,6 @@ BLOCK_ROWS = 128
 TAIL_ROWS = 114
 DECODE_STEPS = 8
 RTOL, ATOL = 0.02, 0.0625
-WINDOW_OPTIONS = dict(
-    key_tile=512,
-    mlp_window=True,
-    rolled_prefix=True,
-    expert_panels=True,
-    paired_position_sort=True,
-    sorted_local_merge=True,
-    canonical_dense=True,
-)
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
 DECODER_FIELDS = (
     "kv_cache_local",
@@ -283,7 +276,7 @@ def first_excess(
 
 # ----------------------------------------------------------------------------- systems
 class Engine:
-    """Common driver of the two sharded engine compositions (global array layout)."""
+    """Driver of a sharded engine composition (global array layout)."""
 
     name = ""
 
@@ -355,7 +348,7 @@ class Engine:
         for step in range(steps):
             token_in = token if tokens_in is None else tokens_in[step]
             position = len(self.prompt) + step
-            out, observed = self.decode(
+            out, _ = self.decode(
                 self.put(np.asarray([token_in], np.int32)), decoder_state
             )
             out = jax.block_until_ready(out)
@@ -364,22 +357,12 @@ class Engine:
                 next_token=host(out.next_token),
                 final_residual_local=host(out.final_residual_local),
             )
-            if observed is None:
-                selections = {
-                    str(self.carried_layer): (
-                        leaves["selected_positions"][0],
-                        leaves["selected_scores"][0],
-                    )
-                }
-            else:
-                positions, scores = (
-                    host(observed.selected_positions),
-                    host(observed.selected_scores),
+            selections = {  # only the carried selection is observable in production
+                str(self.carried_layer): (
+                    leaves["selected_positions"][0],
+                    leaves["selected_scores"][0],
                 )
-                selections = {
-                    str(layer): (positions[i, 0], scores[i, 0])
-                    for i, layer in enumerate(self.config.full_index_slots)
-                }
+            }
             token = int(leaves["next_token"][0])
             on_record(
                 "decode",
@@ -397,51 +380,6 @@ class Engine:
     @property
     def carried_layer(self) -> int:
         return self.config.full_index_slots[-1]
-
-
-class Fp8Oracle(Engine):
-    """The frozen raw-FP8 prefill and decoder programs (observed decoder)."""
-
-    name = "fp8-oracle"
-
-    def __init__(
-        self,
-        mesh: Any,
-        config: Any,
-        weights: Any,
-        wk: Any,
-        rope: Any,
-        put: Any,
-        prompt: tuple[int, ...],
-    ) -> None:
-        import jax
-
-        from glm_tpu.greenfield.runtime import ws32_batched_prefill as prefill
-        from glm_tpu.greenfield.runtime import ws32_decoder as decoder
-
-        super().__init__(mesh, config, weights, wk, rope, put, prompt)
-        self.weights = weights
-        self.program = prefill.build_ws32_batched_prefill_program(
-            mesh, config, block_rows=BLOCK_ROWS, **WINDOW_OPTIONS, **INTERPRET
-        ).execute
-        self.observe = jax.jit(
-            decoder.build_ws32_decoder_program(mesh, config, **INTERPRET).observe
-        )
-        self.initial = prefill.make_ws32_batched_prefill_state(
-            mesh, config, prompt_length=len(prompt)
-        )
-
-    def block_rows(self, count: int) -> int:
-        return BLOCK_ROWS
-
-    def run_prefill(self, tokens: Any, count: int, state: Any) -> Any:
-        return self.program(
-            tokens, self.put(np.int32(count)), state, self.weights, self.wk, self.rope
-        )
-
-    def decode(self, token: Any, state: Any) -> tuple[Any, Any]:
-        observed = self.observe(token, state, self.weights, self.rope)
-        return observed.result, observed.dsa
 
 
 class Production(Engine):
@@ -650,7 +588,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
     from jax.sharding import NamedSharding
     from jax.sharding import PartitionSpec as P
 
-    from glm_tpu.greenfield.runtime import ws32_decoder as decoder
+    from glm_tpu.optimized import ws32_decoder as decoder
     from tools.equivalence import fixture
     from tools.equivalence.common import sha256_hex, tree_record
     from tools.equivalence.lowering import tpu_v4_info
@@ -701,9 +639,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
                     weights = fixture.bind(mesh, frozen)
                     wk = production_wk(mesh, weights, config)
                     rope = put(np.asarray(decoder.build_ws32_main_rope_table(config)))
-                system = {"fp8-oracle": Fp8Oracle, "production": Production}[name](
-                    mesh, config, weights, wk, rope, put, prompt
-                )
+                system = Production(mesh, config, weights, wk, rope, put, prompt)
             systems[name] = system
         if weights is not None and any(n.startswith("reference") for n in systems):
             ref = next(s for n, s in systems.items() if n.startswith("reference"))
@@ -882,7 +818,7 @@ def summarize(
 def main(argv: list[str] | None = None) -> int:
     from tools.equivalence.common import emit, environment, require_cpu, source_record
 
-    names = ("reference", "reference-one-block", "fp8-oracle", "production")
+    names = ("reference", "reference-one-block", "production")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--pair",

@@ -1,28 +1,30 @@
-"""Packed greedy session: host failures, equality with the frozen session, policy refusals."""
+"""Packed greedy session: host failures, events and timing, policy refusals.
+
+Until S2f the session and policy tests also ran the frozen sampled session and policy they replaced
+(same events and timing, one fewer vote per decode, identical refusals at seed 0). That oracle is
+archived at ``archive/research-20260922``; its final green run is recorded in the S2f commit message,
+and the frozen policy's refusals at seed 0 are pinned below as data (``POLICY_CASES``).
+"""
 import numpy as np
 import pytest
 
-from glm_tpu.optimized.request_session import RequestPolicy as FrozenPolicy, Ws32RequestSession
 from glm_tpu.optimized.ws32_decoder import Ws32DecodeStepResult
 from glm_tpu.optimized.request_loop import PackedDecodeResult, PackedRequestSession, RequestPolicy
 from tests.greenfield.runtime.test_ws32_request_session import state, prefill
 
 
-def setup(packed, *, mutate=None, vote=None, sink_error=False, outputs=(9,10), max_new=4):
+def setup(packed=True, *, mutate=None, vote=None, sink_error=False, outputs=(9,10), max_new=4):
+    assert packed  # the greedy release session is the only session
     clock=[10.]
-    calls, draws, events, votes, puts = [], [], [], [], []
+    calls, draws, events, votes = [], [], [], []
     def decode(token,previous,*uniform):
         i=len(calls)+1
         calls.append(token)
         draws.extend(float(u) for u in uniform)
         clock[0] += .25
         out=Ws32DecodeStepResult(state(3+i),np.array([outputs[i-1]],np.int32),np.zeros((1,1)))
-        if not packed: return out
         status=np.array([outputs[i-1],1,3+i,4+i],np.int32)
         return PackedDecodeResult(out,mutate(status) if mutate else status)
-    def replicate(value):
-        puts.append(value)
-        return value
     def sink(event):
         events.append(event)
         clock[0]+=.5
@@ -30,58 +32,54 @@ def setup(packed, *, mutate=None, vote=None, sink_error=False, outputs=(9,10), m
     def fleet(valid):
         votes.append(valid)
         return vote(valid,len(votes)) if vote else valid
-    common=dict(decode_step=decode,fleet_all=fleet,deliver=sink,
-                delivery_boundary='fake sink',request_started=1.,clock=lambda:clock[0])
-    if packed:  # the greedy release session: no seed, no uniform draws
-        session=PackedRequestSession(RequestPolicy('request-a',3,max_new,20,256,(10,)),**common)
-    else:  # the frozen sampled session it replaced
-        session=Ws32RequestSession(FrozenPolicy('request-a',42,3,max_new,20,256,(10,)),
-                                   replicate_uniform=replicate,**common)
-    return session,calls,draws,events,votes,puts,clock
+    session=PackedRequestSession(RequestPolicy('request-a',3,max_new,20,256,(10,)),decode_step=decode,
+                                 fleet_all=fleet,deliver=sink,delivery_boundary='fake sink',
+                                 request_started=1.,clock=lambda:clock[0])
+    return session,calls,draws,events,votes,[],clock
 
 
-def test_packed_loop_preserves_events_rng_pause_eos_and_removes_boundary_work():
-    a=setup(False); b=setup(True)
-    a[0].next_uniform()  # the frozen session replicates the prefill-index draw
-    with pytest.raises(RuntimeError):b[0].next_uniform()  # greedy: no draw exists
-    for session,*_ in (a,b):
-        session.accept_prefill(prefill())
-        session.step()
-        paused=session
-        paused.step()
-        assert session.finished and not session.failed
-        assert session.decode_seconds==(.25,.25)
-        assert session.ttft_seconds==9.5 and session.delivered_request_seconds==11.
-        with pytest.raises(RuntimeError):session.step()
-        session.release()
-        assert session._state is None
-    assert a[3]==b[3]  # the same events
-    assert len(a[2])==2 and b[2]==[]  # one draw per frozen decode, none in the greedy session
-    assert [int(v[0]) for v in b[1]]==[7,9]
-    assert len(a[4])==9 and len(b[4])==7  # Prefill unchanged, 3 -> 2 votes/decode.
-    assert len(a[5])==3 and len(b[5])==0  # The greedy session never replicates a draw.
+def test_packed_loop_events_pause_eos_and_boundary_work():
+    session,calls,draws,events,votes,_,_=setup()
+    with pytest.raises(RuntimeError):session.next_uniform()  # greedy: no draw exists
+    session.accept_prefill(prefill())
+    session.step()
+    paused=session
+    paused.step()
+    assert session.finished and not session.failed
+    assert session.decode_seconds==(.25,.25)
+    assert session.ttft_seconds==9.5 and session.delivered_request_seconds==11.
+    with pytest.raises(RuntimeError):session.step()
+    session.release()
+    assert session._state is None
+    assert [(e.index,e.token_id,e.finish_reason) for e in events]==[(0,7,None),(1,9,None),(2,10,'eos')]
+    assert draws==[]  # the greedy session never draws a uniform
+    assert [int(v[0]) for v in calls]==[7,9]
+    assert len(votes)==7  # prefill: 3 votes, then 2 per decode
 
 
+# (arguments, outcome of the frozen sampled policy at seed 0 -- the release's value -- recorded from
+# the final run of the frozen policy at S2f: None, or (exception type name, message))
 POLICY_CASES = [
-    ('request-a', 3, 4, 20, 256, (10,)),
-    ('r', 1, 1, 2, 1, (0,)),
-    ('', 3, 4, 20, 256, (10,)),
-    (None, 3, 4, 20, 256, (10,)),
-    (7, 3, 4, 20, 256, (10,)),
-    ('\ud800', 3, 4, 20, 256, (10,)),
-    ('ok', 0, 4, 20, 256, (10,)),
-    ('ok', True, 4, 20, 256, (10,)),
-    ('ok', 3, 4.0, 20, 256, (10,)),
-    ('ok', 3, 4, -20, 256, (10,)),
-    ('ok', 3, 4, 20, 0, (10,)),
-    ('ok', 3, 18, 20, 256, (10,)),
-    ('ok', 3, 4, 20, 256, [10]),
-    ('ok', 3, 4, 20, 256, ()),
-    ('ok', 3, 4, 20, 256, (10, 10)),
-    ('ok', 3, 4, 20, 256, (256,)),
-    ('ok', 3, 4, 20, 256, (True,)),
-    ('', 0, 0, 0, 0, ()),
-    ('ok', 0, 0, 0, 0, [1, 1]),
+    (('request-a', 3, 4, 20, 256, (10,)), None),
+    (('r', 1, 1, 2, 1, (0,)), None),
+    (('', 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')),
+    ((None, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')),
+    ((7, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')),
+    (('\ud800', 3, 4, 20, 256, (10,)),
+     ('UnicodeEncodeError', "'utf-8' codec can't encode character '\\ud800' in position 0: surrogates not allowed")),
+    (('ok', 0, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')),
+    (('ok', True, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')),
+    (('ok', 3, 4.0, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')),
+    (('ok', 3, 4, -20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')),
+    (('ok', 3, 4, 20, 0, (10,)), ('ValueError', 'positive integer request dimensions required')),
+    (('ok', 3, 18, 20, 256, (10,)), ('ValueError', 'full registered generation cap must fit; no silent truncation')),
+    (('ok', 3, 4, 20, 256, [10]), ('ValueError', 'unique in-vocabulary EOS ids required')),
+    (('ok', 3, 4, 20, 256, ()), ('ValueError', 'unique in-vocabulary EOS ids required')),
+    (('ok', 3, 4, 20, 256, (10, 10)), ('ValueError', 'unique in-vocabulary EOS ids required')),
+    (('ok', 3, 4, 20, 256, (256,)), ('ValueError', 'unique in-vocabulary EOS ids required')),
+    (('ok', 3, 4, 20, 256, (True,)), ('ValueError', 'unique in-vocabulary EOS ids required')),
+    (('', 0, 0, 0, 0, ()), ('ValueError', 'a nonempty request id is required')),
+    (('ok', 0, 0, 0, 0, [1, 1]), ('ValueError', 'positive integer request dimensions required')),
 ]
 
 
@@ -93,10 +91,10 @@ def _outcome(factory, *args):
     return None
 
 
-@pytest.mark.parametrize('args', POLICY_CASES)
-def test_greedy_policy_refuses_exactly_like_the_frozen_policy_at_seed_zero(args):
-    expected = _outcome(lambda request_id, *rest: FrozenPolicy(request_id, 0, *rest), *args)
-    assert _outcome(RequestPolicy, *args) == expected
+@pytest.mark.parametrize(('args', 'expected'), POLICY_CASES)
+def test_greedy_policy_refuses_exactly_like_the_frozen_policy_at_seed_zero(args, expected):
+    outcome = _outcome(RequestPolicy, *args)
+    assert (None if outcome is None else (outcome[0].__name__, outcome[1])) == expected
     assert 'seed' not in RequestPolicy.__dataclass_fields__
 
 

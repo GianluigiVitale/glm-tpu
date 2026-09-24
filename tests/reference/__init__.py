@@ -8,8 +8,9 @@ under ``glm_tpu/optimized/reference`` is exact it is reused as is.
 
 ``model.py`` composes the layers in ``linear.py``, ``norm.py``,
 ``attention.py``, ``dsa.py`` and ``moe.py``. ``oracle_run.py`` is the 32-device
-CPU child that compares the reference with the frozen FP8 oracle and with the
-production composition; ``VALIDATION.md`` is the acceptance receipt.
+CPU child that compares the reference with the production composition (until S2f
+also with the frozen FP8 oracle; ``floors.json`` keeps the production-to-oracle
+distances of its final run); ``VALIDATION.md`` is the acceptance receipt.
 
 Importing this package imports nothing.
 """

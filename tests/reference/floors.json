@@ -1,0 +1,209 @@
+{
+ "command": "JAX_PLATFORMS=cpu XLA_FLAGS=--xla_force_host_platform_device_count=32 python -B -m tests.reference.oracle_run --pair production:fp8-oracle --prompt {short,a}",
+ "environment": {
+  "jax": "0.10.1",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13"
+ },
+ "fixture": {
+  "checkpoint": "d8664fd5cdd4911a3029b3224633f63ec1e09deca98a4b4e5444f2b72aa66809",
+  "version": "frozen_fixture_v1"
+ },
+ "floors": {
+  "a": {
+   "decode": [
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": false
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": false
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": false
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": false
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": false
+      }
+     }
+    }
+   ],
+   "prompt": {
+    "length": 157,
+    "name": "a",
+    "sha256": "d3faaaa50b4e4e039af05f2cf01c037622bbd1627e02c1b700c76b901b99bad5"
+   },
+   "report_sha256": "d125de5fa157596b452c564b41e9af0b9964b3e8e28f00c0e6eab6e2ab6c6596",
+   "steps": 8,
+   "summary": {
+    "decode_bound_ratio": {
+     "final_residual_local": 3.4620098039215685,
+     "index_cache_local": 1.9282215523737756,
+     "kv_cache_local": 2.5250953233211426,
+     "selected_scores": 1.2073961750088713
+    },
+    "decode_outside_fraction": {
+     "final_residual_local": 0.2177734375,
+     "index_cache_local": 8.900960286458333e-05,
+     "kv_cache_local": 8.557637532552083e-05,
+     "selected_scores": 0.015625
+    },
+    "prefill_bound_ratio": {
+     "index_cache_local": 1.9010535959688504,
+     "kv_cache_local": 2.5250953233211426,
+     "repaired_index_local": 1.9010535959688504,
+     "selected_scores": 0.42709132063454947
+    },
+    "prefill_outside_fraction": {
+     "index_cache_local": 7.120768229166667e-05,
+     "kv_cache_local": 6.90460205078125e-05,
+     "repaired_index_local": 7.120768229166667e-05,
+     "selected_scores": 0.0
+    }
+   }
+  },
+  "short": {
+   "decode": [
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    },
+    {
+     "selections": {
+      "6": {
+       "set_equal": true
+      }
+     }
+    }
+   ],
+   "prompt": {
+    "length": 3,
+    "name": "short",
+    "sha256": "91b89f90f71a7aae7d04ca619249d5b548fd01986ac26a7b03e25e431d6949ba"
+   },
+   "report_sha256": "c5ff2813524142489f967a954a759ca0672518980b2c193934ae27a5b7190431",
+   "steps": 8,
+   "summary": {
+    "decode_bound_ratio": {
+     "final_residual_local": 3.9649539649539647,
+     "index_cache_local": 1.3513513513513513,
+     "kv_cache_local": 2.6615384615384614,
+     "selected_scores": 0.9026276340031744
+    },
+    "decode_outside_fraction": {
+     "final_residual_local": 0.1826171875,
+     "index_cache_local": 1.3987223307291666e-05,
+     "kv_cache_local": 2.7338663736979168e-05,
+     "selected_scores": 0.0
+    },
+    "prefill_bound_ratio": {
+     "index_cache_local": 0.46137048774831874,
+     "kv_cache_local": 0.5412521942656524,
+     "repaired_index_local": 0.46137048774831874,
+     "selected_scores": 0.2022885777746797
+    },
+    "prefill_outside_fraction": {
+     "index_cache_local": 0.0,
+     "kv_cache_local": 0.0,
+     "repaired_index_local": 0.0,
+     "selected_scores": 0.0
+    }
+   }
+  }
+ },
+ "note": "How far the production composition was from the frozen FP8 oracle on the frozen fixture v1 (the floors of test_reference_matches_production_composition), recorded from the oracle's final run before S2f archived it at archive/research-20260922. Only the fields the acceptance criteria read are kept; report_sha256 identifies the full report (canonical JSON). The values equal the S2e runs of VALIDATION.md.",
+ "pair": "production:fp8-oracle",
+ "recorded_at": "2e3c8dd1d10c7131b38fb0eb5100cbbf67c913b4",
+ "tolerances": {
+  "atol": 0.0625,
+  "rtol": 0.02
+ }
+}

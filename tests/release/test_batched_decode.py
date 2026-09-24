@@ -1,4 +1,8 @@
-"""CPU32: batched execution matches eight independent histories and freezes EOS lanes."""
+"""CPU32: batched execution matches eight independent histories and freezes EOS lanes.
+
+The eight histories come from the production cache initializer and prefill (until S2f: the frozen
+sampled FP8 prefill program, archived at ``archive/research-20260922``).
+"""
 import json
 import os
 import subprocess
@@ -25,49 +29,35 @@ def cpu_dot(ctx,left,right,**params):
         return mlir.lower_fun(widened,multiple_results=False)(ctx,left,right)
     return lax_internal._dot_general_lower(ctx,left,right,platform='cpu',**params)
 mlir.register_lowering(lax_internal.dot_general_p,cpu_dot,platform='cpu')
-from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import NamedSharding, PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
-from glm_tpu.greenfield.runtime import ws32_batched_prefill as b
-from glm_tpu.greenfield.runtime import ws32_decoder as d
-from glm_tpu.greenfield.runtime.ws32_sampled_request import build_ws32_sampled_prefill_program
-from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig
-from glm_tpu.optimized.bf16_resident import bf16_resident_weights
 from glm_tpu.optimized.ws32_decoder_challenger import build_ws32_challenger_decoder_program
 from glm_tpu.optimized.batched_decode import build_batched_decoder_program
 from glm_tpu.optimized.batched_runtime import compile_batch
 from glm_tpu.runner.programs import build_program_set
-from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
-mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
+from tests.fixtures.tiny_model import cpu_mesh, engine_inputs, prefill
+mesh=cpu_mesh()
 def put(x): return jax.device_put(x,NamedSharding(mesh,P()))
-config,weights,wk=fixture(mesh,panel_geometry=True)
-wk=tuple(put(x) for x in wk)
-rope=put(jnp.asarray(d.build_ws32_main_rope_table(config),jnp.bfloat16))
+inputs=engine_inputs(mesh,panel_geometry=True)
+config,bf16,rope=inputs.config,inputs.weights,inputs.rope
 interpret=dict(sparse_attention_interpret=True,linear_interpret=True)
-bf16=bf16_resident_weights(mesh,config,weights)
-prefill=build_ws32_sampled_prefill_program(mesh,config,sampling=NucleusConfig(),
-    block_rows=2,key_tile=128,**interpret)
+# The production program set, built with Pallas interpretation enabled (its batched decoder equals
+# ``batch`` below): eight independent histories through its own cache initializer and prefill.
+programs=build_program_set(mesh,config,concurrent_size=8,interpret=True)
 states=[];tokens=[]
 for lane in range(8):
-    ids=np.arange(30+lane*5,33+lane*5+lane%2,dtype=np.int32)
-    state=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=len(ids))
-    for start in range(0,len(ids),2):
-        part=ids[start:start+2]
-        out=prefill.execute(put(np.pad(part,(0,2-len(part)),constant_values=-1)),
-            put(np.int32(len(part))),state,weights,wk,rope,put(np.float32(.5)))
-        state=out.state
-    state,token=b.finish_ws32_batched_prefill(out)
+    ids=[int(x) for x in np.arange(30+lane*5,33+lane*5+lane%2)]
+    state,token=prefill(mesh,inputs,programs,ids)
     states.append(state);tokens.append(token)
 single=build_ws32_challenger_decoder_program(mesh,config,**interpret).execute
 batch=build_batched_decoder_program(mesh,config,batch_size=8,**interpret)
 # Exercise the actual bank initializer and donated per-lane insertion without
-# compiling a TPU-only kernel: the production program set, built with Pallas
-# interpretation enabled (its batched decoder equals ``batch`` above).
+# compiling a TPU-only kernel.
 r=SimpleNamespace(concurrent_size=8,mesh=mesh,config=config,put=put,weights=bf16,rope=rope,
     compile=lambda name,fn,values,**kwargs:fn.lower(*values).compile())
-programs=build_program_set(mesh,config,concurrent_size=8,interpret=True)
-compile_batch(r,b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3),programs.batch)
+compile_batch(r,programs.cache_init.fn(put(np.int32(3))),programs.batch)
 stacked=r.initialize_batch(put(np.array([3+i%2 for i in range(8)],np.int32)))
 for lane in range(8):stacked=r.insert_batch(stacked,states[lane],put(np.int32(lane)))
 batch=r.decode_batch
