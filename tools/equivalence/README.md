@@ -91,11 +91,12 @@ harness). `driver.py` fakes only what needs a fleet, private assets or the TPU c
 program compiles, `jax.stages.Traced.lower` lowers for the TPU platform (what `fn.lower` does on
 the fleet) and `jax.stages.Lowered.compile` returns a stand-in executable (runs the program on the
 CPU mesh, or returns abstract outputs; zero compiler memory; a stand-in optimized-HLO text); the
-HLO admission parser `inspect_research_hlo` (no TPU optimized module exists on a CPU host: a
-recorder checks it is handed the stand-in text read back from the HLO directory);
+HLO admission parser `check_hlo_collectives` (recorded as `inspect_research_hlo`; no TPU optimized
+module exists on a CPU host: a recorder checks it is handed the stand-in text read back from the HLO
+directory);
 `process_allgather` (stacks the local value; a probe makes one host differ and records that the
 real graph-consensus phase refuses it); `stats` (four idle synthetic chips, so the real
-`admit`/`admit_memory`/`memory_projection` run); identity votes; every file under `/dev/shm` (an
+`admit`/`admit_memory`/`project_memory` run); identity votes; every file under `/dev/shm` (an
 in-memory overlay: the HLO directory, the originals and `runner.json` are recorded relative to the
 runtime's `hlo` attribute and never written; any other file write during the build is refused);
 and the free-space probe. `model.require_site`, `model.require_inventory`, `phase`, the binder and
@@ -132,9 +133,9 @@ recorded only from the baseline production tree. Per run: the graph-consensus pr
 (`refused (RuntimeError)`), the arguments of the checkpoint verification call
 (`verify_file_hashes=True`, the four local slots, `local_slot_layout=True`, the site pins), the
 memory admission requests (order-insensitive), the programs that pass the HLO admission and the
-number of graph-consensus calls. Per tier: the verdicts of production's own `memory_projection` on
+number of graph-consensus calls. Per tier: the verdicts of production's own `project_memory` on
 fixed synthetic chip statistics around the 512 MiB reserve (one byte below and exactly at the chip
-limit, the alias credit, one fuller chip, five invalid accountings) and of `inspect_research_hlo`
+limit, the alias credit, one fuller chip, five invalid accountings) and of `check_hlo_collectives`
 on a small synthetic optimized-HLO module (physical expert-8/feature-4 axes with a 4,096-byte
 full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, no collectives:
 refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
@@ -477,7 +478,7 @@ to 4 CPUs also reproduced every G3 group.
   environment the launcher starts the worker with, and the jax configuration and compile
   environment the worker has when it constructs the runtime). A changed
   compiler or libtpu is caught only by the TPU comparison (`compare-run`), not here, and the HLO
-  admission parser (`inspect_research_hlo`) never sees a real TPU optimized module on the CPU host
+  admission parser (`check_hlo_collectives`) never sees a real TPU optimized module on the CPU host
   (its call is checked; its verdicts are characterized on a small synthetic optimized module in the
   frozen safety record -- it has no unit tests at 181c013e -- and covered by the TPU runs).
 * The production tier is abstract: its inputs are derived, not loaded. This is licensed by the
@@ -518,9 +519,9 @@ to 4 CPUs also reproduced every G3 group.
   `driver.HOMES` (recorded stub name -> module and current name since S4.2; "`_load` no longer calls
   the faked ..."); the config class `driver.CONFIG_MODULE`/`CONFIG_CLASS` and the defaults lists
   `driver.DEFAULT_CLASSES`/`DEFAULT_FUNCTIONS` (a renamed class or builder is re-keyed there, and
-  G1-protocol/G2-protocol are re-recorded with the stage's reason); `inspect_research_hlo` in
-  `driver.ADMISSION_HOMES`, under its current names from `driver.RECORDED_NAMES` or
-  `closure_map.toml` `[functions]` (the real parser refuses the stand-in text);
+  G1-protocol/G2-protocol are re-recorded with the stage's reason); the HLO admission parser in
+  `driver.ADMISSION_HOMES`, under every current name of `inspect_research_hlo` from
+  `driver.RECORDED_NAMES` or `closure_map.toml` `[functions]` (the real parser refuses the stand-in text);
   `weights._decode_program` (the binding `bf16_resident_weights` uses; the FP8-table capture; a bypass drops the `fp8_table[...]`
   programs from G1); `multihost_utils.process_allgather` (a from-import binding would see the real
   single-process gather and the graph-consensus probe would record "accepted", which fails the
@@ -570,9 +571,10 @@ units):
 3. clear the table in the same commit (a stale entry maps a current name to a name the new data
    no longer contain, so the check fails until it is removed).
 
-The frozen safety record reads the two admission functions by name (`memory_projection`,
-`inspect_research_hlo`). A commit that renames either also changes its row in
-`driver.RECORDED_NAMES` (recorded name -> current name). That table is permanent, like
+The frozen safety record reads the two admission functions by their recorded names
+(`memory_projection`, `inspect_research_hlo`; `project_memory` and `check_hlo_collectives` since
+WU-R). A commit that renames either also changes its row in `driver.RECORDED_NAMES` (recorded
+name -> current name). That table is permanent, like
 `driver.HOMES` (the faked loader functions, keyed by their recorded stub names) and
 `kernel_renames.toml` `[names]`: no re-baseline clears it, because frozen G1/G2 are never
 re-recorded, and without the row the verdicts read `<absent>` once `closure_map.toml` is cleared

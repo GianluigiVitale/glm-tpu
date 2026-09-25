@@ -8,8 +8,9 @@ top-level definitions moved to their final modules), ``renames.toml`` (S4.2, pub
 ``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules),
 ``helper_names.toml`` (S4.4, the public names of the private helpers other modules import and the
 ``jax.named_scope`` names), ``test_moves.toml`` (S5 A2, tests moved to the test module of their
-subject) and ``owed_tests.toml`` (S5 D, the reference cross-validation moved to the test module of its
-subject); the S4 kinds (and S5's) are applied by ``symbols.py`` (its docstring has the rules).
+subject), ``owed_tests.toml`` (S5 D, the reference cross-validation moved to the test module of its
+subject) and ``work_units.toml`` (the S5 work units' renames and reviewed message rewrites, first WU-R);
+the S4 kinds (and S5's) are applied by ``symbols.py`` (its docstring has the rules).
 ``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4 when a moved
 or renamed definition differs from its base-commit original (imports aside), a dissolved module or
 any tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
@@ -498,10 +499,13 @@ def run_table(table: Path, *, check: bool) -> int:
     symbols.write(result)
     added = symbols.write_closure_entries(plan.stage, f"tools/migration/{table.name}", result.closure)
     scoped = symbols.apply_named_scopes(plan) if plan.scopes else []
+    messaged = symbols.apply_messages(plan) if plan.messages else []
     for row in result.notes:
         print("review:", row)
     if plan.scopes:
         print(f"apply {plan.stage}: named scopes rewritten in {len(scoped)} files")
+    if plan.messages:
+        print(f"apply {plan.stage}: messages rewritten in {len(messaged)} files")
     print(
         f"apply {plan.stage}: {len(result.texts)} files written, {len(result.removed)} modules removed, "
         f"{added} closure_map.toml entries"
@@ -511,6 +515,7 @@ def run_table(table: Path, *, check: bool) -> int:
 
 def check_symbols(symbols: Any, plan: Any) -> int:
     problems = symbols.check(plan) + (symbols.check_named_scopes(plan) if plan.scopes else [])
+    problems += symbols.check_messages(plan) if plan.messages else []
     resolver = symbols.Resolver({}, {}, {module_name(p) for p in plan.dissolve})
     reports = []
     for path in tracked():

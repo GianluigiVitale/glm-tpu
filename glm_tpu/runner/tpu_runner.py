@@ -17,7 +17,7 @@ from jax.sharding import NamedSharding, PartitionSpec as P
 from glm_tpu.config import cache
 from glm_tpu.models.glm_moe_dsa import weights
 from glm_tpu.layers import rope
-from glm_tpu.runner.admission import inspect_research_hlo, memory_projection
+from glm_tpu.runner.admission import check_hlo_collectives, project_memory
 from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
 from glm_tpu.engine.request_session import PackedRequestSession, RequestPolicy
 from glm_tpu.engine.request import validate, CAPACITY
@@ -116,7 +116,7 @@ class OrdinaryRuntime:
             raise RuntimeError(message)
 
     def admit_memory(self, name, memory):
-        report = memory_projection(self.stats(), memory)
+        report = project_memory(self.stats(), memory)
         self.phase("memory_" + name, lambda: self.require(report["passed"], "optimized memory admission failed"))
         return report
 
@@ -139,7 +139,7 @@ class OrdinaryRuntime:
         self.phase("graph_consensus_" + name, consensus)
         if model:
             row["hlo_admission"] = self.phase(
-                "hlo_" + name, lambda: inspect_research_hlo((self.hlo / f"{name}.optimized_hlo.txt").read_text())
+                "hlo_" + name, lambda: check_hlo_collectives((self.hlo / f"{name}.optimized_hlo.txt").read_text())
             )
         self.admit(name)
         return exe

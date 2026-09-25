@@ -18,15 +18,15 @@ private assets or the TPU compiler is replaced:
   ``Lowered`` production built (N1-N8, when requested) and returns a stand-in executable: it runs
   the jitted function on the CPU mesh (concrete) or returns ``ShapeDtypeStruct`` outputs with the
   CPU-compiled executable's shardings (abstract), reports zero compiler memory and a stand-in
-  optimized-HLO text. The HLO admission parser (``inspect_research_hlo``, under its current name
-  from ``RECORDED_NAMES``) cannot read a TPU optimized module that does not exist here: it is
-  replaced by a recorder that checks it was handed the stand-in text read back from the HLO
-  directory;
+  optimized-HLO text. The HLO admission parser (``check_hlo_collectives``, recorded as
+  ``inspect_research_hlo``; found under its current name from ``RECORDED_NAMES``) cannot read a TPU
+  optimized module that does not exist here: it is replaced by a recorder that checks it was handed
+  the stand-in text read back from the HLO directory;
 * the fleet: votes are identity (``phase`` runs for real and records the phase sequence), and
   ``process_allgather`` stacks the local value eight times (payload sizes recorded); a probe
   proves the real graph-consensus phase rejects a divergent host;
 * device memory: ``stats`` reports four idle synthetic chips (1 TiB), so the real ``admit`` /
-  ``admit_memory`` / ``memory_projection`` run; every admission request is recorded;
+  ``admit_memory`` / ``project_memory`` run; every admission request is recorded;
 * the host: every file production writes or reads under ``/dev/shm`` (the HLO-originals
   directory: ``mkdir``, the StableHLO and optimized-HLO originals, ``runner.json``) lives in an
   in-memory overlay (recorded relative to the runtime's ``hlo`` directory; nothing is ever written
@@ -108,10 +108,10 @@ ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.runner.admission")
 # that makes it and no re-baseline clears it (a missing or stale row makes the verdicts read
 # ``<absent>`` once ``closure_map.toml`` is cleared, and G1/G2 fail). The negative control is in
 # tests/golden/test_recorded_names.py. A rename keeps no alias under the recorded name in the same
-# module: two bindings read ``<ambiguous: 2 definitions>`` (fail-closed).
+# module: two bindings read ``<ambiguous: 2 definitions>`` (fail-closed). WU-R (S5) renamed both.
 RECORDED_NAMES = {
-    "memory_projection": "memory_projection",
-    "inspect_research_hlo": "inspect_research_hlo",
+    "memory_projection": "project_memory",
+    "inspect_research_hlo": "check_hlo_collectives",
 }
 # Builders the prefill and decode programs come from, by role, under every name a home has bound
 # them (S2d c3: ``build_prefill_program``; before, ``build_ws32_prefill_challenger_program``), and
@@ -695,7 +695,7 @@ def _shard_probe(self: Any) -> list[Any]:
 
 
 def synthetic_stats() -> list[dict[str, Any]]:
-    """Four idle local chips (``memory_projection`` requires exactly four); CPU devices report no
+    """Four idle local chips (``project_memory`` requires exactly four); CPU devices report no
     allocator statistics."""
     import jax
 

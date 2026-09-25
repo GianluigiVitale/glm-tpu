@@ -21,7 +21,7 @@ of such a fleet, in two threads and in lock step:
 
 The runtime is built by its real constructor with the worker's keywords; only the checkpoint load and
 compilation (``_load``), the HLO dump-space check and the device memory statistics are synthetic, so the real
-memory admission (``admit`` -> ``memory_projection`` -> its phase vote) runs. Nothing here opens a device:
+memory admission (``admit`` -> ``project_memory`` -> its phase vote) runs. Nothing here opens a device:
 NumPy values stand for device arrays and ``put`` is the identity.
 """
 

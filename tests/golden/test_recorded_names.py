@@ -3,8 +3,9 @@ read them are frozen or keep the 181c013e spellings:
 
 * ``driver.RECORDED_NAMES``: the admission functions whose verdicts the frozen G1/G2 ``safety``
   record holds (``verdicts.admission_cases``) and under whose name ``compile``'s HLO admission is
-  faked. Negative control: after a rename and a cleared ``closure_map.toml``, a stale or missing row
-  makes a verdict read ``<absent>``, which differs from the frozen record (G1/G2 would fail).
+  faked (``project_memory`` and ``check_hlo_collectives`` since WU-R). Negative control: after a
+  rename and a cleared ``closure_map.toml``, a stale or missing row makes a verdict read ``<absent>``,
+  which differs from the frozen record (G1/G2 would fail).
 * ``driver.HOMES``: the faked loader functions, keyed by the recorded stub names that the load
   protocol and the frozen ``verify_checkpoint`` fact read.
 * ``kernel_renames.toml`` ``[names]``: one row per public Pallas kernel name.
@@ -128,6 +129,24 @@ def test_the_hlo_admission_fake_follows_the_table(cleared, monkeypatch):
         assert all(getattr(module, new) is real for module in homes)
     with pytest.raises(ValueError):
         real(driver.STANDIN_HLO.format(name="decode"))
+
+
+def test_the_hlo_admission_fake_follows_a_closure_map_entry(cleared, monkeypatch):
+    """In the renaming commit the ``[functions]`` entry alone (row not yet updated) also moves the fake."""
+    recorded = "inspect_research_hlo"
+    new, real = _rename(monkeypatch, recorded)
+    homes = [sys.modules[name] for name in driver.ADMISSION_HOMES if getattr(sys.modules[name], new, None) is real]
+    assert sys.modules[real.__module__] in homes and sys.modules[driver.RUNTIME_MODULE] in homes
+    compiler = driver.ProductionCompile(SimpleNamespace(), fingerprint=False, keep=None)
+    entry = closure_map.ClosureMap(functions={f"{real.__module__}:{new}": f"{real.__module__}:{recorded}"})
+    with monkeypatch.context() as scoped:
+        scoped.setattr(closure_map, "load", lambda path=closure_map.MAP: entry)
+        with compiler.patches():
+            assert all(getattr(module, new) is not real for module in homes)
+    assert all(getattr(module, new) is real for module in homes)
+    # The table cleared and the row stale: the real parser stays in place (and refuses the stand-in text).
+    with compiler.patches():
+        assert all(getattr(module, new) is real for module in homes)
 
 
 @pytest.mark.parametrize("stub", sorted(driver.HOMES))

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from glm_tpu.runner.admission import inspect_research_hlo, memory_projection
+from glm_tpu.runner.admission import check_hlo_collectives, project_memory
 
 GIB = 1 << 30
 MIB = 1 << 20
@@ -39,9 +39,9 @@ def memory(output: object, temp: object = 0, code: object = 0, alias: object = 0
 FOUR = chips(IN_USE, IN_USE, IN_USE, IN_USE)
 
 
-# ------------------------------------------------------------------------------ memory_projection
+# ------------------------------------------------------------------------------ project_memory
 def test_one_byte_below_the_limit_fits_and_the_report_is_complete():
-    report = memory_projection(FOUR, memory(FITS - 3, 1, 2))
+    report = project_memory(FOUR, memory(FITS - 3, 1, 2))
     assert report == dict(
         passed=True,
         reserve_bytes=RESERVE,
@@ -50,21 +50,21 @@ def test_one_byte_below_the_limit_fits_and_the_report_is_complete():
 
 
 def test_the_reserve_makes_exactly_the_limit_not_fit():
-    report = memory_projection(FOUR, memory(FITS + 1))
+    report = project_memory(FOUR, memory(FITS + 1))
     assert not report["passed"]
     assert {row["predicted_bytes"] for row in report["chips"]} == {LIMIT}
-    assert memory_projection(FOUR, memory(FITS + 1), reserve_bytes=RESERVE - 1)["passed"]
+    assert project_memory(FOUR, memory(FITS + 1), reserve_bytes=RESERVE - 1)["passed"]
 
 
 def test_aliased_bytes_are_credited_but_never_below_zero():
-    assert memory_projection(FOUR, memory(FITS + GIB, alias=GIB))["passed"]
-    assert not memory_projection(FOUR, memory(FITS + GIB + 1, alias=GIB))["passed"]
-    report = memory_projection(FOUR, memory(0, alias=GIB))
+    assert project_memory(FOUR, memory(FITS + GIB, alias=GIB))["passed"]
+    assert not project_memory(FOUR, memory(FITS + GIB + 1, alias=GIB))["passed"]
+    report = project_memory(FOUR, memory(0, alias=GIB))
     assert report["passed"] and {row["predicted_bytes"] for row in report["chips"]} == {IN_USE + RESERVE}
 
 
 def test_every_chip_must_fit():
-    report = memory_projection(chips(IN_USE, IN_USE, IN_USE + 1, IN_USE), memory(FITS))
+    report = project_memory(chips(IN_USE, IN_USE, IN_USE + 1, IN_USE), memory(FITS))
     assert not report["passed"]
     assert [row["fits"] for row in report["chips"]] == [True, True, False, True]
 
@@ -104,11 +104,11 @@ def test_every_chip_must_fit():
 )
 def test_invalid_accounting_is_refused(stats, value, reserve, message):
     with pytest.raises(ValueError) as refused:
-        memory_projection(stats, value, reserve_bytes=reserve)
+        project_memory(stats, value, reserve_bytes=reserve)
     assert str(refused.value) == message
 
 
-# ------------------------------------------------------------------------------ inspect_research_hlo
+# ------------------------------------------------------------------------------ check_hlo_collectives
 FEATURE = "{" + ",".join("{" + ",".join(str(i) for i in range(r * 4, r * 4 + 4)) + "}" for r in range(8)) + "}"
 EXPERT = "{" + ",".join("{" + ",".join(str(i) for i in range(c, 32, 4)) + "}" for c in range(4)) + "}"
 POD = "{{" + ",".join(str(i) for i in range(32)) + "}}"
@@ -150,7 +150,7 @@ def optimized_hlo(
 
 
 def test_physical_axes_with_a_4_kib_full_pod_payload_are_admitted():
-    assert inspect_research_hlo(optimized_hlo()) == dict(
+    assert check_hlo_collectives(optimized_hlo()) == dict(
         passed=True,
         profile="research_ws32_axis_payload_v1",
         num_partitions=32,
@@ -162,7 +162,7 @@ def test_physical_axes_with_a_4_kib_full_pod_payload_are_admitted():
 
 
 def test_bf16_halves_the_payload_of_the_same_shapes():
-    report = inspect_research_hlo(optimized_hlo(dtype="bf16", pod_elements=2048))
+    report = check_hlo_collectives(optimized_hlo(dtype="bf16", pod_elements=2048))
     assert report["passed"] and report["maximum_collective_payload_bytes"] == 16384
 
 
@@ -180,15 +180,15 @@ OVER_128_MIB = (
 @pytest.mark.parametrize(
     ("text", "message"),
     [
-        (optimized_hlo(header="num_partitions=16"), "research model graph requires exactly32 partitions/one replica"),
+        (optimized_hlo(header="num_partitions=16"), "model graph requires exactly 32 partitions/one replica"),
         (
             optimized_hlo(header="num_partitions=32, replica_count=2"),
-            "research model graph requires exactly32 partitions/one replica",
+            "model graph requires exactly 32 partitions/one replica",
         ),
-        (optimized_hlo(extra=A2A), "unreviewed collective kind in research graph: all-to-all"),
-        (optimized_hlo(feature_groups=PAIRS), "research collective does not follow physical expert8/feature4 axes"),
-        (optimized_hlo(pod_elements=1025), "oversized or unparsed collective in research graph"),
-        (optimized_hlo(extra=OVER_128_MIB), "oversized or unparsed collective in research graph"),
+        (optimized_hlo(extra=A2A), "unreviewed collective kind in model graph: all-to-all"),
+        (optimized_hlo(feature_groups=PAIRS), "collective does not follow physical expert8/feature4 axes"),
+        (optimized_hlo(pod_elements=1025), "oversized or unparsed collective in model graph"),
+        (optimized_hlo(extra=OVER_128_MIB), "oversized or unparsed collective in model graph"),
         (optimized_hlo(dtype="c64"), "unknown collective dtype"),
         (optimized_hlo(collectives=False), "model graph has no parsed collectives"),
     ],
@@ -205,5 +205,5 @@ OVER_128_MIB = (
 )
 def test_refusals_and_their_messages(text, message):
     with pytest.raises(ValueError) as refused:
-        inspect_research_hlo(text)
+        check_hlo_collectives(text)
     assert str(refused.value) == message

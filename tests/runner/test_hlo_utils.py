@@ -115,7 +115,7 @@ decode_layer {
 
 
 def test_async_collective_start_counts_once_and_done_is_not_a_collective() -> None:
-    # The TPU graph admission (optimized.admission.inspect_research_hlo) counts
+    # The TPU graph admission (glm_tpu.runner.admission.check_hlo_collectives) counts
     # module.collectives by opcode and relies on this normalization of async forms.
     async_hlo = GOOD_HLO.replace("all-reduce(x)", "all-reduce-start(x)").replace(
         "  routed = bf16[1,2048]{1,0} slice(local),",

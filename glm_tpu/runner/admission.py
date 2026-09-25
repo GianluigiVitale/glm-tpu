@@ -3,7 +3,7 @@
 from collections import Counter
 
 
-def inspect_research_hlo(text: str) -> dict:
+def check_hlo_collectives(text: str) -> dict:
     """Fresh WS32 graph check: physical axis groups and bounded exchanges.
 
     This is a deliberately scoped structural check, not the frozen graph's
@@ -15,7 +15,7 @@ def inspect_research_hlo(text: str) -> dict:
 
     module = parse_hlo_module(text)
     if module.num_partitions != 32 or module.num_replicas not in (None, 1):
-        raise ValueError("research model graph requires exactly32 partitions/one replica")
+        raise ValueError("model graph requires exactly 32 partitions/one replica")
     widths = {
         "pred": 1,
         "s8": 1,
@@ -39,10 +39,10 @@ def inspect_research_hlo(text: str) -> dict:
     maximum = 0
     for op in module.collectives:
         if op.opcode not in ("all-reduce", "all-gather", "reduce-scatter"):
-            raise ValueError("unreviewed collective kind in research graph: " + op.opcode)
+            raise ValueError("unreviewed collective kind in model graph: " + op.opcode)
         groups = frozenset(frozenset(g) for g in op.replica_groups)
         if not op.use_global_device_ids or groups not in allowed or sum(map(len, op.replica_groups)) != 32:
-            raise ValueError("research collective does not follow physical expert8/feature4 axes")
+            raise ValueError("collective does not follow physical expert8/feature4 axes")
         sizes = []
         for shape in (*op.result_shapes, *op.operand_shapes):
             if shape.dtype not in widths:
@@ -51,7 +51,7 @@ def inspect_research_hlo(text: str) -> dict:
         payload = max(sizes, default=0)
         maximum = max(maximum, payload)
         if not sizes or payload > 128 * 1024**2 or (op.maximum_group_size == 32 and payload > 4096):
-            raise ValueError("oversized or unparsed collective in research graph")
+            raise ValueError("oversized or unparsed collective in model graph")
     if not module.collectives:
         raise ValueError("model graph has no parsed collectives")
     return dict(
@@ -65,7 +65,7 @@ def inspect_research_hlo(text: str) -> dict:
     )
 
 
-def memory_projection(stats, memory, *, reserve_bytes=512 * 1024**2):
+def project_memory(stats, memory, *, reserve_bytes=512 * 1024**2):
     fields = ("output_size_in_bytes", "temp_size_in_bytes", "generated_code_size_in_bytes", "alias_size_in_bytes")
     if any(type(memory.get(k)) is not int or memory[k] < 0 for k in fields) or reserve_bytes < 0:
         raise ValueError("invalid compiler memory accounting")

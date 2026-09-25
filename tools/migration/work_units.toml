@@ -1,0 +1,31 @@
+# S5 work units (DESIGN 11.3 S5): the renames and reviewed message rewrites of a work unit, applied by
+# `tools/migration/restructure.py --apply work_units.toml` (tools/migration/symbols.py: rename step B, the
+# reference pass C/D, and step G for [messages]). `--check work_units.toml` proves every renamed definition
+# AST-equal to its base-commit original with the renames undone and the messages mapped back (imports aside),
+# and every file under [messages] equal to its base-commit text through the same table. A later work unit that
+# renames rewrites this table against its own base; each version is checked at the commit that applies it
+# (history keeps it). S7 deletes tools/migration/.
+#
+# S5 WU-R (the runner's admission; owner decision DN-21, 2026-09-25: the refusal wording goes under WU-R, H11
+# covers only the admission profile string):
+# * R-a: the admission functions get public names (S5 plan P1). The frozen G1/G2 safety record still reads them
+#   under their recorded (181c013e) names through the permanent tools/equivalence/driver.py RECORDED_NAMES rows,
+#   which change in the same commit; no alias stays under a recorded name.
+# * R-b: the HLO admission's refusal messages lose the research label ("research graph" -> "model graph",
+#   "research collective" -> "collective") and "exactly32" becomes "exactly 32". The report, its keys and the
+#   profile string "research_ws32_axis_payload_v1" (H11) are unchanged.
+
+[stage]
+name = "S5 WU-R"
+kind = "renames"
+base = "e04300af"   # the tree this table was written against
+
+[renames]
+"glm_tpu/runner/admission.py:inspect_research_hlo" = "check_hlo_collectives"   # HLO admission (faked by the G1/G2 driver)
+"glm_tpu/runner/admission.py:memory_projection" = "project_memory"   # memory admission (traced by G7)
+
+[messages."glm_tpu/runner/admission.py"]
+"research model graph requires exactly32 partitions/one replica" = "model graph requires exactly 32 partitions/one replica"   # in no record
+"unreviewed collective kind in research graph: " = "unreviewed collective kind in model graph: "   # G1-/G2-protocol verdicts.hlo.all_to_all
+"research collective does not follow physical expert8/feature4 axes" = "collective does not follow physical expert8/feature4 axes"   # verdicts.hlo.non_physical_groups
+"oversized or unparsed collective in research graph" = "oversized or unparsed collective in model graph"   # verdicts.hlo.pod_payload_4100_bytes

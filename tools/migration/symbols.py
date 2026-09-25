@@ -4,7 +4,8 @@ The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1), ``restruc
 renames.toml`` (S4.2), ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
 modules), ``restructure.py --apply helper_names.toml`` (S4.4: renames plus ``[named_scopes]``, the
 ``jax.named_scope`` names, see F), ``restructure.py --apply test_moves.toml`` (S5 A2) and
-``restructure.py --apply owed_tests.toml`` (S5 D), moves between test modules. The tables describe
+``restructure.py --apply owed_tests.toml`` (S5 D), moves between test modules, and ``restructure.py
+--apply work_units.toml`` (the S5 work units: renames plus ``[messages]``, see G). The tables describe
 one kind of change -- a top-level definition ``(module, name)`` becomes ``(module', name')`` -- and
 share one reference pass:
 
@@ -36,6 +37,13 @@ F. ``[named_scopes]`` (S4.4): the name literal of every ``<x>.named_scope(...)``
    to the value; ``--check`` requires the scope names of each module to be its base-commit scope
    names mapped through the table, and compares renamed definitions with their base originals
    with the table applied to the originals' scope names.
+G. ``[messages."<path>"]`` (S5 WU-R): reviewed rewrites of whole string literals in one file,
+   ``"old text" = "new text"`` (e.g. an error message losing a campaign label). ``--apply`` rewrites every
+   plain one-line double-quoted literal of the file whose value is a key (each key must occur; any other
+   spelling of a key -- an f-string part, an implicit concatenation, escapes -- is refused); ``--check``
+   compares renamed or moved definitions with their base originals with the file's messages applied to
+   the originals' string constants, compares each listed file whole with its base-commit text through
+   the table's renames and messages (imports aside), and reports a key left in the file.
 
 Formatting, ruff and docstrings are S4.4 and the work units. Standard library plus libcst.
 """
@@ -255,6 +263,7 @@ class Plan:
     added: dict[str, str] = field(default_factory=dict)  # closure_map [added] entries
     allow_stale: dict[str, list[str]] = field(default_factory=dict)  # path -> spellings kept on purpose
     scopes: dict[str, str] = field(default_factory=dict)  # named-scope name (template) -> new name (S4.4)
+    messages: dict[str, dict[str, str]] = field(default_factory=dict)  # path -> {old literal: new} (S5 WU-R)
 
     @classmethod
     def load(cls, path: Path) -> Plan:
@@ -270,7 +279,15 @@ class Plan:
             added=value.get("closure_added", {}),
             allow_stale=value.get("baseline_references", {}),
             scopes=value.get("named_scopes", {}),
+            messages=value.get("messages", {}),
         )
+        for path_, table in plan.messages.items():
+            if not (
+                isinstance(table, dict)
+                and table
+                and all(isinstance(k, str) and isinstance(v, str) and k and k != v for k, v in table.items())
+            ):
+                raise PlanError(f"{path.name}: [messages.{path_!r}] must map old literals to different new ones")
         for source, table in value.get("moves", {}).items():
             for name, spec in table.items():
                 dest, new = (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
@@ -1656,10 +1673,22 @@ def _module_aliases(tree: ast.Module, rev: str | None = None) -> set[str]:
 
 class _Normalize(ast.NodeTransformer):
     """A definition modulo import paths: no function-local imports, ``alias.name`` through a module
-    alias of this repository spelled ``name``, and the run's renames undone."""
+    alias of this repository spelled ``name``, and the run's renames undone (``messages``: string constants
+    mapped as ``[messages]`` rewrites them)."""
 
-    def __init__(self, aliases: set[str], renames: dict[str, str], scopes: dict[str, str] | None = None):
-        self.aliases, self.renames, self.scopes = aliases, renames, scopes or {}
+    def __init__(
+        self,
+        aliases: set[str],
+        renames: dict[str, str],
+        scopes: dict[str, str] | None = None,
+        messages: dict[str, str] | None = None,
+    ):
+        self.aliases, self.renames, self.scopes, self.messages = aliases, renames, scopes or {}, messages or {}
+
+    def visit_Constant(self, node: ast.Constant) -> ast.Constant:
+        if isinstance(node.value, str) and node.value in self.messages:
+            node.value = self.messages[node.value]
+        return node
 
     def visit_Call(self, node: ast.Call) -> ast.AST:
         self.generic_visit(node)
@@ -1714,12 +1743,17 @@ def _definition(tree: ast.Module, name: str) -> ast.AST | None:
 
 
 def normalized(
-    tree: ast.Module, name: str, renames: dict[str, str], rev: str | None = None, scopes: dict[str, str] | None = None
+    tree: ast.Module,
+    name: str,
+    renames: dict[str, str],
+    rev: str | None = None,
+    scopes: dict[str, str] | None = None,
+    messages: dict[str, str] | None = None,
 ) -> str | None:
     node = _definition(tree, name)
     if node is None:
         return None
-    return ast.dump(_Normalize(_module_aliases(tree, rev), renames, scopes).visit(copy.deepcopy(node)))
+    return ast.dump(_Normalize(_module_aliases(tree, rev), renames, scopes, messages).visit(copy.deepcopy(node)))
 
 
 def _renames_for(tree: ast.Module, module: str, mapping: dict[tuple[str, str], tuple[str, str]]) -> dict[str, str]:
@@ -1767,7 +1801,14 @@ def check(plan: Plan) -> list[str]:
         if base is None or current is None:
             problems.append(f"{source}:{name}: the base file or the destination {dest} is missing")
             return
-        want = normalized(base, name, _renames_for(base, module_name(source), mapping), plan.base, plan.scopes)
+        want = normalized(
+            base,
+            name,
+            _renames_for(base, module_name(source), mapping),
+            plan.base,
+            plan.scopes,
+            plan.messages.get(source),
+        )
         have = normalized(current, new, {})
         if have is None:
             problems.append(f"{dest}: {new} missing ({plan.base}:{source}:{name})")
@@ -1862,6 +1903,62 @@ def check_named_scopes(plan: Plan) -> list[str]:
         if current != [plan.scopes.get(name, name) for name in base]:
             problems.append(f"{path}: named scopes {current} differ from {plan.base} mapped through the table")
         problems += [f"{path}: named scope {name} is left" for name in current if name in plan.scopes]
+    return problems
+
+
+# ============================================================================== G. messages (S5 WU-R)
+def _message_literals(tree: ast.Module, table: dict[str, str]) -> list[ast.Constant]:
+    """The string constants of a module whose value is a key of ``table``, in source order."""
+    nodes = [n for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value in table]
+    return sorted(nodes, key=lambda n: (n.lineno, n.col_offset))
+
+
+def apply_messages(plan: Plan) -> list[str]:
+    """Rewrite the literals ``[messages]`` names (see G); returns the changed paths."""
+    changed = []
+    for path, table in sorted(plan.messages.items()):
+        text = (REPO / path).read_text()
+        lines = text.split("\n")
+        literals = _message_literals(ast.parse(text), table)
+        missing = sorted(set(table) - {n.value for n in literals})
+        if missing:
+            raise PlanError(f"{path}: [messages] keys not found: {missing}")
+        for node in reversed(literals):
+            source = lines[node.lineno - 1].encode()  # the column offsets count UTF-8 bytes
+            spelled = source[node.col_offset : node.end_col_offset].decode()
+            new = table[node.value]
+            if node.lineno != node.end_lineno or spelled != f'"{node.value}"':
+                raise PlanError(f"{path}:{node.lineno}: {spelled[:60]} is not a plain one-line literal")
+            if '"' in new or "\\" in new or "\n" in new:
+                raise PlanError(f"{path}: [messages] value {new!r} needs quoting; spell it without quotes or escapes")
+            lines[node.lineno - 1] = (
+                source[: node.col_offset] + f'"{new}"'.encode() + source[node.end_col_offset :]
+            ).decode()
+        (REPO / path).write_text("\n".join(lines))
+        changed.append(path)
+    return changed
+
+
+def check_messages(plan: Plan) -> list[str]:
+    """Problems of an applied ``[messages]``: a listed file differs from its base-commit text other than by
+    the table's renames and messages (imports aside), or a key is left in it."""
+    problems = []
+    mapping = plan.mapping()
+    for path, table in sorted(plan.messages.items()):
+        try:
+            base = ast.parse(git("show", f"{plan.base}:{path}"))
+        except subprocess.CalledProcessError:
+            problems.append(f"{path}: not in {plan.base}")
+            continue
+        current = ast.parse((REPO / path).read_text())
+        renames = _renames_for(base, module_name(path), mapping)
+        want = ast.dump(
+            _Normalize(_module_aliases(base, plan.base), renames, plan.scopes, table).visit(copy.deepcopy(base))
+        )
+        have = ast.dump(_Normalize(_module_aliases(current), {}).visit(copy.deepcopy(current)))
+        if want != have:
+            problems.append(f"{path}: differs from {plan.base} other than by the table's renames and messages")
+        problems += [f"{path}:{n.lineno}: message {n.value!r} is left" for n in _message_literals(current, table)]
     return problems
 
 

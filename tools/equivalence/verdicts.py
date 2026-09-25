@@ -2,8 +2,9 @@
 
 Two kinds of record come from here:
 
-* ``admission_cases()``: production's memory admission (``memory_projection``) and HLO admission
-  (``inspect_research_hlo``) run on fixed synthetic inputs. The memory cases sit on the 512 MiB
+* ``admission_cases()``: production's memory admission (``project_memory``, recorded as
+  ``memory_projection``) and HLO admission (``check_hlo_collectives``, recorded as
+  ``inspect_research_hlo``) run on fixed synthetic inputs. The memory cases sit on the 512 MiB
   reserve boundary (one byte below and exactly at the chip limit), exercise the alias credit, the
   per-chip rule and the refusals of invalid accounting; the HLO cases are a small synthetic
   optimized module that follows the physical expert-8/feature-4 axes (accepted, with a full-pod
@@ -21,9 +22,10 @@ Two kinds of record come from here:
   calls.
 
 The frozen record (``safety_verdicts`` and ``run_safety``) keeps verdicts only (accepted / refused
-and the exception type, fits or not), so message wording and report key names -- which planned
-stages rename (H11 renames the HLO admission profile string, WU-R the admission functions) -- stay
-in the re-baselined characterization record; the frozen G1/G2 files keep what must never change.
+and the exception type, fits or not), so message wording and report contents -- which the work
+units change (WU-R renamed the admission functions and reworded the HLO refusals; H11 renames the HLO
+admission profile string) -- stay in the re-baselined characterization record; the frozen G1/G2 files
+keep what must never change.
 """
 
 from __future__ import annotations
@@ -128,11 +130,11 @@ def admission_cases() -> dict[str, Any]:
     from .driver import _definition
 
     out: dict[str, Any] = {}
-    memory_projection = _definition("memory_projection")
-    inspect_research_hlo = _definition("inspect_research_hlo")
+    project_memory = _definition("memory_projection")  # recorded (181c013e) names: driver.RECORDED_NAMES
+    check_hlo_collectives = _definition("inspect_research_hlo")
     for label, function, cases in (
-        ("memory", memory_projection, MEMORY_CASES),
-        ("hlo", inspect_research_hlo, HLO_CASES),
+        ("memory", project_memory, MEMORY_CASES),
+        ("hlo", check_hlo_collectives, HLO_CASES),
     ):
         if isinstance(function, str):
             out[label] = function  # <absent> or <ambiguous: ...>

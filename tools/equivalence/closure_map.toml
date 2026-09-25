@@ -1,7 +1,7 @@
 # Reviewed rename table for G6 (import closures) and G7 (executed functions); see closure_map.py.
 # Keys are current names, values the names recorded in tests/golden/data. Every entry is added in
 # the commit that moves or renames the code and is reviewed there; the entries are removed again
-# after `python -m tools.equivalence record --gates G6,G7 --rename-only --reason <stage|H#>`.
+# after `python -m tools.equivalence record --gates G6,G7 --rename-only --reason <stage|H#|work unit>`.
 
 [modules]
 # "glm_tpu.runner.tpu_runner" = "glm_tpu.recorded.runtime"
@@ -9,6 +9,9 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
+# S5 WU-R (tools/migration/work_units.toml): moved or renamed definitions, current = recorded
+"glm_tpu.runner.admission:check_hlo_collectives" = "glm_tpu.runner.admission:inspect_research_hlo"
+"glm_tpu.runner.admission:project_memory" = "glm_tpu.runner.admission:memory_projection"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
