@@ -1,6 +1,6 @@
 {
  "count": 595,
- "digest": "521d923f39fb7d310756ad7ed19aaafaae1bc256ea200abbec4c19b498ec6eab",
+ "digest": "a528f47ca1ccee2a9bc1f5abfe133176d8c39cc0dc16b09c4670fd956e16d94f",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -544,8 +544,8 @@
   "glm_tpu.models.glm_moe_dsa.weights:build_wk_programs.<locals>.decode",
   "glm_tpu.models.glm_moe_dsa.weights:decoder_weight_names",
   "glm_tpu.models.glm_moe_dsa.weights:decoder_weight_specs",
-  "glm_tpu.runner.admission:memory_projection",
-  "glm_tpu.runner.admission:memory_projection.<locals>.<genexpr>",
+  "glm_tpu.runner.admission:project_memory",
+  "glm_tpu.runner.admission:project_memory.<locals>.<genexpr>",
   "glm_tpu.runner.compilation_manager:_atomic_json",
   "glm_tpu.runner.compilation_manager:_compiled_memory",
   "glm_tpu.runner.compilation_manager:_write_compiler_original",
@@ -675,15 +675,15 @@
   "glm_tpu.worker.tpu_worker"
  ],
  "rebaseline": {
-  "closure_map": "b63eeeabf955f1b16ff12f4e33ac77d5269c2b41e9dc6c5b62ef61088c334646",
+  "closure_map": "27ec6bac2936c027609b267f46ef4de3b58d5b7b872308656f848ed126c4ce2e",
   "kind": "rename-only",
-  "previous_digest": "06777da7b1a9213148698c89c9e49b558910f49d3f9b9dd41aefde25e50035ac",
-  "reason": "S4.4"
+  "previous_digest": "521d923f39fb7d310756ad7ed19aaafaae1bc256ea200abbec4c19b498ec6eab",
+  "reason": "WU-R"
  },
- "recorded_unix": 1790285939,
+ "recorded_unix": 1790322549,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "a3c6e279c1e3b479f168dcfb1639742da3df8b98",
+  "head": "f5745edbb1e5157b5f22d7558a6ed463de046400",
   "production_paths_equal_baseline": false
  }
 }

@@ -64,9 +64,9 @@
  "gate": "G1-protocol",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "S4.2"
+  "reason": "WU-R"
  },
- "recorded_unix": 1790269273,
+ "recorded_unix": 1790322188,
  "runtime": {
   "1536": {
    "admissions": [
@@ -1897,14 +1897,14 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "48b322822343846aa8a86ca05025c668b2cc6899",
+  "head": "f5745edbb1e5157b5f22d7558a6ed463de046400",
   "production_paths_equal_baseline": false
  },
  "tier": "fixture",
  "verdicts": {
   "hlo": {
    "all_to_all": {
-    "detail": "ValueError: unreviewed collective kind in research graph: all-to-all",
+    "detail": "ValueError: unreviewed collective kind in model graph: all-to-all",
     "verdict": "refused (ValueError)"
    },
    "no_collectives": {
@@ -1912,7 +1912,7 @@
     "verdict": "refused (ValueError)"
    },
    "non_physical_groups": {
-    "detail": "ValueError: research collective does not follow physical expert8/feature4 axes",
+    "detail": "ValueError: collective does not follow physical expert8/feature4 axes",
     "verdict": "refused (ValueError)"
    },
    "physical_axes_pod_4096_bytes": {
@@ -1931,7 +1931,7 @@
     "verdict": "accepted"
    },
    "pod_payload_4100_bytes": {
-    "detail": "ValueError: oversized or unparsed collective in research graph",
+    "detail": "ValueError: oversized or unparsed collective in model graph",
     "verdict": "refused (ValueError)"
    }
   },

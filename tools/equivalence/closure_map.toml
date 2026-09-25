@@ -9,9 +9,6 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
-# S5 WU-R (tools/migration/work_units.toml): moved or renamed definitions, current = recorded
-"glm_tpu.runner.admission:check_hlo_collectives" = "glm_tpu.runner.admission:inspect_research_hlo"
-"glm_tpu.runner.admission:project_memory" = "glm_tpu.runner.admission:memory_projection"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
