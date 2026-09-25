@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 
 CPU_CHECK = r"""
 import json
@@ -127,6 +129,7 @@ print(json.dumps(report))
 """
 
 
+@pytest.mark.cpu32
 def test_eight_conversations_match_separate_decode_and_freeze_finished_lane():
     env = dict(
         os.environ,

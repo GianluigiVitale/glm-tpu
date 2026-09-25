@@ -310,6 +310,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.cpu32
 def test_ws32_runtime_loader_uses_only_exact_final_owner_shards(
     tmp_path: Path,
 ) -> None:

@@ -38,6 +38,7 @@ def test_decode_table_matches_reference_dequantizer_bitwise():
         decode_fp8_table(bits.astype(jnp.int8), scale)
 
 
+@pytest.mark.cpu32
 def test_bf16_resident_decode_paths_agree_cpu32():
     code = r"""
 import json

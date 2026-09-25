@@ -124,6 +124,7 @@ FROZEN_TILED_SELECTOR = {
 }
 
 
+@pytest.mark.cpu32
 def test_one_pass_prefill_matches_the_recorded_tiled_selector_cpu32():
     code = r"""
 import hashlib, json

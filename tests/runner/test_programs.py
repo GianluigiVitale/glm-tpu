@@ -16,6 +16,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 
 CHILD = r"""
@@ -66,6 +68,7 @@ def _child() -> dict:
     return json.loads(output.strip().splitlines()[-1])
 
 
+@pytest.mark.cpu32
 def test_program_set_names_order_donation_and_builder_arguments():
     from glm_tpu.runner.programs import INTERPRET
 

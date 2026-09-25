@@ -1,4 +1,6 @@
-"""The resident controller's stop and failure paths against a fake eight-host fleet (DESIGN 6.8, H1).
+"""Tests of :mod:`glm_tpu.executor.multihost_executor`: the fleet summary that may publish a result, the lease
+order before any SSH, and the resident controller's stop and failure paths against a fake eight-host fleet
+(DESIGN 6.8, H1).
 
 The real launcher ``main`` runs with ``--keep-loaded``. Faked are only the SSH hosts (every
 ``subprocess.run``/``Popen`` of an SSH command is answered by :class:`FakeFleet`: the helper is
@@ -24,7 +26,9 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -35,7 +39,7 @@ from glm_tpu.engine import request
 from glm_tpu.utils.json_utils import canonical
 from glm_tpu.executor import multihost_executor as launch
 from glm_tpu.utils import io_utils
-from tests.fixtures.site import example_mapping, write_example_site
+from tests.fixtures.site import example_mapping, example_site, write_example_site
 
 FAKE_SSH = "glm-test-ssh"
 HOSTS = [f"example-w-{rank}" for rank in range(8)]
@@ -510,3 +514,225 @@ def test_an_edit_of_the_helper_files_during_the_run_changes_nothing_that_is_sent
         assert str(outcome) == "resident worker exited unexpectedly", repr(outcome)
         assert _terminal(root)["collected"] is True
     assert "Cleanup unresolved" not in printed
+
+
+def rows():
+    return [
+        dict(
+            rank=i,
+            hostname=f"fixture-w-{i}",
+            complete=True,
+            code_hash="a" * 40,
+            request_sha256="b" * 64,
+            request=dict(token_sha256="c" * 64, emitted=3),
+            programs=dict(decode=dict(stablehlo_sha256="d" * 64, optimized_hlo_sha256="e" * 64)),
+        )
+        for i in range(8)
+    ]
+
+
+def test_complete_fleet_required():
+    assert launch.summarize(rows(), "a" * 40, "b" * 64)["passed"]
+    for bad in (rows()[:7], list(reversed(rows()))):
+        with pytest.raises(ValueError):
+            launch.summarize(bad, "a" * 40, "b" * 64)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("complete", False), ("code_hash", "f" * 40), ("request_sha256", "f" * 64), ("hostname", "fixture-w-0")],
+)
+def test_identity_and_failure_cannot_publish(field, value):
+    fleet = rows()
+    fleet[7][field] = value
+    with pytest.raises(ValueError):
+        launch.summarize(fleet, "a" * 40, "b" * 64)
+
+
+def test_graph_or_output_disagreement_cannot_publish():
+    for section, key in [("request", "token_sha256"), ("request", "emitted"), ("programs", "decode")]:
+        fleet = rows()
+        if section == "programs":
+            fleet[7][section][key]["optimized_hlo_sha256"] = "f" * 64
+        else:
+            fleet[7][section][key] = "different"
+        with pytest.raises(ValueError):
+            launch.summarize(fleet, "a" * 40, "b" * 64)
+
+
+def test_resident_result_never_claims_cleanup():
+    result = launch.summarize(rows(), "a" * 40, "b" * 64, idle_after=False)
+    assert result["passed"] and not result["all_hosts_idle_after"]
+
+
+def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatch, tmp_path):
+    import base64
+    import io
+    from glm_tpu.engine import request
+
+    value = request.from_token_ids([7], request_id="fixture", max_new_tokens=2)
+    fleet = rows()
+    for row in fleet:
+        row["request_sha256"] = value["request_sha256"]
+    io_utils.persist(tmp_path / "resident-ready.json", dict(sequence=0))
+
+    def collect(commands, command, root, label):
+        # the fetch helper's output: base64 of each host's runner.rank{rank}.json
+        for rank, row in enumerate(fleet):
+            raw = (json.dumps(row, sort_keys=True, indent=2) + "\n").encode()
+            (root / f"{label}.rank{rank}.log").write_text(
+                json.dumps({f"runner.rank{rank}.json": base64.b64encode(raw).decode()})
+            )
+
+    monkeypatch.setattr(launch, "remote_all", collect)
+    elapsed = [0]
+    monkeypatch.setattr(launch.time, "monotonic", lambda: elapsed[0])
+
+    def wait(seconds):
+        elapsed[0] += 1000
+        if elapsed[0] >= 2000:
+            stop = tmp_path / "inbox/stop.json"
+            stop.write_text('{"stop":true}')
+            stop.chmod(0o600)
+
+    monkeypatch.setattr(launch.time, "sleep", wait)
+    processes = [SimpleNamespace(poll=lambda: None, stdin=io.BytesIO()) for _ in range(8)]
+    launch.resident_controller(
+        [],
+        processes,
+        tmp_path,
+        "a" * 40,
+        value,
+        1,
+        False,
+        hosts=[row["hostname"] for row in fleet],
+        fleet=example_site(tmp_path).fleet,
+        helpers=launch.remote.HelperTexts.from_package(),
+    )
+    assert elapsed[0] >= 2000
+    assert all(p.stdin.getvalue() == b'{"stop":true}\n' for p in processes)
+    result = json.loads((tmp_path / "resident-measurement.json").read_text())
+    assert result["model_retained"] and not result["all_hosts_idle_after"]
+
+
+@pytest.mark.parametrize("held_index", [0, 2])
+def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch, tmp_path, held_index):
+    import fcntl
+    import os
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from glm_tpu.engine import request
+    from glm_tpu.utils.json_utils import canonical
+
+    paths = tuple(str(tmp_path / f"lock{i}") for i in range(4))
+    import subprocess
+
+    repo = tmp_path / "source"
+    repo.mkdir()
+    monkeypatch.setattr(launch, "REPO", repo)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)  # the launch checkout must be a git top level
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    site = write_example_site(
+        tmp_path / "site.toml",
+        example_mapping(
+            tmp_path, paths=dict(run_root=str(runs)), locks=dict(workload=list(paths[:2]), sync=list(paths[2:]))
+        ),
+    )
+    path = tmp_path / "input.json"
+    path.write_bytes(canonical(request.from_token_ids([7], request_id="fixture", max_new_tokens=2)))
+    path.chmod(0o600)
+    ready = threading.Event()
+    dispatched = threading.Event()
+
+    def identity(repo, policy):
+        ready.set()
+        return "a" * 40
+
+    monkeypatch.setattr(launch, "source_identity", identity)
+    # the empty checkout has no helper blobs: this package's texts (the real snapshot requires equal)
+    monkeypatch.setattr(launch, "pinned_helpers", lambda repo, pin: launch.remote.HelperTexts.from_package())
+
+    class EndBeforeSSH(Exception):
+        pass
+
+    def ssh(fleet):
+        dispatched.set()
+        raise EndBeforeSSH
+
+    monkeypatch.setattr(launch, "ssh_commands", ssh)
+    previous_umask = os.umask(0o077)
+    try:
+        with open(paths[held_index], "a") as owner:
+            fcntl.flock(owner, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending = pool.submit(launch.main, ["--request", str(path), "--site", str(site)])
+                assert ready.wait(5)
+                if held_index == 0:
+                    with pytest.raises(BlockingIOError):
+                        pending.result(timeout=5)
+                    assert not dispatched.is_set()
+                else:
+                    assert not dispatched.wait(0.1)
+                    fcntl.flock(owner, fcntl.LOCK_UN)
+                    with pytest.raises(EndBeforeSSH):
+                        pending.result(timeout=5)
+                    assert dispatched.is_set()
+    finally:
+        os.umask(previous_umask)
+
+
+# `python -m glm_tpu.executor.multihost_executor --help`, byte for byte (S5 A2): argparse wraps to the terminal
+# width (pinned: COLUMNS=100) and its layout differs between Python versions (the literal is Python 3.12's).
+HELP = """\
+usage: multihost_executor.py [-h] --request REQUEST [--wall-seconds WALL_SECONDS]
+                             [--print-answers] [--keep-loaded] [--site SITE] [--repo REPO]
+
+One private greedy request on the retained 32-chip site; no automatic retries. The site's [launch]
+policy decides which checkout may launch (branch patterns, origin, clean, pushed;
+glm_tpu.executor.launch_policy), and the staged source is `git archive` of the pinned commit of
+that checkout, which must be this controller's own (--repo and the site's paths.repo may only name
+it: the controller's code and the remote helper texts come from it). This controller holds the
+workload leases through authenticated cleanup, and never creates or resizes resources. Every site
+value (fleet, interpreters, paths, pins, locks) comes from the validated site file (--site, else
+$GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged
+to every host as site.json and bound by --site-sha256. Remote work is done by the stdlib helper
+programs of glm_tpu.executor.remote, sent as `<interpreter> -c <file text> <one JSON argument>`
+(glm_tpu.executor.fleet). Their texts are read once, right after the launch policy: the helper
+blobs of the pinned commit, each required equal to this checkout's file; their SHA-256s are
+recorded in the run's helpers.json, and every remote command of the run is built from that
+snapshot (an edit of the checkout during the run changes nothing that is sent). After the workers
+end (stop, completion or failure) and idle_after has verified every host, the local SSH clients
+get a bounded time to exit (a stalled one is ended and listed in controller_terminal.json as
+stalled_ssh_clients), then every host's records are collected once, host by host: a record the
+resident receipt already holds is skipped when equal, and a different one is kept as final/<name>
+and listed (divergent_records); a host whose fetch fails is listed (uncollected_ranks) without
+losing the others' records. Nothing is overwritten; a resident failure (recorded as failure) is
+reported only after collection and is never replaced by a collection error (recorded as
+collect_error).
+
+options:
+  -h, --help            show this help message and exit
+  --request REQUEST
+  --wall-seconds WALL_SECONDS
+  --print-answers       print completed local outputs after cleanup
+  --keep-loaded
+  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else
+                        $GLM_TPU_CONFIG_ROOT/site.toml)
+  --repo REPO           git checkout to stage; must be this controller's own (default: the site
+                        paths.repo, else this checkout)
+"""
+
+
+def test_help_text_is_unchanged():
+    assert sys.version_info[:2] == (3, 12), "the literal is Python 3.12 argparse output"
+    result = subprocess.run(
+        [sys.executable, "-m", "glm_tpu.executor.multihost_executor", "--help"],
+        cwd=Path(__file__).resolve().parents[2],
+        env=dict(os.environ, COLUMNS="100"),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == HELP

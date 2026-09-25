@@ -1,4 +1,6 @@
-"""The site file is fail-closed: exact keys, owner-only regular file, validated values."""
+"""The site file is fail-closed: exact keys, owner-only regular file, validated values; the worker's
+binding of a site (``site_args``, ``require_site``) refuses an incomplete model source or a GLM-5.2-era
+checkpoint."""
 
 from __future__ import annotations
 
@@ -7,9 +9,11 @@ import os
 from pathlib import Path
 import re
 import tomllib
+from types import SimpleNamespace
 
 import pytest
 
+from glm_tpu.config import model
 from glm_tpu.config import site as site_module
 from glm_tpu.config.site import (
     SiteConfig,
@@ -19,6 +23,7 @@ from glm_tpu.config.site import (
     host_rank,
     rank_matches,
     set_current_site,
+    site_args,
     to_toml,
 )
 from tests.fixtures.site import EXAMPLE_BUCKET, example_mapping, installed_site, write_example_site
@@ -327,3 +332,107 @@ def test_rank_parsing_admits_plain_hostnames_only():
     assert host_rank("example-vm-w-3\n") is None and not rank_matches("example-vm-w-3\n", 3)
     assert host_rank("example vm-w-3") is None and host_rank("example-vm-w-٣") is None
     assert host_rank("example-vm-w-3.internal", r"-w-(\d+)\.internal$") == 3
+
+
+def site_fixture(tmp_path):
+    """An example site (tests/fixtures/site.py) whose model path holds a SOURCE_COMPLETE receipt."""
+    from hashlib import sha256
+    from glm_tpu.config.site import SiteConfig
+    from tests.fixtures.site import example_mapping
+
+    complete = dict(
+        passed=True,
+        repository=model.MODEL_ID,
+        revision=model.REVISION,
+        verified_shards=141,
+        verified_bytes=755632050320,
+    )
+    raw = json.dumps(complete).encode()
+    mapping = example_mapping(
+        tmp_path,
+        paths=dict(model_path=str(tmp_path)),
+        checkpoint=dict(
+            source_inventory_sha256="a" * 64,
+            manifest_sha256="b" * 64,
+            success_sha256="c" * 64,
+            source_complete_sha256=sha256(raw).hexdigest(),
+        ),
+    )
+    (tmp_path / "SOURCE_COMPLETE.json").write_bytes(raw)
+    return SiteConfig.from_mapping(mapping), mapping, complete
+
+
+def test_new_site_binds_complete_source_without_legacy_overlay(tmp_path):
+    site, _, _ = site_fixture(tmp_path)
+    args = site_args(SimpleNamespace(), site)
+    assert args.model_id == model.MODEL_ID and args.model_revision == model.REVISION
+    assert args.source_inventory_sha256 == "a" * 64 and args.checkpoint_manifest_sha256 == "b" * 64
+    assert args.checkpoint_success_sha256 == "c" * 64
+    assert args.checkpoint_root == site.checkpoint.root and args.source_inventory == site.checkpoint.source_inventory
+    assert args.num_processes == 8 and args.checkpoint_transport == "shm"
+    assert args.hlo_dump_root == site.paths.hlo_dump_root
+    assert (args.topology_capture_root, args.slice_name, args.mesh_sha256) == (
+        site.topology.capture_root,
+        site.topology.slice_name,
+        site.topology.mesh_sha256,
+    )
+    assert not hasattr(args, "strategy_nd_dense_overlay_root")
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("passed", False),
+        ("verified_shards", 17),
+        ("verified_bytes", 91184236216),
+        ("revision", "0" * 40),
+        ("repository", "zai-org/GLM-5.2-FP8"),
+    ],
+)
+def test_incomplete_or_other_model_source_refused_even_with_matching_digest(tmp_path, field, value):
+    from hashlib import sha256
+    from glm_tpu.config.site import SiteConfig
+
+    _, mapping, complete = site_fixture(tmp_path)
+    complete[field] = value
+    raw = json.dumps(complete).encode()
+    mapping["checkpoint"]["source_complete_sha256"] = sha256(raw).hexdigest()
+    (tmp_path / "SOURCE_COMPLETE.json").write_bytes(raw)
+    with pytest.raises(ValueError, match="incomplete"):
+        site_args(SimpleNamespace(), SiteConfig.from_mapping(mapping))
+
+
+def test_changed_source_completion_receipt_refused(tmp_path):
+    site, _, complete = site_fixture(tmp_path)
+    (tmp_path / "SOURCE_COMPLETE.json").write_bytes(json.dumps(dict(complete, note="x")).encode())
+    with pytest.raises(ValueError, match="source completion identity"):
+        site_args(SimpleNamespace(), site)
+
+
+def test_site_does_not_fall_back_when_missing(tmp_path):
+    from glm_tpu.config.site import SiteConfig, SiteConfigError
+
+    with pytest.raises(SiteConfigError, match="no site file"):
+        SiteConfig.load(tmp_path / "site.toml")
+    site, _, _ = site_fixture(tmp_path)
+    (tmp_path / "SOURCE_COMPLETE.json").unlink()
+    with pytest.raises(FileNotFoundError):
+        site_args(SimpleNamespace(), site)
+
+
+def test_migration_refuses_inherited_glm52_checkpoint():
+    # A GLM-5.2-era site binding (the archived legacy worker's recipe): checkpoint and topology pins,
+    # but no GLM-5.3 model identity and no source-inventory digest.
+    args = SimpleNamespace(
+        checkpoint_root=Path("/example/glm52/checkpoint"),
+        checkpoint_transport="gcsfuse",
+        checkpoint_manifest_sha256="0" * 64,
+        checkpoint_success_sha256="1" * 64,
+        source_inventory=Path("/example/glm52/source_inventory.json"),
+        topology_capture_root=Path("/example/topology"),
+        topology_sha256="2" * 64,
+    )
+    from glm_tpu.config.site import require_site  # the binding the worker's preflight uses
+
+    with pytest.raises(ValueError, match=r"GLM-5.3 runtime checkpoint"):
+        require_site(args)

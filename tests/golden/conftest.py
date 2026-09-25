@@ -1,10 +1,11 @@
-"""Golden-gate glue: markers, the recorded-version rule and the CPU budget rule.
+"""Golden-gate glue: the golden markers and the recorded-version rule.
 
 Golden data are bound to the package versions recorded in ``tests/golden/data/*.json`` (per gate:
 ``tools.equivalence.gates.BOUND_PACKAGES``). On any other version a golden test skips loudly with
 the reason -- unless ``GLM_EQUIVALENCE_STRICT=1`` (CI, integrator), where a mismatch fails. A
 missing data file is always a failure, never a skip. While a TPU run is live on this host, the
-heavy (``cpu32``) goldens skip instead of competing with the run (D25).
+heavy (``cpu32``) goldens skip instead of competing with the run (D25): the rule of every ``cpu32``
+test, in ``tests/conftest.py``.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from typing import Any
 
 import pytest
 
-from tools.equivalence.budget import live_tpu_run, refusal_reason
 from tools.equivalence.common import DATA, read_json, version_mismatch
 from tools.equivalence.gates import BOUND_PACKAGES, DATA_FILES
 
@@ -28,8 +28,6 @@ def pytest_configure(config: pytest.Config) -> None:
     for line in (
         "golden: compares against tests/golden/data (bound to the recorded package versions)",
         "golden_data(name): the data file a golden test compares against",
-        "cpu32: runs a child process on 32 forced CPU devices",
-        "slow: takes more than ~30 s on a 4-core host",
     ):
         config.addinivalue_line("markers", line)
 
@@ -42,7 +40,6 @@ def mismatch_reason(name: str) -> str | None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    live = None
     for item in items:
         data = item.get_closest_marker("golden_data")
         # A missing data file is not skipped: the test itself fails on it.
@@ -50,10 +47,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             reason = mismatch_reason(data.args[0])
             if reason:
                 item.add_marker(pytest.mark.skip(reason=reason + " (GLM_EQUIVALENCE_STRICT=1 makes this fail)"))
-        if item.get_closest_marker("cpu32") is not None:
-            live = live_tpu_run() if live is None else live
-            if live:
-                item.add_marker(pytest.mark.skip(reason=refusal_reason()))
 
 
 @pytest.fixture

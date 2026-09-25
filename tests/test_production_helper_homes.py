@@ -13,6 +13,8 @@ reference is compared as renamed where the current module defines or imports tha
 A Pallas kernel name S4.2b made public (``glm_tpu.kernels.names.KERNEL_NAMES[key]``) is compared as
 the 181c013e name the equivalence harness patches it back to (``tools/equivalence/kernel_renames.toml``),
 and a ``jax.named_scope`` name S4.4 renamed as the name it replaced (``helper_names.toml [named_scopes]``).
+A definition an S5 work unit changes is declared in ``S5_DECLARED``: compared under its new name or at its
+new home when renamed or moved, not compared when rewritten, removed or given a new docstring.
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -22,6 +24,7 @@ import ast
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -189,6 +192,19 @@ S2F_SPLIT = (
 )
 
 
+# S5 (DESIGN 11.3): the compared definitions an S5 commit changes, keyed by their home and name after S4
+# (``_s4_home``); the value is ``"<work unit or H number>: <kind>"``, kind ``renamed -> <new name>``, ``moved ->
+# <new home>`` (compared there, verbatim), ``rewritten``, ``docstring`` or ``removed`` (not compared). Rows are
+# added by the commit that makes the change; S7 retires this test with tools/migration/.
+S5_DECLARED: dict[tuple[str, str], str] = {}
+S5_DECLARATION = re.compile(
+    r"(?:WU-[A-Z][A-Za-z]*|H[1-9][0-9]?): "
+    r"(?:rewritten|docstring|removed|renamed -> [A-Za-z_][A-Za-z0-9_]*|moved -> glm_tpu/[A-Za-z0-9_/]+\.py)"
+)
+S5_NOT_COMPARED = ("rewritten", "docstring", "removed")
+COMPARED = 265  # the definitions this test compares (their post-S4 homes: 43 files)
+
+
 def _symbol_moves() -> dict:
     import tomllib
 
@@ -210,8 +226,8 @@ def _helper_names() -> dict:
     return tomllib.loads((REPO / "tools/migration/helper_names.toml").read_text())
 
 
-def _final_home(home: str, name: str) -> tuple[str, str]:
-    """Where a definition of the S3 file ``home`` is now, under which name."""
+def _s4_home(home: str, name: str) -> tuple[str, str]:
+    """Where S4 put a definition of the S3 file ``home``, under which name."""
     table = _symbol_moves()
     spec = table["moves"].get(home, {}).get(name)
     if spec is None:
@@ -220,6 +236,28 @@ def _final_home(home: str, name: str) -> tuple[str, str]:
         path, current = (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
     public = _public_names().get(f"{path}:{current}", current)
     return path, _helper_names()["renames"].get(f"{path}:{public}", public)
+
+
+def _s5_kind(home: str, name: str) -> str | None:
+    """The S5 declaration of a definition of the S3 file ``home`` (``S5_DECLARED``), without its token."""
+    declared = S5_DECLARED.get(_s4_home(home, name))
+    return None if declared is None else declared.partition(": ")[2]
+
+
+def _final_home(home: str, name: str) -> tuple[str, str]:
+    """Where a definition of the S3 file ``home`` is now, under which name (S4, then an S5 rename or move)."""
+    path, current = _s4_home(home, name)
+    kind = _s5_kind(home, name) or ""
+    if kind.startswith("renamed -> "):
+        return path, kind.removeprefix("renamed -> ")
+    if kind.startswith("moved -> "):
+        return kind.removeprefix("moved -> "), current
+    return path, current
+
+
+def _compared(home: str, name: str) -> bool:
+    """False for a definition an S5 unit rewrote, removed or gave a new docstring (``S5_DECLARED``)."""
+    return _s5_kind(home, name) not in S5_NOT_COMPARED
 
 
 def _helpers_bound_in(path: str) -> dict[str, str]:
@@ -375,6 +413,8 @@ def _current(path: str) -> ast.Module:
 
 @pytest.mark.parametrize(("home", "origin", "name"), VERBATIM)
 def test_moved_definition_equals_its_181c013e_original(home, origin, name):
+    if not _compared(home, name):
+        pytest.skip(f"S5: {S5_DECLARED[_s4_home(home, name)]}")
     # Function-local imports name the homes of their day (S2f moved some of them); compared by the
     # names they bind.
     current, baseline = _moved_definition(home, name), _as_renamed_in(home, _definition(_baseline(origin), name), name)
@@ -492,7 +532,7 @@ def _pruned_at_s2f(home: str) -> set[str]:
 @pytest.mark.parametrize(("home", "origin"), S2F_WHOLE)
 def test_s2f_moved_file_keeps_every_definition(home, origin):
     base = _s2f_base(origin)
-    names = [n for n in _top_level_names(base) if n not in _pruned_at_s2f(home)]
+    names = [n for n in _top_level_names(base) if n not in _pruned_at_s2f(home) and _compared(home, n)]
     # the definitions that stay in the file keep their order, minus the pruned dead ones (a split
     # may append its definitions to a moved file); S4.1 moved the others on, verbatim
     staying = [n for n in names if _final_home(home, n)[0] == home]
@@ -507,7 +547,7 @@ def test_s2f_moved_file_keeps_every_definition(home, origin):
 @pytest.mark.parametrize(("home", "origin", "names"), S2F_SPLIT)
 def test_s2f_split_definitions_equal_their_research_originals(home, origin, names):
     base = _s2f_base(origin)
-    for name in names:
+    for name in filter(lambda n: _compared(home, n), names):
         original = _as_renamed_in(home, _definition(base, name), name)
         assert _without_import_paths(_moved_definition(home, name)) == _without_import_paths(original)
 
@@ -530,3 +570,15 @@ def test_every_entry_point_loads_only_glm_tpu_modules():
         )
     )
     assert loaded and [m for m in loaded if m != "glm_tpu" and not m.startswith("glm_tpu.")] == []
+
+
+def test_s5_declarations_are_well_formed_and_name_compared_definitions():
+    compared = {_s4_home(home, name) for home, _, name in VERBATIM}
+    compared |= {_s4_home(home, name) for home, _, names in S2F_SPLIT for name in names}
+    for home, origin in S2F_WHOLE:
+        base = _top_level_names(_s2f_base(origin))
+        compared |= {_s4_home(home, name) for name in base if name not in _pruned_at_s2f(home)}
+    assert len(compared) == COMPARED
+    for key, value in S5_DECLARED.items():
+        assert key in compared, key
+        assert S5_DECLARATION.fullmatch(value), value

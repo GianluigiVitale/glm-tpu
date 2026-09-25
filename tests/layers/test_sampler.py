@@ -7,7 +7,10 @@ import os
 import subprocess
 import sys
 
+import pytest
 
+
+@pytest.mark.cpu32
 def test_ws32_io_matches_forced_32_reference_without_vocab_gather() -> None:
     program = r"""
 import json

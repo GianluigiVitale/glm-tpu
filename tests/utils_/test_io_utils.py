@@ -1,7 +1,7 @@
 """Create-once record writes: never overwrite, never follow a link, never raise on a difference.
 
 Bounded input reads (``read_bounded``, ``glm_tpu/utils/io_utils.py``): a regular file within its
-byte cap, never through a symlink.
+byte cap, never through a symlink. Private inputs (``private``): owner-only, never a symlink.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import pytest
 
 from glm_tpu.engine.request import PAYLOAD_CAP
 from glm_tpu.utils.io_utils import read_bounded, FINAL_DIR, create_private_exclusive, write_collected
+from glm_tpu.utils import io_utils
 
 RECORD = {"complete": True, "rank": 3, "request": {"emitted": 3}}
 
@@ -142,3 +143,17 @@ def test_read_bounded_refuses_symlinks_oversize_and_non_regular_files(tmp_path):
     os.mkfifo(fifo)  # opened non-blocking: refused, never waited on
     with pytest.raises(ValueError, match="bounded regular file"):
         read_bounded(fifo, PAYLOAD_CAP)
+
+
+def test_private_input_rejects_public_permissions_and_symlink(tmp_path):
+    path = tmp_path / "request.json"
+    path.write_text("{}")
+    path.chmod(0o644)
+    with pytest.raises(ValueError):
+        io_utils.private(path)
+    path.chmod(0o600)
+    io_utils.private(path)
+    link = tmp_path / "link"
+    link.symlink_to(path)
+    with pytest.raises(ValueError):
+        io_utils.private(link)

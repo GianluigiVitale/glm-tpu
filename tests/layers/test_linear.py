@@ -33,6 +33,7 @@ def test_resident_projection_rejects_raw_bits_or_scales():
             resident.resident_matmul(lhs, weight, scale)
 
 
+@pytest.mark.cpu32
 def test_bf16_canonical_dense_cpu32():
     code = r"""
 import jax, jax.numpy as jnp, numpy as np

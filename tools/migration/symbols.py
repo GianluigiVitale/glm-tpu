@@ -2,8 +2,9 @@
 
 The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1), ``restructure.py --apply
 renames.toml`` (S4.2), ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
-modules) and ``restructure.py --apply helper_names.toml`` (S4.4: renames plus ``[named_scopes]``, the
-``jax.named_scope`` names, see F). The tables describe one kind of change -- a top-level definition
+modules), ``restructure.py --apply helper_names.toml`` (S4.4: renames plus ``[named_scopes]``, the
+``jax.named_scope`` names, see F) and ``restructure.py --apply test_moves.toml`` (S5 A2, moves between
+test modules). The tables describe one kind of change -- a top-level definition
 ``(module, name)`` becomes ``(module', name')`` -- and share one reference pass:
 
 A. *move* (``[moves]``, S4.1): every listed top-level definition is cut from its module and pasted
@@ -1674,8 +1675,12 @@ class _Normalize(ast.NodeTransformer):
 
     def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
         self.generic_visit(node)
-        if isinstance(node.value, ast.Name) and node.value.id in self.aliases:
-            return ast.copy_location(ast.Name(id=self.renames.get(node.attr, node.attr), ctx=node.ctx), node)
+        if isinstance(node.value, ast.Name) and node.value.id in self.aliases and not hasattr(node.value, "spelled"):
+            name = ast.copy_location(ast.Name(id=self.renames.get(node.attr, node.attr), ctx=node.ctx), node)
+            # ``alias.module.name``: the spelled ``module`` is an attribute, never one of the file's aliases (a
+            # destination that imports that module under the same name would otherwise spell ``name`` alone).
+            name.spelled = True
+            return name
         return node
 
     def visit_Name(self, node: ast.Name) -> ast.Name:

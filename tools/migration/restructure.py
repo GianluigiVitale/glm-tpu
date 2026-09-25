@@ -5,18 +5,18 @@
 
 Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
 top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names),
-``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules) and
+``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules),
 ``helper_names.toml`` (S4.4, the public names of the private helpers other modules import and the
-``jax.named_scope`` names); the S4 kinds are applied by ``symbols.py`` (its docstring has the
-rules). ``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4
-when a moved or renamed definition differs from its base-commit original (imports aside), a
-dissolved module or any tracked ``_s3_`` path is left, or a Python or TOML file still names a
-dissolved module. Each S4 table is checked at its own step: a later table renames what an earlier
-one placed (``--check symbol_moves.toml`` reports the S4.2 renames as differences), S4.4 edits
-definitions the earlier tables placed (reviewed lint fixes; the public helper names), and S5 edits
-definitions the S4.4 table compares (its check compares docstrings too). So without a TABLE argument
-``--check`` runs ``move_map.toml`` only; each S4 table is checked, by name, at the commit that
-applied it.
+``jax.named_scope`` names) and ``test_moves.toml`` (S5 A2, tests moved to the test module of their
+subject); the S4 kinds (and S5 A2's) are applied by ``symbols.py`` (its docstring has the rules).
+``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4 when a moved
+or renamed definition differs from its base-commit original (imports aside), a dissolved module or
+any tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
+table is checked at its own step: a later table renames what an earlier one placed (``--check
+symbol_moves.toml`` reports the S4.2 renames as differences), S4.4 edits definitions the earlier
+tables placed (reviewed lint fixes; the public helper names), and S5 edits definitions the S4.4 table
+compares (its check compares docstrings too). So without a TABLE argument ``--check`` runs
+``move_map.toml`` only; each S4 table (and S5 A2's) is checked, by name, at the commit that applied it.
 
 S3, ``move_map.toml``:
 
@@ -66,6 +66,7 @@ MAP = Path(__file__).with_name("move_map.toml")
 SYMBOLS = Path(__file__).with_name("symbol_moves.toml")  # S4.1
 RENAMES = Path(__file__).with_name("renames.toml")  # S4.2
 MERGES = Path(__file__).with_name("test_merges.toml")  # S4.3
+TEST_MOVES = Path(__file__).with_name("test_moves.toml")  # S5 A2
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -404,10 +405,10 @@ def tracked() -> list[str]:
 
 
 def dissolved_later() -> set[str]:
-    """Modules a later table dissolved (the S4.1 interim modules, the S4.3 merged tests): S3
-    destinations that no longer exist."""
+    """Modules a later table dissolved (the S4.1 interim modules, the S4.3 merged tests, the S5 A2 split
+    test modules): S3 destinations that no longer exist."""
     out: set[str] = set()
-    for table in (SYMBOLS, RENAMES, MERGES):
+    for table in (SYMBOLS, RENAMES, MERGES, TEST_MOVES):
         if table.is_file():
             out |= set(tomllib.loads(table.read_text()).get("dissolve", {}).get("modules", []))
     return out

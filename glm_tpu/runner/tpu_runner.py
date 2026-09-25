@@ -187,7 +187,7 @@ class OrdinaryRuntime:
             inventory_sha256=inventory.inventory_sha256,
             verified_slots=slots,
         )
-        raw = self.phase("bind_weights", lambda: weights.bind_decoder_weights(loaded.arrays, config))  # noqa: F821 (FOLLOWUPS 35)
+        raw = self.phase("bind_weights", lambda: weights.bind_decoder_weights(loaded.arrays, config))  # noqa: F821 (phase() calls this closure before the del below; pyflakes checks it after the del)
         del loaded
         # Every program this runtime compiles comes from the one production builder.
         programs = build_program_set(self.mesh, config, concurrent_size=self.concurrent_size)
@@ -228,7 +228,7 @@ class OrdinaryRuntime:
         )
         self.weights = self.phase(
             "bf16_prepare",
-            lambda: jax.block_until_ready(bf16_resident_weights(self.mesh, config, raw)),  # noqa: F821 (FOLLOWUPS 35)
+            lambda: jax.block_until_ready(bf16_resident_weights(self.mesh, config, raw)),  # noqa: F821 (phase() calls this closure before the del below; pyflakes checks it after the del)
         )
         del raw, tables, layer
         gc.collect()

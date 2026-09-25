@@ -58,7 +58,7 @@ def generate_batch(r, values, *, deliver, deadline, clock=time.perf_counter):
             )
             fresh = out.state
             r.require(r.vote(bool(np.asarray(fresh.decoder.contract_valid).all())) is True, "concurrent prefill failed")
-        one, token = r.phase("batch_prefill_finish", lambda: pre.finish_batched_prefill(out))  # noqa: B023, F821 (B023: called in this iteration; F821: FOLLOWUPS 35)
+        one, token = r.phase("batch_prefill_finish", lambda: pre.finish_batched_prefill(out))  # noqa: B023, F821 (phase() calls this closure in this iteration, before the del below; pyflakes checks it after the del)
         prefill_times.append(clock() - prefill_started)
         first_tokens.append(int(np.asarray(token)[0]))
         metadata.append([first_tokens[-1], 1, int(lengths[lane]), int(lengths[lane]) + 1])

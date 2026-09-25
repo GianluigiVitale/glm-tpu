@@ -11,6 +11,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 
 CODE = r"""
 import jax, jax.numpy as jnp, numpy as np
@@ -62,6 +64,7 @@ print('Exclusive prefill state donation preserves every output leaf')
 """
 
 
+@pytest.mark.cpu32
 def test_prefill_program_health_selector_refusal_and_donation_cpu32():
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", CODE], env=env, capture_output=True, text=True, timeout=900)
