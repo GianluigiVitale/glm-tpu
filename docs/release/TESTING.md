@@ -22,6 +22,7 @@ JAX_PLATFORMS=cpu python -m pytest -q \
   tests/utils_/test_io_utils.py \
   tests/config/test_site.py \
   tests/runner/test_tpu_runner.py \
+  tests/engine/test_llm_engine.py \
   tests/entrypoints/cli/test_ask.py
 ```
 

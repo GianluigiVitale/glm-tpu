@@ -10,11 +10,11 @@ top-level packages, and whether JAX was imported:
   controller stage also drives the real launcher ``main`` (``controller.launcher_record``: staging,
   preflight, dispatch, supervision, collection, the failure path's cleanup), so a lazy import on the
   launch path is recorded and the controller must stay JAX-free while it runs;
-* ``graph``: drives the real ``OrdinaryRuntime.__init__``/``_load`` for every fixture-tier run
+* ``graph``: drives the real ``TPUModelRunner.__init__``/``_load`` for every fixture-tier run
   (``driver.py``) and traces every program -- catches lazy imports inside ``_load`` and inside
   graph construction (e.g. the expert-panel kernels);
 * ``serving``: the G9 exercise (``wire.record``): the real ``run_queued`` over the real
-  ``generate``, ``run_concurrent`` over the real ``generate_batch``/``BatchedSession``, worker
+  ``LLMEngine.generate``, ``run_concurrent`` over the real ``LLMEngine.generate_concurrent``/``BatchedSession``, worker
   ``main``, ``resident_loop``, ``resident_controller``, ``summarize`` and the UI/API handler.
 
 The comparison (``gates.check``) maps current names through ``closure_map.toml`` and lets a
@@ -64,7 +64,7 @@ STAGES: dict[str, tuple[str, ...]] = {
         "glm_tpu.distributed.topology",
         "glm_tpu.distributed.mesh",
     ),
-    # worker main: runtime initialization, OrdinaryRuntime and _load's lazy imports
+    # worker main: runtime initialization, TPUModelRunner (and _load's lazy imports) and LLMEngine
     "worker_main": (
         "glm_tpu.worker.tpu_worker",
         "glm_tpu.distributed.parallel_state",

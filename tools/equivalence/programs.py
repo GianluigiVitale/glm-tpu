@@ -1,7 +1,7 @@
 """Device programs of the tree under test, as lowerable ``(fn, args)`` pairs built by production.
 
-``program_specs`` constructs the real ``OrdinaryRuntime`` with its real ``__init__`` (which runs
-the real ``_load`` and, for a concurrent runtime, the real ``batched_runtime.compile_batch``)
+``program_specs`` constructs the real ``TPUModelRunner`` with its real ``__init__`` (which runs
+the real ``_load`` and, for a concurrent runtime, the real ``tpu_runner.compile_batch``)
 through ``driver.build_runtime``. ``_load``'s ``compile`` calls run the real ``compile`` and
 ``compile_program``; the fingerprint of a compiled program is taken from the ``Lowered`` that
 ``compile_program`` itself built (``fn.lower(*inputs)``, for the TPU platform, location-free) and
@@ -398,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         "--adapter",
         choices=("runtime", "programset"),
         default="runtime",
-        help="runtime: the real OrdinaryRuntime (the gate); programset: build_program_set "
+        help="runtime: the real TPUModelRunner (the gate); programset: build_program_set "
         "standalone with the runtime's arguments (cross-check)",
     )
     parser.add_argument("--consistency", action="store_true", help="also run the fixture adapter-consistency check")

@@ -67,12 +67,14 @@ every `cpu32` test (`test_import_closures` included; `test_import_closures_stati
 ### Programs: built by the real runtime (`programs.py`, `driver.py`)
 
 At `181c013e` production had no program builder: `OrdinaryRuntime._load` built and compiled its
-programs inline. Since S2c `_load` and `batched_runtime.compile_batch` obtain every program from
+programs inline. Since S2c `_load` and `batched_runtime.compile_batch` (`tpu_runner.compile_batch`
+from S4.1) obtain every program from
 `glm_tpu.runner.programs.build_program_set` (the per-table FP8 decoders excepted, see below) and
 compile its specs with the arguments the load produces. `program_specs` constructs the **real**
-`OrdinaryRuntime` with its real `__init__`, which runs the real `_load` (and, for a concurrent
+`TPUModelRunner` (`OrdinaryRuntime` until S5 WU-E1, which moved generation to `LLMEngine`) with its
+real `__init__`, which runs the real `_load` (and, for a concurrent
 runtime, the real `compile_batch`). `_load`'s `compile` calls run production's **real compile
-path**: `OrdinaryRuntime.compile` -> `compile_program` (`fn.lower(*inputs)`, the StableHLO
+path**: `TPUModelRunner.compile` -> `compile_program` (`fn.lower(*inputs)`, the StableHLO
 original, `lowered.compile()`, the optimized-HLO original, `runner.json`), the graph-consensus
 phase, the HLO admission and the memory admission. A compiled program's fingerprint is taken from
 the `Lowered` that `compile_program` itself built -- donation, prefill options, the 2,034-token
@@ -264,7 +266,7 @@ platform-attribute differences.
 
 Executed by production's own runtime code: the real `__init__`/`_load` load the fixture (the prefill
 and decode builders get the two Pallas interpret flags), and prompts A and B run through the real
-`OrdinaryRuntime.generate` (identity votes, `process_allgather` faked, request validation relaxed
+`LLMEngine.generate` of an engine around that runner (identity votes, `process_allgather` faked, request validation relaxed
 for the fixture profile) with the compiled prefill/decode programs wrapped to record each block and
 step; the batch groups come from a real concurrent (n=4) runtime. Driven this way, every group is
 byte-identical to the S0 recording made with the harness's own copy of the loop. Each program's
@@ -289,7 +291,7 @@ each block; prompt B (114, one block); prompt C (refused prefill on a finished s
 frontier unchanged, health false, token -1); three packed decode steps;
 an 8-token `PackedRequestSession` loop with identity votes (tokens and TokenEvent JSONL digest);
 `batch_cache_init` and `batch_insert` through the real `compile_batch`; `batch_generate`: the real
-`generate_concurrent` -> `generate_batch` of the concurrent runtime over four lanes (prompts A, B
+`LLMEngine.generate_concurrent` (`generate_batch` until S5 WU-E1) over the concurrent runtime, four lanes (prompts A, B
 and two short ones) with that runtime's **own** `cache_init`, prefill and `batch_insert` programs
 (block states and tokens, the bank handed to `batch_decode`, round-0 TokenEvent lines, and whether
 lanes A and B equal the sequential runtime's prefill); `donated_prompt_a` (the 8,704-slot
@@ -360,9 +362,9 @@ import their entry modules and the lazy imports those processes perform, and the
 also runs the real launcher `main` (G9's `controller.launcher_record`), so a lazy import anywhere
 on the launch path -- staging, preflight, dispatch, supervision, collection, cleanup -- is recorded
 and must keep the controller JAX-free; `graph` drives the real
-`OrdinaryRuntime.__init__`/`_load` (and the real compile path) for every fixture run and traces
+`TPUModelRunner.__init__`/`_load` (and the real compile path) for every fixture run and traces
 every program, so a lazy import inside `_load`, `compile` or graph construction is recorded;
-`serving` runs the G9 exercise (the real `run_queued`/`generate`, `run_concurrent`/`generate_batch`,
+`serving` runs the G9 exercise (the real `run_queued`/`generate`, `run_concurrent`/`generate_concurrent`,
 worker `main` with its real `preflight` and `initialize_runtime`, `resident_loop`,
 `resident_controller`, `summarize`, the UI/API handler), so a lazy import in the worker's
 preflight or runtime initialization is recorded too. The static scan lists every
@@ -394,15 +396,15 @@ bodies for each profile, sequential and concurrent batches, refusals (the 181c01
 a non-ASCII request id; the goldens record that) and both canonical-JSON contracts on non-ASCII
 message content; the API's messages-size measure, found by bisection over `glm_tpu.entrypoints.openai.chat_utils.convert`
 itself (largest accepted one-message content per character class: ASCII, Latin, CJK, astral);
-`run_queued` over the real `OrdinaryRuntime.generate` with synthetic device results (TokenEvent
+`run_queued` over the real `LLMEngine.generate` with synthetic device results (TokenEvent
 lines, `answer.txt`, report keys and values, phase names, and the prefill block schedule incl. a
 114-token tail and a 128+114 prompt), at 8,192 and at the donated long-context capacities 32,768
-and 166,912 (the capacity-dependent host rules: warm-up prompt, tail program); `run_concurrent` over the real `generate_concurrent` ->
-`batched_runtime.generate_batch` -> `BatchedSession` with synthetic device results (four lanes of
+and 166,912 (the capacity-dependent host rules: warm-up prompt, tail program); `run_concurrent` over the real
+`LLMEngine.generate_concurrent` -> `BatchedSession` with synthetic device results (four lanes of
 different lengths and budgets, one EOS: lines with `batch_round`, answers, reports, aggregate,
 prefill schedule); the refusals of the fleet votes in the same host logic (`fleet_refusals`: a
 host whose output digest differs at the output consensus, and a prefill whose contract is invalid
--- the local health vote is false --, for `generate` and for `generate_batch`; `accepted` would mean
+-- the local health vote is false --, for `generate` and for `generate_concurrent`; `accepted` would mean
 the check is gone); `resident_loop` and `resident_controller` (ready file bytes, worker stdin
 command and stop bytes, measurement keys); the worker `main` for a sequential request and a
 concurrent batch, run with its **real `preflight`** against a synthetic staged run directory
@@ -413,7 +415,7 @@ only the environment marker, the hostname, the checkpoint pins `site_args` binds
 check (both read private assets), `jax.distributed`, the device queries and `Mesh` --: the record
 keys, the arguments `preflight` binds (context capacity, process id, topology capture root, ...),
 the topology binding it authenticates, the `jax.distributed` arguments, the mesh axis names, shape
-and device-order digest, the arguments `main` passes to `OrdinaryRuntime` (names and described
+and device-order digest, the arguments `main` passes to `TPUModelRunner` (names and described
 values: `context_capacity`, `concurrent_size`, the vote function, the file `save` writes, ...),
 and the refusals the real `preflight` and `initialize_runtime` must produce on inputs with exactly
 one defect (deployed-source digest, existing namespace, coordinator port, owner-only modes,
@@ -509,8 +511,12 @@ to 4 CPUs also reproduced every G3 group.
   the hook with the code:
   `request.CONCURRENT_CAPACITY` (fixture concurrent guard, read by `__init__` through a call-time
   import; a module-level binding makes the n = 1..4 builds refuse "requires 32K");
-  `runtime.validate` and `llm_engine.batch` (`batched_runtime.batch` until S4.1; G3's relaxed fixture-request validation; a
-  bypass makes production validation refuse the 1,536-slot requests); the program-set module's
+  `llm_engine.validate` and `llm_engine.batch` (`driver.ENGINE_MODULE`; `runtime.validate` until S5 WU-E1,
+  `batched_runtime.batch` until S4.1; G3's relaxed fixture-request validation; a
+  bypass makes production validation refuse the 1,536-slot requests); the runner and engine classes
+  `driver.RUNTIME_CLASS` (`TPUModelRunner`, `OrdinaryRuntime` until S5 WU-E1) and `driver.ENGINE_CLASS`
+  (`LLMEngine` in `driver.ENGINE_MODULE`; G1-G3 and G7 build them, G9's worker exercise patches the runner
+  class where `main` imports it; a rename not followed fails on the missing attribute); the program-set module's
   (S2c; the runtime module's before) `build_prefill_program` (S2d c3; before,
   `build_ws32_prefill_challenger_program`) and `build_packed_decoder_program` (G3's Pallas interpret
   flags; a bypass runs TPU kernels on CPU and

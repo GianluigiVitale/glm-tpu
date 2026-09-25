@@ -35,9 +35,9 @@ def test_worker_uses_one_batch_and_separate_deliveries(monkeypatch, tmp_path):
             batch_size=8
         )
 
-    runtime = SimpleNamespace(phase=lambda name, fn: fn(), generate_concurrent=generate)
+    engine = SimpleNamespace(runner=SimpleNamespace(phase=lambda name, fn: fn()), generate_concurrent=generate)
     with installed_site(example_site(tmp_path / "site")):  # the answer writer's tokenizer location
-        reports, aggregate = run_concurrent(runtime, pending, tmp_path, 0, 100)
+        reports, aggregate = run_concurrent(engine, pending, tmp_path, 0, 100)
     assert len(calls) == 2 and calls[1] == pending  # Disposable warmup, then ONE measured batch.
     assert all(len(v["prompt_ids"]) == 128 and v["max_new_tokens"] == 2 for v in calls[0])
     assert len(reports) == 8 and aggregate["batch_size"] == 8
@@ -54,7 +54,7 @@ def test_resident_reuses_runtime_and_has_explicit_stop(monkeypatch, tmp_path):
     from glm_tpu.engine import request
 
     value = request.from_token_ids([7], request_id="fixture", max_new_tokens=2, context_capacity=32768)
-    runtime = SimpleNamespace(capacity=32768, phase=lambda name, action: action())
+    engine = SimpleNamespace(runner=SimpleNamespace(capacity=32768, phase=lambda name, action: action()))
     seen = []
 
     def generate(actual, pending, value, root, rank, deadline, **kwargs):
@@ -63,8 +63,8 @@ def test_resident_reuses_runtime_and_has_explicit_stop(monkeypatch, tmp_path):
 
     monkeypatch.setattr(worker, "run_queued", generate)
     commands = json.dumps(dict(sequence=1, request=value)) + "\n" + json.dumps(dict(stop=True)) + "\n"
-    worker.resident_loop(runtime, rows()[0], tmp_path, 0, 3600, stream=io.StringIO(commands))
-    assert seen == [(runtime, False, "resident-0001")]
+    worker.resident_loop(engine, rows()[0], tmp_path, 0, 3600, stream=io.StringIO(commands))
+    assert seen == [(engine, False, "resident-0001")]
     assert json.loads((tmp_path / "resident-ready.json").read_text()) == {"sequence": 1}
     assert (
         json.loads((tmp_path / "resident-0001/runner.rank0.json").read_text())["request_sha256"]
@@ -83,9 +83,9 @@ def test_resident_refuses_ambiguous_or_incompatible_input(tmp_path, case):
     line = (
         "" if case == "disconnect" else json.dumps(dict(sequence=2 if case == "sequence" else 1, request=value)) + "\n"
     )
-    runtime = SimpleNamespace(capacity=32768, phase=lambda name, action: action())
+    engine = SimpleNamespace(runner=SimpleNamespace(capacity=32768, phase=lambda name, action: action()))
     with pytest.raises(ValueError):
-        worker.resident_loop(runtime, rows()[0], tmp_path, 0, 3600, stream=io.StringIO(line))
+        worker.resident_loop(engine, rows()[0], tmp_path, 0, 3600, stream=io.StringIO(line))
     assert not (tmp_path / "resident-0001").exists()
 
 

@@ -1,5 +1,5 @@
 """Adapter authenticity (best effort, read-only): does the harness build what production compiled on
-the TPU fleet? (Since the programs come from the real ``OrdinaryRuntime``, this checks the CPU-hosted
+the TPU fleet? (Since the programs come from the real ``TPUModelRunner``, this checks the CPU-hosted
 TPU lowering and the abstract production inputs.)
 
 Production writes the StableHLO it compiled to ``<hlo root>/<run>/native.rank0/<name>.stablehlo.mlir``

@@ -1,14 +1,14 @@
 """G3: CPU32 execution goldens of the production composition (one subprocess).
 
 Frozen fixture v1 on a 32-device CPU mesh, Pallas kernels in interpret mode, TPU-v4 chip info.
-Everything is executed by production's own runtime code: the real ``OrdinaryRuntime.__init__``
-and ``_load`` build and run the load (``driver.build_runtime``: checkpoint I/O, admission and TPU
-compilation faked; the prefill and decode builders get the two interpret flags), and prompts A
-and B run through the real ``OrdinaryRuntime.generate`` (votes identity, ``process_allgather``
-faked, request validation relaxed for the fixture's 1,536-slot, 256-token profile), with the
-prefill and decode programs ``_load`` compiled wrapped to record every block and step. Results
-are positional leaf digests ``sha256(dtype | shape | raw bytes)`` in pytree-flatten order; key
-paths are labels only.
+Everything is executed by production's own runner and engine code: the real
+``TPUModelRunner.__init__`` and ``_load`` build and run the load (``driver.build_runtime``:
+checkpoint I/O, admission and TPU compilation faked; the prefill and decode builders get the two
+interpret flags), and prompts A and B run through the real ``LLMEngine.generate`` of one engine
+around that runner (votes identity, ``process_allgather`` faked, request validation relaxed for the
+fixture's 1,536-slot, 256-token profile), with the prefill and decode programs ``_load`` compiled
+wrapped to record every block and step. Results are positional leaf digests
+``sha256(dtype | shape | raw bytes)`` in pytree-flatten order; key paths are labels only.
 
 Groups: fixture checkpoint leaves; WK decode (the compiled ``wk_decode`` over every full-index
 layer) and promote (``runtime.wk``); resident BF16 weights (``runtime.weights``); host RoPE tables
@@ -17,8 +17,8 @@ prompt A (157 tokens = B128 + B114 tail) state, token and health after each bloc
 (114 tokens, one block); prompt C (a refused prefill on B's finished state); the first three packed
 decode steps of prompt A's session; the 8-token session (tokens + TokenEvent JSON lines);
 ``batch_cache_init`` and ``batch_insert`` of a real concurrent (n=4) runtime; ``batch_generate``: the
-real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` of that runtime over four lanes
-(prompts A, B and two short ones) with its **own** ``cache_init``, prefill and ``batch_insert``
+real ``LLMEngine.generate_concurrent`` (``generate_batch`` before S5 WU-E1) of that runtime over four
+lanes (prompts A, B and two short ones) with its **own** ``cache_init``, prefill and ``batch_insert``
 programs, up to the first batched decode (per-block states and tokens, the bank handed to
 ``batch_decode``, the round-0 TokenEvent lines, and whether lanes A and B equal the sequential
 runtime's prefill); ``donated_prompt_a``: prompt A through the real ``generate`` of the donated
@@ -101,7 +101,7 @@ def composition(mesh: Any) -> dict[str, Any]:
     plans = driver.fixture_plans(arrays)
     timed("fixture")
 
-    # --- load: the real OrdinaryRuntime.__init__ / _load
+    # --- load: the real TPUModelRunner.__init__ / _load
     built = driver.build_runtime(
         mesh,
         tier="fixture",
@@ -114,6 +114,7 @@ def composition(mesh: Any) -> dict[str, Any]:
         interpret=True,
     )
     runtime = built.runtime
+    engine = driver.engine_class()(runtime)  # one engine per runner, as the worker builds it
     config = runtime.config
     raw = bind_decoder_weights(arrays, config)  # what _load bound from the same loaded arrays
     wk_decode = built.recorder.program("wk_decode").fn
@@ -142,13 +143,13 @@ def composition(mesh: Any) -> dict[str, Any]:
         ticks[0] += 1.0
         return ticks[0]
 
-    run_a = generate_recorded(runtime, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
+    run_a = generate_recorded(engine, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
     groups["prompt_a"] = dict(blocks=run_a["blocks"])
     result_a = run_a["prefill"][-1]
     groups["decode_steps"] = run_a["decode_steps"]
     groups["request_session"] = run_a["session"]
     timed("prompt_a")
-    run_b = generate_recorded(runtime, "golden-b", PROMPT_B, 1, clock)
+    run_b = generate_recorded(engine, "golden-b", PROMPT_B, 1, clock)
     groups["prompt_b"] = dict(blocks=run_b["blocks"])
     result_b = run_b["prefill"][-1]
     timed("prompt_b")
@@ -196,7 +197,7 @@ def composition(mesh: Any) -> dict[str, Any]:
     groups["batch_insert"] = tree_record(bank)
     timed("batch")
     groups["batch_generate"] = batch_generate(
-        batched,
+        driver.engine_class()(batched),
         config,
         clock,
         sequential=dict(
@@ -228,7 +229,7 @@ def composition(mesh: Any) -> dict[str, Any]:
             ).runtime
         loads[key] = load_products(built_run, put)
         if run["donating"]:
-            donated = generate_recorded(built_run, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
+            donated = generate_recorded(driver.engine_class()(built_run), "golden-a", PROMPT_A, SESSION_TOKENS, clock)
             groups["donated_prompt_a"] = dict(
                 capacity=run["capacity"],
                 state_ownership=built_run.record.get("state_ownership"),
@@ -259,14 +260,15 @@ def load_products(runtime: Any, put: Any) -> dict[str, Any]:
     )
 
 
-def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: int, clock: Any) -> dict[str, Any]:
-    """The real ``OrdinaryRuntime.generate`` over the prefill and decode programs ``_load``
+def generate_recorded(engine: Any, name: str, ids: list[int], max_new_tokens: int, clock: Any) -> dict[str, Any]:
+    """The real ``LLMEngine.generate`` over the prefill and decode programs its runner's ``_load``
     compiled, each wrapped to record its result when it returns (a donating runtime consumes every
     state in the next call, so nothing is read afterwards). Returns the per-block records, the first
     ``DECODE_STEPS`` packed decode steps, the session's tokens and TokenEvent lines, and the raw
     prefill results (valid only for a non-donating runtime)."""
     from . import driver
 
+    runtime = engine.runner
     config = runtime.config
     programs, decode_program = dict(runtime.prefill), runtime.decode
     blocks: list[dict[str, Any]] = []
@@ -307,7 +309,7 @@ def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: i
     events: list[Any] = []
     try:
         with driver.serving_fakes(relaxed_validation=True):
-            tokens, _report = runtime.generate(
+            tokens, _report = engine.generate(
                 fixture_request(name, ids, max_new_tokens, config),
                 deliver=events.append,
                 deadline=float("inf"),
@@ -335,12 +337,13 @@ class _BatchedDecodeReached(Exception):
     """Raised by the stand-in ``batch_decode``: the batched loop reached its first decode round."""
 
 
-def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[str, str]) -> dict[str, Any]:
-    """The real ``generate_concurrent`` of a concurrent runtime, over its own compiled
+def batch_generate(engine: Any, config: Any, clock: Any, *, sequential: dict[str, str]) -> dict[str, Any]:
+    """The real ``LLMEngine.generate_concurrent`` over a concurrent runtime's own compiled
     ``cache_init``, ``prefill_128``/``prefill_114``, ``batch_cache_init`` and ``batch_insert``
     programs, host logic included (block staging, per-lane finish, insertion order). The loop is
     stopped at the first ``batch_decode`` call, whose arguments (tokens, bank, active lanes) are
     recorded: the vmapped BF16 decode itself cannot execute on CPU."""
+    runtime = engine.runner
     calls: list[Any] = []
     programs = dict(runtime.prefill)
 
@@ -373,7 +376,7 @@ def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[st
 
     with driver.serving_fakes(relaxed_validation=True):
         try:
-            runtime.generate_concurrent(requests, deliver=deliver, deadline=float("inf"), clock=clock)
+            engine.generate_concurrent(requests, deliver=deliver, deadline=float("inf"), clock=clock)
         except _BatchedDecodeReached:
             pass
         else:
@@ -387,10 +390,10 @@ def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[st
         )
         for rows, result in calls
     ]
-    # generate_batch prefills the lanes one after the other, 128-row blocks and a 114-row tail.
+    # generate_concurrent prefills the lanes one after the other, 128-row blocks and a 114-row tail.
     ends = np.cumsum([-(-len(ids) // 128) for ids in BATCH_PROMPTS])
     if len(blocks) != ends[-1]:
-        raise RuntimeError(f"generate_batch ran {len(blocks)} prefill blocks, expected {ends[-1]}")
+        raise RuntimeError(f"generate_concurrent ran {len(blocks)} prefill blocks, expected {ends[-1]}")
     finals = [blocks[end - 1]["state"]["digest"] for end in ends]
     return dict(
         blocks=blocks,

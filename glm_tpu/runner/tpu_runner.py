@@ -1,11 +1,12 @@
-"""The model runner: cold loading and private user generation for the ordinary profile.
+"""The model runner: cold loading, compilation and admission for the ordinary profile.
 
-The controller owns fleet/source admission and process cleanup. This
-runtime verifies real checkpoint bytes and admits each new graph against live
-memory before execution. It never loads speculative modules or benchmark cases.
+The controller owns fleet/source admission and process cleanup. This runner
+verifies real checkpoint bytes, compiles the production program set and admits
+each new graph against live memory before execution; generation over the loaded
+programs is the engine's (``glm_tpu.engine.llm_engine.LLMEngine``). It never
+loads speculative modules or benchmark cases.
 """
 
-from hashlib import sha256
 import gc
 import time
 
@@ -19,14 +20,13 @@ from glm_tpu.models.glm_moe_dsa import weights
 from glm_tpu.layers import rope
 from glm_tpu.runner.admission import check_hlo_collectives, project_memory
 from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
-from glm_tpu.engine.request_session import PackedRequestSession, RequestPolicy
-from glm_tpu.engine.request import validate, CAPACITY
+from glm_tpu.engine.request import CAPACITY
 from glm_tpu.config import model
 from glm_tpu.config import site
 from glm_tpu.runner.programs import build_program_set, donates_state
 
 
-class OrdinaryRuntime:
+class TPUModelRunner:
     def __init__(
         self,
         *,
@@ -84,7 +84,6 @@ class OrdinaryRuntime:
         self.require(shutil.disk_usage(dump_root.parent).free > 8 * 1024**3, "insufficient RAM for HLO originals")
         self.hlo.mkdir(parents=True, mode=0o700)
         self.record["hlo_originals"] = str(self.hlo)
-        self.active = False
         started = time.perf_counter()
         self._load(repo, physical)
         self.record["cold_load_compile_seconds"] = time.perf_counter() - started
@@ -267,105 +266,6 @@ class OrdinaryRuntime:
             )
         del initial, programs, spec
         gc.collect()
-
-    def generate(self, request, *, deliver, deadline, clock=time.perf_counter):
-        """One fresh request; ambiguous delivery or fleet failure poisons this runtime."""
-        validate(request)
-        if self.concurrent_size:
-            raise RuntimeError("use generate_concurrent on a batched runtime")
-        self.require(request["context_capacity"] == self.capacity, "request capacity differs from loaded model")
-        if self.active:
-            raise RuntimeError("optimized runtime has an active or failed request")
-        self.active = True
-        ids = np.asarray(request["prompt_ids"], np.int32)
-        policy = RequestPolicy(
-            request["request_id"],
-            len(ids),
-            request["max_new_tokens"],
-            self.capacity,
-            request["vocab_size"],
-            tuple(request["eos_ids"]),
-        )
-
-        def budget():
-            self.require(self.vote(clock() < deadline) is True, "optimized request deadline expired")
-
-        for name in ("cache_init", "prefill_128", "prefill_114", "decode"):
-            self.admit(name)
-        fresh = jax.block_until_ready(self.initialize(self.put(np.int32(len(ids)))))
-        staged = []
-        for start in range(0, len(ids), 128):
-            block = ids[start : start + 128]
-            rows = 114 if len(block) <= 114 else 128
-            staged.append(
-                (self.put(np.pad(block, (0, rows - len(block)), constant_values=-1)), self.put(np.int32(len(block))))
-            )
-        budget()
-        started = clock()
-        for _i, (block, count) in enumerate(staged):
-            budget()
-            result = jax.block_until_ready(
-                self.prefill[block.size](block, count, fresh, self.weights, self.wk, self.rope)
-            )
-            fresh = result.state
-            self.require(
-                self.vote(bool(np.asarray(fresh.decoder.contract_valid).all())) is True, "optimized prefill failed"
-            )
-        prefill_seconds = clock() - started
-        session = PackedRequestSession(
-            policy,
-            decode_step=lambda t, s: self.decode(t, s, self.weights, self.rope),
-            fleet_all=lambda valid: self.vote(valid and clock() < deadline),
-            deliver=deliver,
-            request_started=started,
-            delivery_boundary="rank0 private JSONL token write+flush; no network transport",
-            clock=clock,
-        )
-        session.accept_prefill(result)
-        # Release prefill references before entering sustained decode.
-        del fresh, result
-        decode_started = clock()
-        while not session.finished:
-            session.step()
-        elapsed = clock() - decode_started
-        tokens = np.asarray([event.token_id for event in session.events], np.int32)
-        # Deadline admission participates in the existing fleet votes. A local
-        # pre-dispatch exception would strand peers in the next collective.
-        from jax.experimental import multihost_utils
-
-        token_digest = sha256(tokens.tobytes()).hexdigest()
-
-        def agree_tokens():
-            hashes = np.asarray(multihost_utils.process_allgather(np.frombuffer(bytes.fromhex(token_digest), np.uint8)))
-            self.require(bool((hashes == hashes[0]).all()), "optimized output differs across hosts")
-
-        self.phase("output_consensus", agree_tokens)
-        report = dict(
-            request_sha256=request["request_sha256"],
-            prompt_tokens=len(ids),
-            emitted=len(tokens),
-            timed_decode_tokens=len(tokens) - 1,
-            finish_reason=session.events[-1].finish_reason,
-            prefill_seconds=prefill_seconds,
-            prefill_tokens_per_second=len(ids) / prefill_seconds,
-            decode_wall_seconds=elapsed,
-            decode_tokens_per_second=(len(tokens) - 1) / elapsed if len(tokens) > 1 else None,
-            ttft_seconds=session.ttft_seconds,
-            token_sha256=token_digest,
-            peak_memory=self.stats(),
-            sampling="greedy",
-            speculative=False,
-        )
-        session.release()
-        self.active = False
-        self.record["requests"].append(report)
-        self.save(self.record)
-        return tokens, report
-
-    def generate_concurrent(self, requests, *, deliver, deadline, clock=time.perf_counter):
-        from glm_tpu.engine.llm_engine import generate_batch
-
-        return generate_batch(self, requests, deliver=deliver, deadline=deadline, clock=clock)
 
 
 def compile_batch(runtime, initial, programs):

@@ -3,7 +3,7 @@
 ``fixture(mesh, panel_geometry=...)`` returns ``(config, weights, wk_extra)`` leaf for leaf equal to
 the historical research CPU fixture it replaces (``archive/research-20260922``; proved at S0 for
 both geometries, ``tests/golden/data/fixture.json``), so a switched test keeps its inputs
-byte for byte. ``engine_inputs`` derives what ``OrdinaryRuntime._load`` derives from those weights
+byte for byte. ``engine_inputs`` derives what ``TPUModelRunner._load`` derives from those weights
 on the fleet: the BF16-resident weight tree, the promoted indexer ``wk`` tables and the main RoPE
 table. Everything runs on 32 forced CPU devices (``expert=8 x feature=4``; run the test body in a
 child with ``XLA_FLAGS=--xla_force_host_platform_device_count=32``).
@@ -38,7 +38,7 @@ class EngineInputs(NamedTuple):
 
 
 def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
-    """The fixture's engine inputs exactly as ``OrdinaryRuntime._load`` computes them."""
+    """The fixture's engine inputs exactly as ``TPUModelRunner._load`` computes them."""
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
@@ -58,7 +58,7 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
 
 def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -> tuple[Any, Any]:
     """One prompt of at most 128 tokens through the production program set's cache initializer and
-    one B114/B128 prefill block (``OrdinaryRuntime.generate``'s block rule); returns the decode
+    one B114/B128 prefill block (``LLMEngine.generate``'s block rule); returns the decode
     state and the first token (``finish_batched_prefill``)."""
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P

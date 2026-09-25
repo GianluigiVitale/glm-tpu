@@ -12,7 +12,7 @@ TPU-v4 chip description):
 * ``reference`` -- :mod:`tests.reference.model`, prefill in 128-row blocks;
   ``reference-one-block`` -- the same with the whole prompt in one block (only
   the accumulation shapes change: the reference's own rounding-noise floor);
-* ``production`` -- what ``OrdinaryRuntime._load`` builds (as at 181c013e): BF16-resident
+* ``production`` -- what ``TPUModelRunner._load`` builds (as ``OrdinaryRuntime._load`` at 181c013e): BF16-resident
   tables and the B128/B114 prefill, packed decode and cache-initializer programs of
   ``glm_tpu.runner.programs.build_program_set`` (only the carried selection is observable).
 
@@ -356,7 +356,7 @@ class Engine:
 
 
 class Production(Engine):
-    """``OrdinaryRuntime._load``'s composition (BF16-resident weights and the production program set)."""
+    """``TPUModelRunner._load``'s composition (BF16-resident weights and the production program set)."""
 
     name = "production"
 
@@ -381,7 +381,7 @@ class Production(Engine):
         self.initial = programs.cache_init.fn(put(np.int32(len(prompt))))
 
     def block_rows(self, count: int) -> int:
-        return TAIL_ROWS if count <= TAIL_ROWS else BLOCK_ROWS  # OrdinaryRuntime.generate's rule
+        return TAIL_ROWS if count <= TAIL_ROWS else BLOCK_ROWS  # LLMEngine.generate's rule
 
     def run_prefill(self, tokens: Any, count: int, state: Any) -> Any:
         return self.programs[int(tokens.shape[0])](

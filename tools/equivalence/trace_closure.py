@@ -1,13 +1,13 @@
 """G7: the set of repository functions the production composition actually executes.
 
 One CPU32 process runs, under ``sys.monitoring`` (PY_START, disabled per code object after its
-first event, so the overhead is one callback per function): the real ``OrdinaryRuntime``
+first event, so the overhead is one callback per function): the real ``TPUModelRunner``
 ``__init__``/``_load`` of every fixture-tier run in concrete mode (``driver.py``; it executes the
 WK, FP8-table and cache-initializer programs, the real compile path, and ``compile_batch`` for the
 concurrent runs), tracing of every fixture-tier program, the CPU golden composition (the real
-``generate`` over prompts A and B: prefill blocks, packed decode, the request-session host loop;
-prompt A on the donated 8,704-slot runtime; the real ``generate_concurrent`` up to its first batched
-decode) and the serving exercise of G9
+``LLMEngine.generate`` over prompts A and B: prefill blocks, packed decode, the request-session host
+loop; prompt A on the donated 8,704-slot runtime; the real ``LLMEngine.generate_concurrent`` up to its
+first batched decode) and the serving exercise of G9
 (``wire.record``: the worker's real ``main``, ``preflight`` and ``initialize_runtime``,
 ``run_queued``, ``run_concurrent``, ``resident_loop``, the controller's launcher ``main`` with
 ``remote_all``, ``idle``, ``stage_bundle`` and ``cleanup_owned``, ``resident_controller`` and

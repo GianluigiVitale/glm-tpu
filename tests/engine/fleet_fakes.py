@@ -291,9 +291,9 @@ def install(monkeypatch: Any, fleet: Fleet) -> None:
     from glm_tpu.engine import llm_engine
     from glm_tpu.runner import tpu_runner
 
-    monkeypatch.setattr(tpu_runner.OrdinaryRuntime, "_load", _load)
+    monkeypatch.setattr(tpu_runner.TPUModelRunner, "_load", _load)
     monkeypatch.setattr(shutil, "disk_usage", lambda path: SimpleNamespace(total=1 << 40, used=0, free=1 << 40))
-    monkeypatch.setattr(tpu_runner, "PackedRequestSession", _recorded(tpu_runner.PackedRequestSession, fleet))
+    monkeypatch.setattr(llm_engine, "PackedRequestSession", _recorded(llm_engine.PackedRequestSession, fleet))
     monkeypatch.setattr(llm_engine, "BatchedSession", _recorded(llm_engine.BatchedSession, fleet))
 
 
@@ -308,7 +308,7 @@ def _recorded(cls: type, fleet: Fleet) -> type:
 
 
 def _load(runtime: Any, repo: Any, physical: Any) -> None:
-    """``OrdinaryRuntime._load`` of a synthetic device: the compiled programs and their memory rows."""
+    """``TPUModelRunner._load`` of a synthetic device: the compiled programs and their memory rows."""
     device = runtime.args.device
     runtime.stats = lambda: [dict(chip) for chip in CHIPS]
     runtime.put = device.put
@@ -325,13 +325,15 @@ def _load(runtime: Any, repo: Any, physical: Any) -> None:
 
 
 def build_runtime(fleet: Fleet, device: Device, root: Path, *, capacity: int, concurrent_size: int) -> Any:
-    """The object the worker's entry points receive, built as ``tpu_worker.main`` builds it."""
+    """The object the worker's entry points receive, built as ``tpu_worker.main`` builds it: the engine around
+    the runner (``TPUModelRunner``, then ``LLMEngine``)."""
     from glm_tpu.distributed import parallel_state
-    from glm_tpu.runner.tpu_runner import OrdinaryRuntime
+    from glm_tpu.engine.llm_engine import LLMEngine
+    from glm_tpu.runner.tpu_runner import TPUModelRunner
 
     native = root / f"native.rank{device.rank}"
     native.mkdir()
-    runtime = OrdinaryRuntime(
+    runner = TPUModelRunner(
         args=SimpleNamespace(hlo_dump_root=str(root / "hlo"), device=device),
         repo=REPO,
         root=native,
@@ -344,21 +346,22 @@ def build_runtime(fleet: Fleet, device: Device, root: Path, *, capacity: int, co
         context_capacity=capacity,
         **(dict(concurrent_size=concurrent_size) if concurrent_size else {}),
     )
-    phase = type(runtime).phase
+    phase = type(runner).phase
 
     def logged_phase(name: str, action: Callable[[], Any]) -> Any:
         fleet.events[device.rank].append(("phase", name))
-        value = phase(runtime, name, action)
+        value = phase(runner, name, action)
         return DeliveryStream(value, fleet, device) if name == "open_tokens" and value is not None else value
 
-    runtime.phase = logged_phase
-    runtime.generate = functools.partial(type(runtime).generate, runtime, clock=device.clock)
-    runtime.generate_concurrent = functools.partial(type(runtime).generate_concurrent, runtime, clock=device.clock)
-    return runtime
+    runner.phase = logged_phase
+    engine = LLMEngine(runner)
+    engine.generate = functools.partial(type(engine).generate, engine, clock=device.clock)
+    engine.generate_concurrent = functools.partial(type(engine).generate_concurrent, engine, clock=device.clock)
+    return engine
 
 
 def poisoned(node: SimpleNamespace) -> bool:
-    """The runtime's poison flag: an active or failed request."""
+    """The runtime's poison flag (the engine's): an active or failed request."""
     return node.runtime.active
 
 

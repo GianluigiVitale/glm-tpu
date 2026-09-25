@@ -1,0 +1,76 @@
+# S5 class splits (DESIGN 11.3 S5; the S5 plan's P9), checked by `tools/migration/split_check.py` (its docstring
+# has the rules): every definition of the listed files at `base` is the declared or implicit origin of a
+# definition now, compared by AST text after the declared rewrite with exactly the declared remaining lines, or is
+# removed; every definition now has an origin or is added. A later split rewrites this table against its own base;
+# each version is checked at the commit that applies it (history keeps it). S7 deletes tools/migration/.
+#
+# S5 WU-E1 (E = the request path; owner decision DN-21): OrdinaryRuntime -> TPUModelRunner + LLMEngine
+# (tools/migration/symbol_moves.toml, "the design splits by method"; move_map.toml [split] runner/tpu_runner.py ->
+# engine/llm_engine.py). The runner keeps loading, compiling and admitting; the engine takes `generate` and the
+# body of `generate_batch` as `generate_concurrent`, and owns the poison flag `active`. The worker builds the
+# runner with the same keywords, then the engine, hands the engine to its entry points, and those run their
+# fleet-voted phases through `engine.runner.phase`. No message, vote, phase, record key or program changes.
+
+[stage]
+name = "S5 WU-E1"
+kind = "splits"
+base = "01935fe6"   # the tree this table was written against
+files = [
+  "glm_tpu/runner/tpu_runner.py",
+  "glm_tpu/engine/llm_engine.py",
+  "glm_tpu/worker/tpu_worker.py",
+  "glm_tpu/runner/programs.py",   # its module docstring names the runner class
+]
+
+[docstrings]
+"glm_tpu/runner/tpu_runner.py" = "WU-E: the runner loads, compiles and admits; generation is the engine's"
+"glm_tpu/engine/llm_engine.py" = "WU-E: the engine module now holds the LLMEngine class"
+"glm_tpu/runner/programs.py" = "WU-E: OrdinaryRuntime._load -> TPUModelRunner._load (one class name)"
+
+[imports."glm_tpu/runner/tpu_runner.py"]
+added = []
+removed = [
+  "hashlib:sha256",
+  "glm_tpu.engine.request:validate",
+  "glm_tpu.engine.request_session:PackedRequestSession",
+  "glm_tpu.engine.request_session:RequestPolicy",
+]
+
+[imports."glm_tpu/engine/llm_engine.py"]
+added = [
+  "glm_tpu.engine.request:validate",
+  "glm_tpu.engine.request_session:PackedRequestSession",
+  "glm_tpu.engine.request_session:RequestPolicy",
+]
+removed = []
+
+[definitions]
+# The runner: the class renamed; its seven kept methods compared implicitly, verbatim, except that the poison
+# flag leaves __init__ (the engine owns it); generate and the generate_concurrent wrapper leave the class.
+"glm_tpu/runner/tpu_runner.py:TPUModelRunner" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime" }
+"glm_tpu/runner/tpu_runner.py:TPUModelRunner.__init__" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.__init__", diff = [
+  "-    self.active = False",
+] }
+
+# The engine: what the runtime did on itself it now does on its runner, except the poison flag.
+"glm_tpu/engine/llm_engine.py:LLMEngine.generate" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.generate", rewrite = { "self.*" = "self.runner.*", "self.active" = "self.active" } }
+"glm_tpu/engine/llm_engine.py:LLMEngine.generate_concurrent" = { from = "glm_tpu/engine/llm_engine.py:generate_batch", rewrite = { "r" = "self", "r.*" = "self.runner.*", "r.active" = "self.active", "values" = "requests" } }
+
+# The worker: its entry points receive the engine and reach the runner's fleet phases (and the loaded
+# capacity) through it; main builds the runner, then the engine.
+"glm_tpu/worker/tpu_worker.py:main" = { rewrite = { "OrdinaryRuntime" = "TPUModelRunner", "runtime" = "engine", "runtime.record" = "runner.record" }, diff = [
+  "+        from glm_tpu.engine.llm_engine import LLMEngine",
+  "-        engine = TPUModelRunner(args=args, repo=REPO, root=native, mesh=mesh, physical=physical, topology=topology, fleet_sha=fleet_sha, vote=parallel_state._batched_fleet_all, save=lambda v: persist(native / 'runtime.json', v), context_capacity=value['context_capacity'], **dict(concurrent_size=len(pending)) if concurrent else {})",
+  "+        runner = TPUModelRunner(args=args, repo=REPO, root=native, mesh=mesh, physical=physical, topology=topology, fleet_sha=fleet_sha, vote=parallel_state._batched_fleet_all, save=lambda v: persist(native / 'runtime.json', v), context_capacity=value['context_capacity'], **dict(concurrent_size=len(pending)) if concurrent else {})",
+  "+        engine = LLMEngine(runner)",
+] }
+"glm_tpu/worker/tpu_worker.py:resident_loop" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase", "runtime.capacity" = "engine.runner.capacity" } }
+"glm_tpu/worker/tpu_worker.py:run_queued" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase" } }
+"glm_tpu/worker/tpu_worker.py:run_concurrent" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase" } }
+
+[added]
+"glm_tpu/engine/llm_engine.py:LLMEngine" = "WU-E: the engine: generation over one loaded TPUModelRunner"
+"glm_tpu/engine/llm_engine.py:LLMEngine.__init__" = "WU-E: holds the runner and the poison flag (active = False, as OrdinaryRuntime.__init__ set it)"
+
+[removed]
+"glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.generate_concurrent" = "WU-E: the wrapper folded into LLMEngine.generate_concurrent (the body of generate_batch)"

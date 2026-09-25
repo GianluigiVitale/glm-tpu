@@ -141,7 +141,8 @@ def main(argv=None):
     persist(path, record)
     try:
         from glm_tpu.distributed import parallel_state
-        from glm_tpu.runner.tpu_runner import OrdinaryRuntime
+        from glm_tpu.runner.tpu_runner import TPUModelRunner
+        from glm_tpu.engine.llm_engine import LLMEngine
 
         started = time.perf_counter()
         jax, mesh, physical, topology, fleet_sha = parallel_state.initialize_runtime(args)
@@ -149,7 +150,7 @@ def main(argv=None):
         native.mkdir()
         pending = request.requests(value)
         concurrent = value.get("schema") == request.CONCURRENT_SCHEMA
-        runtime = OrdinaryRuntime(
+        runner = TPUModelRunner(
             args=args,
             repo=REPO,
             root=native,
@@ -162,18 +163,19 @@ def main(argv=None):
             context_capacity=value["context_capacity"],
             **(dict(concurrent_size=len(pending)) if concurrent else {}),
         )
+        engine = LLMEngine(runner)
         deadline = started + args.wall_seconds
         # Warm the actual graphs on a disposable request/cache. No warm tokens
         # are delivered; the measured request always starts from fresh state.
         if concurrent:
-            reports, aggregate = run_concurrent(runtime, pending, root, rank, deadline)
+            reports, aggregate = run_concurrent(engine, pending, root, rank, deadline)
         else:
 
             def save_requests(reports):
                 record["requests"] = reports
                 persist(path, record)
 
-            reports = run_queued(runtime, pending, value, root, rank, deadline, save=save_requests)
+            reports = run_queued(engine, pending, value, root, rank, deadline, save=save_requests)
         report = (
             reports[0]
             if value.get("schema") not in (request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA)
@@ -191,14 +193,14 @@ def main(argv=None):
             request=report,
             requests=reports,
             jax_process_index=jax.process_index(),
-            cold_load_compile_seconds=runtime.record["cold_load_compile_seconds"],
+            cold_load_compile_seconds=runner.record["cold_load_compile_seconds"],
             worker_wall_seconds=time.perf_counter() - started,
-            programs=runtime.record["programs"],
-            physical_identity=runtime.record["physical_identity"],
+            programs=runner.record["programs"],
+            physical_identity=runner.record["physical_identity"],
         )
         persist(path, record)
         if args.keep_loaded:
-            resident_loop(runtime, record, root, rank, args.wall_seconds)
+            resident_loop(engine, record, root, rank, args.wall_seconds)
         return 0
     except Exception as exc:
         import traceback
@@ -212,7 +214,7 @@ def main(argv=None):
         return 1
 
 
-def resident_loop(runtime, record, root, rank, wall_seconds, *, stream=None):
+def resident_loop(engine, record, root, rank, wall_seconds, *, stream=None):
     """Reuse one loaded runtime via its controller-owned stdin; no network listener."""
     import sys
 
@@ -220,7 +222,7 @@ def resident_loop(runtime, record, root, rank, wall_seconds, *, stream=None):
     sequence = 0
     while True:
         # All result files exist before rank zero announces this round ready.
-        runtime.phase("resident_ready", lambda: None)
+        engine.runner.phase("resident_ready", lambda: None)
         if rank == 0:
             persist(root / "resident-ready.json", dict(sequence=sequence))
         line = stream.readline(request.PAYLOAD_CAP + 1024)
@@ -235,19 +237,19 @@ def resident_loop(runtime, record, root, rank, wall_seconds, *, stream=None):
                 raise ValueError("resident sequence differs")
             value = command["request"]
             request.validate_payload(value)
-            if value["context_capacity"] != runtime.capacity or value.get("schema") == request.CONCURRENT_SCHEMA:
+            if value["context_capacity"] != engine.runner.capacity or value.get("schema") == request.CONCURRENT_SCHEMA:
                 raise ValueError("resident request must match loaded ordinary context")
             return value
 
-        value = runtime.phase("resident_command", decode_command)
+        value = engine.runner.phase("resident_command", decode_command)
         if value is None:
             return
         sequence += 1
         job = root / f"resident-{sequence:04d}"
-        runtime.phase("resident_directory", lambda: job.mkdir(mode=0o700))
+        engine.runner.phase("resident_directory", lambda: job.mkdir(mode=0o700))
         deadline = time.perf_counter() + wall_seconds
         reports = run_queued(
-            runtime, request.requests(value), value, job, rank, deadline, save=lambda reports: None, warmup=False
+            engine, request.requests(value), value, job, rank, deadline, save=lambda reports: None, warmup=False
         )
         report = (
             reports[0]
@@ -269,7 +271,7 @@ def resident_loop(runtime, record, root, rank, wall_seconds, *, stream=None):
         persist(job / f"runner.rank{rank}.json", result)
 
 
-def run_queued(runtime, pending, value, root, rank, deadline, *, save, warmup=True):
+def run_queued(engine, pending, value, root, rank, deadline, *, save, warmup=True):
     from transformers import AutoTokenizer
 
     first = pending[0]
@@ -281,13 +283,15 @@ def run_queued(runtime, pending, value, root, rank, deadline, *, save, warmup=Tr
         context_capacity=value["context_capacity"],
     )
     if warmup:
-        runtime.generate(warm, deliver=lambda event: None, deadline=deadline)
+        engine.generate(warm, deliver=lambda event: None, deadline=deadline)
     reports = []
     for index, item in enumerate(pending):
         item_root = root / f"item{index:03d}" if value.get("schema") == request.BATCH_SCHEMA else root
         if item_root != root:
-            runtime.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
-        stream = runtime.phase("open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None)
+            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
+        stream = engine.runner.phase(
+            "open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None
+        )
 
         def deliver(event):
             if stream is not None:
@@ -295,7 +299,7 @@ def run_queued(runtime, pending, value, root, rank, deadline, *, save, warmup=Tr
                 stream.flush()
 
         try:
-            tokens, report = runtime.generate(item, deliver=deliver, deadline=deadline)
+            tokens, report = engine.generate(item, deliver=deliver, deadline=deadline)
         finally:
             if stream is not None:
                 stream.close()
@@ -308,7 +312,7 @@ def run_queued(runtime, pending, value, root, rank, deadline, *, save, warmup=Tr
                 with (item_root / "answer.txt").open("x") as stream:
                     stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))
 
-        runtime.phase("write_answer", write_answer)
+        engine.runner.phase("write_answer", write_answer)
         report.update(
             request_id=item["request_id"],
             output_directory=item_root.name,
@@ -320,7 +324,7 @@ def run_queued(runtime, pending, value, root, rank, deadline, *, save, warmup=Tr
     return reports
 
 
-def run_concurrent(runtime, pending, root, rank, deadline):
+def run_concurrent(engine, pending, root, rank, deadline):
     from contextlib import ExitStack
     from transformers import AutoTokenizer
 
@@ -333,15 +337,17 @@ def run_concurrent(runtime, pending, root, rank, deadline):
         )
         for item in pending
     ]
-    runtime.generate_concurrent(warm, deliver=lambda *args: None, deadline=deadline)
+    engine.generate_concurrent(warm, deliver=lambda *args: None, deadline=deadline)
     with ExitStack() as stack:
         directories = []
         streams = []
         for index in range(len(pending)):
             item_root = root / f"item{index:03d}"
-            runtime.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
+            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
             directories.append(item_root)
-            stream = runtime.phase("open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None)
+            stream = engine.runner.phase(
+                "open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None
+            )
             streams.append(stack.enter_context(stream) if stream is not None else None)
 
         def deliver(lane, event, round_index):
@@ -350,7 +356,7 @@ def run_concurrent(runtime, pending, root, rank, deadline):
                 stream.write(json.dumps(dict(asdict(event), batch_round=round_index), sort_keys=True) + "\n")
                 stream.flush()
 
-        results, aggregate = runtime.generate_concurrent(pending, deliver=deliver, deadline=deadline)
+        results, aggregate = engine.generate_concurrent(pending, deliver=deliver, deadline=deadline)
     reports = []
     for item, item_root, (tokens, report) in zip(pending, directories, results, strict=True):
 
@@ -362,7 +368,7 @@ def run_concurrent(runtime, pending, root, rank, deadline):
                 with (item_root / "answer.txt").open("x") as stream:
                     stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))
 
-        runtime.phase("write_answer", write_answer)
+        engine.runner.phase("write_answer", write_answer)
         report.update(
             request_id=item["request_id"],
             output_directory=item_root.name,

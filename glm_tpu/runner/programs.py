@@ -1,6 +1,6 @@
 """The device programs one runtime compiles, built in one place.
 
-``build_program_set`` constructs every program ``OrdinaryRuntime._load`` and
+``build_program_set`` constructs every program ``TPUModelRunner._load`` and
 ``tpu_runner.compile_batch`` compile, in their compile order: the indexer WK decode and
 promotion, the fresh cache initializer, the B128 and B114 prefill blocks, and either the packed
 decode step or, for a concurrent runtime, the batch programs (bank initializer, lane insert,

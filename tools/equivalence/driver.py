@@ -1,7 +1,8 @@
-"""Drive the real ``OrdinaryRuntime`` (``__init__``, ``_load``, ``compile``, ``generate``) on the CPU host.
+"""Drive the real ``TPUModelRunner`` (``__init__``, ``_load``, ``compile``) and ``LLMEngine`` (``generate``,
+``generate_concurrent``) on the CPU host.
 
-The gates build their device programs and CPU goldens by running production's own runtime code,
-so an edit to ``__init__``, ``_load``, ``compile``, ``compile_program``, ``generate`` or
+The gates build their device programs and CPU goldens by running production's own runner and engine
+code, so an edit to ``__init__``, ``_load``, ``compile``, ``compile_program``, ``generate`` or
 ``compile_batch`` (donation, options, config flags, sample shapes, the tail rule, what is lowered
 and how it is compiled) reaches the fingerprints and goldens. Only what needs a TPU fleet,
 private assets or the TPU compiler is replaced:
@@ -12,7 +13,7 @@ private assets or the TPU compiler is replaced:
   returns the fixture arrays (concrete) or ``ShapeDtypeStruct`` values with the plans' shardings
   (abstract). Their keyword arguments are recorded. ``model.require_site`` and
   ``model.require_inventory`` run for real on pinned-identity inputs;
-* the TPU compiler: the real ``OrdinaryRuntime.compile`` and ``compile_program`` run. While
+* the TPU compiler: the real ``TPUModelRunner.compile`` and ``compile_program`` run. While
   ``compile`` runs, ``jax.stages.Traced.lower`` lowers for the TPU platform (what ``fn.lower`` does
   on the fleet) and ``jax.stages.Lowered.compile`` records its arguments, fingerprints the
   ``Lowered`` production built (N1-N8, when requested) and returns a stand-in executable: it runs
@@ -74,10 +75,14 @@ import numpy as np
 from .common import REPO
 
 RUNTIME_MODULE = "glm_tpu.runner.tpu_runner"
-RUNTIME_CLASS = "OrdinaryRuntime"
+RUNTIME_CLASS = "TPUModelRunner"  # S5 WU-E1; OrdinaryRuntime before (load, compile and generate)
 PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
 REQUEST_MODULE = "glm_tpu.engine.request"
-BATCHED_MODULE = "glm_tpu.engine.llm_engine"  # generate_batch (S4.1; the batched runtime before)
+# The engine around a built runner (S5 WU-E1): generate (the runtime's before) and generate_concurrent
+# (generate_batch of this module from S4.1, of the batched runtime before). Its module binds the request
+# validation both use (``validate``, ``batch``), which the fixture tier relaxes (``serving_fakes``).
+ENGINE_MODULE = "glm_tpu.engine.llm_engine"
+ENGINE_CLASS = "LLMEngine"
 CONFIG_MODULE = "glm_tpu.config.cache"  # the config class (S4.1; the decoder module before)
 CONFIG_CLASS = "CacheConfig"  # the config __init__ builds (adjusted at the class, fixture tier;
 # S4.2; the research name Ws32DecoderConfig before)
@@ -272,7 +277,7 @@ class StandInCompiled:
 
 
 class ProductionCompile:
-    """Runs the real ``OrdinaryRuntime.compile`` (and through it ``compile_program``, the
+    """Runs the real ``TPUModelRunner.compile`` (and through it ``compile_program``, the
     graph-consensus phase, the HLO admission and the memory admission) and records what it did.
 
     ``wrap`` returns the ``compile`` the runtime instance uses: it sets the program context, calls
@@ -738,6 +743,12 @@ def runtime_class() -> Any:
     return getattr(importlib.import_module(RUNTIME_MODULE), RUNTIME_CLASS)
 
 
+def engine_class() -> Any:
+    """The engine class; ``engine_class()(runtime)`` generates over a built runtime (``build_runtime``, which
+    never imports the engine: the G6 graph stage records the runner's imports only)."""
+    return getattr(importlib.import_module(ENGINE_MODULE), ENGINE_CLASS)
+
+
 def build_runtime(
     mesh: Any,
     *,
@@ -777,8 +788,8 @@ def build_runtime(
     program_sets: list[Any] = []
 
     runtime = object.__new__(cls)
-    # Instance attributes shadow these methods for the whole life of this runtime (generate
-    # included); ``compile`` and ``admit_memory`` record and then run the real class methods.
+    # Instance attributes shadow these methods for the whole life of this runtime (an engine's
+    # generate included); ``compile`` and ``admit_memory`` record and then run the real class methods.
     runtime.compile = compiler.wrap(runtime, cls)
     runtime.stats = synthetic_stats
 
@@ -904,7 +915,7 @@ def build_runtime(
             ),
         )
         protocol["probes"] = dict(graph_consensus=compiler.consensus_probe(runtime, cls))
-    del runtime.phase  # generate uses the class method
+    del runtime.phase  # an engine's generate uses the class method
     return Built(runtime, recorder, protocol, programset_identity(program_sets, recorder.specs))
 
 
@@ -990,10 +1001,9 @@ def _relaxed_batch(values: Any, *, concurrent: bool = False) -> dict[str, Any]:
 
 @contextmanager
 def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
-    """Fleet fakes for ``generate``/``generate_concurrent``: ``process_allgather`` stacks the local
-    value eight times; ``relaxed_validation`` replaces ``runtime.validate`` and the batch binding
-    ``batched_runtime.batch`` (the fixture's 1,536-slot, 256-token vocabulary requests are not a
-    production profile)."""
+    """Fleet fakes for the engine's ``generate``/``generate_concurrent``: ``process_allgather`` stacks the
+    local value eight times; ``relaxed_validation`` replaces the engine module's bindings ``validate`` and
+    ``batch`` (the fixture's 1,536-slot, 256-token vocabulary requests are not a production profile)."""
     from jax.experimental import multihost_utils
 
     with ExitStack() as stack:
@@ -1002,9 +1012,9 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
         )
         if relaxed_validation:
             stack.enter_context(
-                mock.patch.object(importlib.import_module(RUNTIME_MODULE), "validate", lambda request: None)
+                mock.patch.object(importlib.import_module(ENGINE_MODULE), "validate", lambda request: None)
             )
-            stack.enter_context(mock.patch.object(importlib.import_module(BATCHED_MODULE), "batch", _relaxed_batch))
+            stack.enter_context(mock.patch.object(importlib.import_module(ENGINE_MODULE), "batch", _relaxed_batch))
         yield
 
 

@@ -9,9 +9,9 @@ device. Recorded:
   the two canonical-JSON contracts on non-ASCII message content;
 * worker output files (``tokens.jsonl`` TokenEvent lines solo and with ``batch_round``,
   ``answer.txt``, directory layout) and the prefill block schedule (rows, count; a 114-token tail
-  included) from the real ``run_queued`` over the real ``OrdinaryRuntime.generate`` -- at 8,192 and
+  included) from the real ``run_queued`` over the real ``LLMEngine.generate`` -- at 8,192 and
   at the donated long-context capacities 32,768 and 166,912 -- and the real ``run_concurrent`` over
-  the real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` -> ``BatchedSession``, both
+  the real ``LLMEngine.generate_concurrent`` -> ``BatchedSession``, both over a ``TPUModelRunner``
   with synthetic device results;
 * the fleet votes' refusals (``fleet_refusals``): a host with a different output digest at the
   output consensus and a prefill with an invalid contract, sequential and batched;
@@ -26,7 +26,7 @@ device. Recorded:
   the device queries and ``Mesh``); recorded: the arguments
   ``preflight`` binds, the topology binding it authenticates, the ``jax.distributed`` arguments,
   the mesh axis names and device order (digest), the arguments ``main`` passes to
-  ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``,
+  ``TPUModelRunner`` (names and described values, e.g. ``context_capacity``,
   ``concurrent_size``), and the refusals ``preflight`` and ``initialize_runtime`` must produce on
   tampered inputs (deployed-source digest, existing namespace, coordinator port, owner-only
   modes, request, binding and site digests, staged coordinator, host mapping), and the jax
@@ -212,16 +212,17 @@ def _state(position: int, healthy: bool = True) -> Any:
 
 
 def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) -> Any:
-    """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
-    is the loaded context (a long-context runtime donates its state; its host logic runs here);
-    ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
+    """A ``TPUModelRunner`` over synthetic device results (no devices; the real ``phase`` and
+    ``require``), for the real ``LLMEngine`` host logic around it. ``capacity`` is the loaded context
+    (a long-context runtime donates its state; its host logic runs here); ``healthy=False`` makes
+    every prefill report an invalid contract (a failed prefill)."""
     from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, BatchedPrefillState
     from glm_tpu.models.glm_moe_dsa.state import DecodeStepResult
     from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
-    from glm_tpu.runner.tpu_runner import OrdinaryRuntime
+    from glm_tpu.runner.tpu_runner import TPUModelRunner
 
-    runtime = object.__new__(OrdinaryRuntime)
-    runtime.capacity, runtime.concurrent_size, runtime.active = capacity, 0, False
+    runtime = object.__new__(TPUModelRunner)
+    runtime.capacity, runtime.concurrent_size = capacity, 0
     runtime.put = lambda value: value
     runtime.weights = runtime.wk = runtime.rope = None
     runtime.record = dict(schema="glm_optimized_runtime_v1", programs={}, phases={}, requests=[])
@@ -261,15 +262,15 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
 
 
 def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any:
-    """The real ``OrdinaryRuntime.generate_concurrent`` -> ``batched_runtime.generate_batch`` ->
+    """A concurrent ``TPUModelRunner`` for the real ``LLMEngine.generate_concurrent`` ->
     ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
     lists a lane's tokens: the first from prefill, the next ones from successive decode rounds;
     ``healthy=False`` makes every prefill report an invalid contract."""
     from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, BatchedPrefillState
-    from glm_tpu.runner.tpu_runner import OrdinaryRuntime
+    from glm_tpu.runner.tpu_runner import TPUModelRunner
 
-    runtime = object.__new__(OrdinaryRuntime)
-    runtime.capacity, runtime.concurrent_size, runtime.active = 32768, len(schedules), False
+    runtime = object.__new__(TPUModelRunner)
+    runtime.capacity, runtime.concurrent_size = 32768, len(schedules)
     runtime.put = lambda value: value
     runtime.weights = runtime.wk = runtime.rope = None
     runtime.record = dict(schema="glm_optimized_runtime_v1", programs={}, phases={}, requests=[])
@@ -381,9 +382,10 @@ LONG_CONTEXTS = (32768, 166912)  # donated runtimes (capacity > 8,192); the 32K 
 
 
 def _run_queued(capacity: int) -> dict[str, Any]:
-    """The real ``run_queued`` over the real ``generate`` of a runtime loaded at ``capacity``: four
-    queued requests (3, 5, 114 and 242 = 128 + 114 prompt tokens), warm-up included."""
+    """The real ``run_queued`` over the real ``LLMEngine.generate`` of a runtime loaded at ``capacity``:
+    four queued requests (3, 5, 114 and 242 = 128 + 114 prompt tokens), warm-up included."""
     from glm_tpu.engine import request
+    from glm_tpu.engine.llm_engine import LLMEngine
     from glm_tpu.worker import tpu_worker as worker
 
     items = [
@@ -403,7 +405,13 @@ def _run_queued(capacity: int) -> dict[str, Any]:
         root = Path(scratch)
         runtime = _runtime([7, 9, 10, 154820], capacity=capacity)
         reports = worker.run_queued(
-            runtime, request.requests(value), value, root, 0, time.perf_counter() + 600, save=lambda reports: None
+            LLMEngine(runtime),
+            request.requests(value),
+            value,
+            root,
+            0,
+            time.perf_counter() + 600,
+            save=lambda reports: None,
         )
         return dict(
             layout=_tree(root),
@@ -426,10 +434,11 @@ def _attempt(call: Any) -> str:
 
 
 def fleet_refusals() -> dict[str, str]:
-    """The fleet votes of ``generate`` and ``generate_batch`` refuse: a host whose output digest
+    """The fleet votes of ``generate`` and ``generate_concurrent`` refuse: a host whose output digest
     differs at the output consensus, and a prefill whose contract is invalid (the local health vote
     is false), sequential and batched. ``accepted`` means the check is gone."""
     from glm_tpu.engine import request
+    from glm_tpu.engine.llm_engine import LLMEngine
 
     single = request.from_token_ids([30, 31, 32], request_id="golden-vote", max_new_tokens=3)
     lanes = [
@@ -442,12 +451,12 @@ def fleet_refusals() -> dict[str, str]:
     out: dict[str, str] = {}
 
     def sequential(*, healthy: bool = True) -> None:
-        _runtime([7, 9, 10], healthy=healthy).generate(
+        LLMEngine(_runtime([7, 9, 10], healthy=healthy)).generate(
             single, deliver=lambda event: None, deadline=time.perf_counter() + 600
         )
 
     def batched(*, healthy: bool = True) -> None:
-        _batched_runtime(schedules, healthy=healthy).generate_concurrent(
+        LLMEngine(_batched_runtime(schedules, healthy=healthy)).generate_concurrent(
             lanes, deliver=lambda *args: None, deadline=time.perf_counter() + 600
         )
 
@@ -462,6 +471,7 @@ def fleet_refusals() -> dict[str, str]:
 
 def worker_record() -> dict[str, Any]:
     from glm_tpu.engine import request
+    from glm_tpu.engine.llm_engine import LLMEngine
     from glm_tpu.worker import tpu_worker as worker
 
     out: dict[str, Any] = {}
@@ -481,7 +491,7 @@ def worker_record() -> dict[str, Any]:
         # lane 1 stops on EOS in round 1; the others run to their output budget (length)
         schedules = [[10, 11, 12, 13], [20, 154820, 22], [30, 31, 32, 33, 34], [40, 41, 42, 43]]
         runtime = _batched_runtime(schedules)
-        reports, aggregate = worker.run_concurrent(runtime, pending, root, 0, time.perf_counter() + 600)
+        reports, aggregate = worker.run_concurrent(LLMEngine(runtime), pending, root, 0, time.perf_counter() + 600)
         out["run_concurrent"] = dict(
             layout=_tree(root),
             tokens=[(root / f"item{i:03d}" / "tokens.jsonl").read_text() for i in range(len(pending))],
@@ -504,7 +514,7 @@ def worker_record() -> dict[str, Any]:
         root = Path(scratch)
         single = request.from_token_ids([7], request_id="resident", max_new_tokens=2, context_capacity=32768)
         base = dict(schema="glm_optimized_worker_v1", rank=0, complete=True)
-        runtime = SimpleNamespace(capacity=32768, phase=lambda name, action: action())
+        engine = SimpleNamespace(runner=SimpleNamespace(capacity=32768, phase=lambda name, action: action()))
         seen = []
 
         def fake_run(actual: Any, pending: Any, value: Any, job: Path, rank: int, deadline: Any, **kwargs: Any) -> Any:
@@ -513,7 +523,7 @@ def worker_record() -> dict[str, Any]:
 
         commands = json.dumps(dict(sequence=1, request=single)) + "\n" + json.dumps(dict(stop=True)) + "\n"
         with mock.patch.object(worker, "run_queued", fake_run):
-            worker.resident_loop(runtime, base, root, 0, 3600, stream=io.StringIO(commands))
+            worker.resident_loop(engine, base, root, 0, 3600, stream=io.StringIO(commands))
         record = json.loads((root / "resident-0001" / "runner.rank0.json").read_text())
         out["resident_loop"] = dict(
             layout=_tree(root),
@@ -818,7 +828,7 @@ def worker_main_record() -> dict[str, Any]:
     """``runner.rank{r}.json`` from the real worker ``main`` (real ``preflight`` and
     ``initialize_runtime`` on a synthetic staged run; devices, fleet and model faked), for a
     sequential request and a concurrent batch, the arguments ``main`` passes to
-    ``OrdinaryRuntime`` (names, and values described: numbers and strings as they are, objects by
+    ``TPUModelRunner`` (names, and values described: numbers and strings as they are, objects by
     where they came from, the ``save`` callback by the file it writes), what ``preflight`` bound
     and ``initialize_runtime`` built, and the refusals both must produce."""
     from glm_tpu.engine import request
@@ -884,7 +894,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             stack.enter_context(mock.patch.object(worker, "run_queued", fake_run))
             stack.enter_context(mock.patch.object(worker, "run_concurrent", fake_concurrent))
             stack.enter_context(mock.patch.object(parallel_state, "initialize_runtime", initialize))
-            stack.enter_context(mock.patch.object(runtime_module, "OrdinaryRuntime", FakeRuntime))
+            stack.enter_context(mock.patch.object(runtime_module, "TPUModelRunner", FakeRuntime))
             try:
                 code = worker.main(argv)
             finally:
@@ -1118,8 +1128,9 @@ def controller_record() -> dict[str, Any]:
 
 
 def runtime_record_keys() -> dict[str, Any]:
-    """Keys of the ``glm_optimized_runtime_v1`` record ``OrdinaryRuntime.__init__`` builds (static:
-    the constructor needs devices). From S4 this locator follows the renamed module."""
+    """Keys of the ``glm_optimized_runtime_v1`` record ``TPUModelRunner.__init__`` (``OrdinaryRuntime``
+    before S5 WU-E1) builds (static: the constructor needs devices). From S4 this locator follows the
+    renamed module."""
     source = (REPO / "glm_tpu" / "runner" / "tpu_runner.py").read_text()
     for node in ast.walk(ast.parse(source)):
         targets = [t for t in getattr(node, "targets", []) if isinstance(t, ast.Attribute) and t.attr == "record"]
