@@ -43,15 +43,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "cccc7670bc497e5d8807cb07d14dd783b7566ad4aa4a478afec10928a542c5c0",
+  "closure_map": "5b8c323593a069adbead785fc7fa1a2ffc468924a4934547a1aa46e29e8e751f",
   "kind": "rename-only",
-  "previous_digest": "543579e7c23aef93e9c266db1f743081076519e73e44677b2eba4101314ad187",
-  "reason": "S4.2b"
+  "previous_digest": "2354f15501600bab61f7eea999cd657ffb4a8d7ed9f012c5a9f25d639d3cbdac",
+  "reason": "WU-E"
  },
- "recorded_unix": 1790273004,
+ "recorded_unix": 1790328994,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "27b1b411d05ba4fa6566b5e6a52d6dc3d9f8c4ff",
+  "head": "43fa28cbe4aadae6feb0032eb508b0db57536468",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -88,7 +88,7 @@
    "third_party": []
   },
   "graph": {
-   "count": 59,
+   "count": 57,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -98,9 +98,7 @@
     "glm_tpu.config.parallel",
     "glm_tpu.config.site",
     "glm_tpu.engine",
-    "glm_tpu.engine.outputs",
     "glm_tpu.engine.request",
-    "glm_tpu.engine.request_session",
     "glm_tpu.exceptions",
     "glm_tpu.kernels",
     "glm_tpu.kernels.fp8_grouped_matmul",

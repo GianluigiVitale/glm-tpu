@@ -9,17 +9,9 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
-# S5 WU-E1: OrdinaryRuntime -> TPUModelRunner (load, compile, admit) + LLMEngine (generate); the class entry
-# maps its methods and their nested functions; generate_batch became LLMEngine.generate_concurrent.
-"glm_tpu.runner.tpu_runner:TPUModelRunner" = "glm_tpu.runner.tpu_runner:OrdinaryRuntime"
-"glm_tpu.engine.llm_engine:LLMEngine.generate" = "glm_tpu.runner.tpu_runner:OrdinaryRuntime.generate"
-"glm_tpu.engine.llm_engine:LLMEngine.generate_concurrent" = "glm_tpu.engine.llm_engine:generate_batch"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.engine.llm_engine:LLMEngine" = "WU-E: the engine class (generation over one loaded TPUModelRunner)"
-"glm_tpu.engine.llm_engine:LLMEngine.__init__" = "WU-E: holds the runner and the poison flag active"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-"glm_tpu.runner.tpu_runner:OrdinaryRuntime.generate_concurrent" = "WU-E: wrapper folded into LLMEngine.generate_concurrent"
