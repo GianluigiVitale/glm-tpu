@@ -18,6 +18,7 @@ from glm_tpu.layers.attention.dsa_indexer import (
     dsa_scores,
     local_topk_candidates,
     merge_topk_candidates_with_scores,
+    prompt_index_key_chunk,
 )
 from glm_tpu.layers.contracts import DsaNumericalContract
 from tests.reference.dsa import (
@@ -424,3 +425,298 @@ def test_contract_can_change_static_fixture_sizes_without_changing_semantics() -
     contract = replace(small_contract(), top_k=2)
     assert contract.tie_policy == "descending_score_then_lowest_global_position"
     assert contract.interleaved_rotary is True
+
+
+# ---------------------------------------------------------------------------------------------- prefill (cpu32)
+# Ported from the research package's kernels/test_ws32_prefill_dsa.py, test_ws32_prefill_dsa_producer.py and the DSA
+# part of test_prefill_index.py (archive/research-20260922; tools/migration/archive_list.txt) onto the production
+# prefill indexer.
+SELECTOR = r"""
+import json
+import jax, jax.numpy as jnp, numpy as np
+from jax.sharding import NamedSharding, PartitionSpec as P
+from glm_tpu.layers.attention.dsa_indexer import dsa_scores, prefill_dsa_one_pass
+from glm_tpu.runner.hlo_utils import parse_hlo_module
+from tests.fixtures.tiny_model import cpu_mesh
+from tests.reference.dsa import exact_topk
+mesh = cpu_mesh()
+rng = np.random.default_rng(356)
+q = jnp.asarray(rng.normal(0, 0.2, (5, 32, 128)), jnp.float32)
+keys = jnp.asarray(rng.normal(0, 0.2, (8, 256, 128)), jnp.bfloat16)
+weights = jnp.asarray(rng.normal(0, 0.2, (5, 32)), jnp.float32).at[4].set(0)
+positions = jnp.arange(2048, dtype=jnp.int32).reshape(256, 8).T  # owner e holds positions e, e + 8, ...
+lengths = jnp.asarray([0, 1, 129, 1300, 2048], jnp.int32)
+specs = (P(), P('expert', None, None), P(), P('expert', None), P())
+values = tuple(jax.device_put(v, NamedSharding(mesh, s)) for v, s in zip((q, keys, weights, positions, lengths), specs))
+
+
+def body(q, k, w, p, n):
+    # production's call (prefill_dsa): default-precision scores, 512 candidates per owner
+    selected, health = prefill_dsa_one_pass(q, k[0], w, p[0], n, global_context_size=2048, top_k=64,
+                                            precision='default', candidates_per_owner=512)
+    return selected.positions, selected.valid_counts, selected.scores, health[None, None]
+
+
+mapped = jax.jit(jax.shard_map(body, mesh=mesh, in_specs=specs, out_specs=(P(), P(), P(), P('expert', 'feature')),
+                               check_vma=False))
+compiled = mapped.lower(*values).compile()
+selected, counts, scores, health = (np.asarray(v) for v in compiled(*values))
+assert health.all()
+expected_scores = dsa_scores(q, keys.transpose(1, 0, 2).reshape(2048, 128), weights, precision='default')
+expected = exact_topk(expected_scores, lengths, top_k=64)
+np.testing.assert_array_equal(selected, np.asarray(expected.positions))
+np.testing.assert_array_equal(counts, np.asarray(expected.valid_counts))
+np.testing.assert_array_equal(selected[4], np.arange(64))  # zero head weights: all ties, lowest positions win
+expert = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
+collectives = parse_hlo_module(compiled.as_text()).collectives
+assert collectives and all(c.replica_groups == expert for c in collectives), {c.replica_groups for c in collectives}
+report = dict(collectives=sorted({c.opcode for c in collectives}))
+# a repeated live position is unhealthy on its owner
+bad = np.asarray(mapped(*values[:3], values[3].at[2, 3].set(values[3][2, 2]), values[4])[3])
+assert not bad[2].any()
+report['repeated_position_unhealthy_owners'] = sorted(int(e) for e in range(8) if not bad[e].all())
+# requested counts are not proof of coverage: a table of holes, or two owners claiming the same positions
+holes = jax.device_put(jnp.full((8, 256), -1, jnp.int32), NamedSharding(mesh, specs[3]))
+assert not np.asarray(mapped(*values[:3], holes, values[4])[3]).any()
+duplicate = values[3].at[1].set(values[3][0])
+assert not np.asarray(mapped(*values[:3], duplicate, values[4])[3]).any()
+print(json.dumps(report))
+"""
+
+
+@pytest.mark.cpu32
+def test_prefill_selector_matches_the_exact_reference_cpu32():
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    result = subprocess.run([sys.executable, "-c", SELECTOR], env=env, capture_output=True, text=True, timeout=600)
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    assert 2 in report["repeated_position_unhealthy_owners"], report
+
+
+PRODUCER = r"""
+import json
+import jax, jax.numpy as jnp, numpy as np
+from jax.sharding import NamedSharding, PartitionSpec as P
+from glm_tpu.layers.attention.dsa_indexer import dsa_scores, prefill_dsa, prefill_dsa_inputs, prompt_index_key_chunk
+from glm_tpu.layers.attention.mla import PreparedAttention
+from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs
+from glm_tpu.runner.hlo_utils import parse_hlo_module
+from tests.fixtures.tiny_model import cpu_mesh, engine_inputs
+from tests.reference.dsa import exact_topk
+mesh = cpu_mesh()
+inputs = engine_inputs(mesh, panel_geometry=True)
+config = inputs.config
+contract = config.dsa_contract
+layer, spec = inputs.weights.layers[0], bf16_weight_specs(config).layers[0]
+dsa = layer.dsa
+rng = np.random.default_rng(456)
+R, TOP_K = 17, contract.top_k
+INT_MIN, INT_MAX = -(2**31), 2**31 - 1
+
+
+def bf(shape, scale=0.1):
+    return np.asarray(jnp.asarray(rng.normal(0, scale, shape), jnp.bfloat16))
+
+
+def put(value, sharding=P()):
+    return jax.device_put(value, NamedSharding(mesh, sharding))
+
+
+# The repair weight is materialized by the loader; here deliberately unlike the checkpoint's (whose repair keys
+# equal the unrepaired ones on CPU), so a key written into the wrong buffer shows. Not a provenance claim.
+wk = put(bf((contract.head_dim, config.geometry.hidden_size)).astype(np.float32))
+
+
+def bits(value):
+    return np.asarray(value).tobytes()
+
+
+CACHE = P(None, 'expert', None)
+normalized = put(bf((R, config.geometry.hidden_size)), P(None, 'feature'))
+prepared = PreparedAttention(normalized, normalized, put(bf((R, config.geometry.q_lora_rank))),
+                             put(bf((R, config.geometry.kv_lora_rank + config.geometry.qk_rope_head_dim))))
+prep_spec = PreparedAttention(P(None, 'feature'), P(None, 'feature'), P(), P())
+cache = put(bf((config.page_count, config.logical_page_size, contract.head_dim)), CACHE)
+# deliberately different from the live keys, so a write into the wrong buffer shows
+repaired = put(np.full((config.page_count, config.logical_page_size, contract.head_dim), 7, jnp.bfloat16), CACHE)
+table = put(np.asarray([[2, 0, 1]], np.int32))
+PAGES = np.asarray(table)[0]
+
+
+def body(p, c, r, o, n, t, w, k):
+    v = prefill_dsa(p, c, r, o, n, t, w, k, contract=contract, linear_interpret=True)
+    return (v.unrepaired_index_cache, v.repaired_index_cache, v.selected_positions, v.selected_valid_counts,
+            v.selected_scores, v.contract_valid[None, None])
+
+
+fn = jax.jit(jax.shard_map(body, mesh=mesh, in_specs=(prep_spec, CACHE, CACHE, P(), P(), P(), spec.dsa, P()),
+                           out_specs=(CACHE, CACHE, P(), P(), P(), P('expert', 'feature')), check_vma=False))
+
+
+def inputs_body(p, positions, live, w):
+    v = prefill_dsa_inputs(p, positions, live, w, contract=contract, linear_interpret=True)
+    return v.query, v.head_weights, v.keys, v.normalized_full
+
+
+produce = jax.jit(jax.shard_map(inputs_body, mesh=mesh, in_specs=(prep_spec, P(), P(), spec.dsa),
+                                out_specs=(P(), P(), P(), P()), check_vma=False))
+
+
+def run(offset, count, p=prepared, r=repaired, c=cache, t=table, w=dsa):
+    return tuple(np.asarray(v) for v in jax.block_until_ready(
+        fn(p, c, r, put(np.int32(offset)), put(np.int32(count)), t, w, wk)))
+
+
+def placed(base, offset, rows):
+    # ``base`` with row i written at position offset + i (page table, then the position's row in its page)
+    out = np.asarray(base).copy()
+    for i, row in enumerate(rows):
+        out[PAGES[(offset + i) // 512], (offset + i) % 512] = row
+    return out
+
+
+report = {}
+for offset, count in ((55, 17), (505, 17), (0, 11)):
+    out = run(offset, count)
+    assert out[5].all(), (offset, count)
+    positions = np.arange(R, dtype=np.int32) + offset
+    live = np.arange(R) < count
+    query, head, keys, normalized_full = produce(prepared, put(positions), put(live), dsa)
+    # the unrepaired cache: exactly the live keys, each at its own position
+    assert bits(out[0]) == bits(placed(cache, offset, np.asarray(keys)[:count])), (offset, count)
+    # the selection: the exact reference over the logical unrepaired cache with per-row causal lengths
+    logical = jnp.asarray(np.concatenate([out[0][page] for page in PAGES]))
+    scores = dsa_scores(query, logical, head, precision='default')
+    reference = exact_topk(scores, jnp.asarray(np.where(live, positions + 1, 0)), top_k=TOP_K)
+    np.testing.assert_array_equal(out[2], np.asarray(reference.positions))
+    np.testing.assert_array_equal(out[3], np.asarray(reference.valid_counts))
+    chosen = np.take_along_axis(np.asarray(scores), np.maximum(out[2], 0), axis=1)
+    np.testing.assert_array_equal(out[4], np.where(np.arange(TOP_K)[None] < out[3][:, None], chosen, -np.inf))
+    # the repaired cache: each live row's M64 repair key (its full normalized input, the 64-row physical chunk
+    # repeating the last live row) at the same position; the unrepaired key never lands there
+    repeat = np.minimum(np.arange(64), max(count - 1, 0))
+    repair = prompt_index_key_chunk(jnp.asarray(normalized_full)[repeat], jnp.asarray(positions[repeat]), wk,
+                                    dsa.key_norm_weight, dsa.key_norm_bias, contract=contract)[:R].astype(jnp.bfloat16)
+    assert bits(out[1]) == bits(placed(repaired, offset, np.asarray(repair)[:count])), (offset, count)
+    assert bits(np.asarray(repair)[:count]) != bits(np.asarray(keys)[:count])
+    # a different repaired history changes nothing the prompt computes
+    other = run(offset, count, r=jnp.full_like(repaired, -13))
+    assert all(bits(out[i]) == bits(other[i]) for i in (0, 2, 3, 4)), (offset, count)
+    # head weights within the FP64 forward-error bound of the exact product (dimension-derived, not fitted)
+    x = np.where(live[:, None], np.asarray(normalized, np.float64), 0)
+    hw = np.asarray(dsa.head_weight_local, np.float64)
+    n = config.geometry.hidden_size + 8
+    gamma = n * 2.0**-24 / (1 - n * 2.0**-24)
+    exact, bound = x @ hw.T * 32**-0.5, gamma * (np.abs(x) @ np.abs(hw).T) * 32**-0.5
+    assert np.all(np.abs(np.asarray(head, np.float64) - exact) <= bound), (offset, count)
+    report[f'{offset}+{count}'] = 'exact'
+base = run(55, 17)
+# a later live row's inputs reach no earlier key or selection
+altered = run(55, 17, p=jax.tree.map(lambda v: v.at[-1].set(3), prepared))
+assert bits(altered[0]) == bits(placed(base[0], 71, [altered[0][PAGES[0], 71]]))
+assert all(bits(altered[i][:-1]) == bits(base[i][:-1]) for i in (2, 3, 4))
+# NaN padding is ignored; zero live rows leave both caches unchanged with empty selections
+poisoned = run(0, 11, p=jax.tree.map(lambda v: v.at[11:].set(jnp.nan), prepared))
+assert all(bits(a) == bits(b) for a, b in zip(poisoned, run(0, 11)))
+empty = run(0, 0, p=jax.tree.map(lambda v: jnp.full_like(v, jnp.nan), prepared))
+assert empty[5].all() and bits(empty[0]) == bits(cache) and bits(empty[1]) == bits(repaired)
+assert (empty[2] == -1).all() and (empty[3] == 0).all()
+# invalid offsets, counts or page tables leave both caches unchanged and fail health
+for offset, count, t in ((INT_MAX, 17, table), (INT_MIN, 17, table), (0, INT_MAX, table),
+                         (505, 17, put(np.asarray([[2, 2, 1]], np.int32)))):
+    bad = run(offset, count, t=t)
+    assert not bad[5].any() and bits(bad[0]) == bits(cache) and bits(bad[1]) == bits(repaired), (offset, count)
+# a NaN history key row 0 can select (position 40), a NaN live normalized or q row: unhealthy
+for label, result in (('history', run(55, 17, c=cache.at[PAGES[0], 40, 0].set(jnp.nan))),
+                      ('normalized', run(55, 17, p=prepared._replace(normalized_local=normalized.at[0, 0].set(jnp.nan)))),
+                      ('q', run(55, 17, p=prepared._replace(q_residual=prepared.q_residual.at[0, 0].set(jnp.nan))))):
+    assert not result[5].all(), label
+# zero head weights: every score ties and the lowest positions win in every row
+tie = run(55, 17, w=dsa._replace(head_weight_local=jnp.zeros_like(dsa.head_weight_local)))
+for i in range(17):
+    n = min(56 + i, TOP_K)
+    np.testing.assert_array_equal(tie[2][i, :n], np.arange(n))
+# every collective is in the feature-4 or the expert-8 groups
+compiled = fn.lower(prepared, cache, repaired, put(np.int32(55)), put(np.int32(17)), table, dsa, wk).compile()
+feature = tuple(tuple(range(e * 4, e * 4 + 4)) for e in range(8))
+expert = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
+collectives = parse_hlo_module(compiled.as_text()).collectives
+assert collectives and all(c.replica_groups in (feature, expert) for c in collectives)
+print(json.dumps(report))
+"""  # noqa: E501 (child program text)
+
+
+@pytest.mark.cpu32
+def test_prefill_dsa_keeps_causal_and_repair_state_separate_cpu32():
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    result = subprocess.run([sys.executable, "-c", PRODUCER], env=env, capture_output=True, text=True, timeout=900)
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    assert report == {"55+17": "exact", "505+17": "exact", "0+11": "exact"}
+
+
+def key_contract() -> DsaNumericalContract:
+    return DsaNumericalContract(hidden_size=8, q_lora_rank=4, num_heads=1, head_dim=4, rotary_dim=2, top_k=4)
+
+
+def key_chunk_arguments(rows: int) -> tuple[jax.Array, ...]:
+    rng = np.random.default_rng(67)
+    normalized = jnp.asarray(rng.normal(0, 1, (rows, 8)), jnp.bfloat16)
+    wk = jnp.asarray(rng.normal(0, 0.5, (4, 8)), jnp.float32)
+    return (
+        normalized,
+        jnp.arange(rows, dtype=jnp.int32) + 4096,
+        wk,
+        jnp.asarray([1.0, 0.75, -0.5, 1.25], jnp.bfloat16),
+        jnp.asarray([0.0, 0.25, -0.125, 0.5], jnp.bfloat16),
+    )
+
+
+def test_prompt_key_chunk_projects_each_physical_partition_alone() -> None:
+    """The repair keys' M64 association is partition-local: a chunk equals its physical partitions computed
+    one by one, and the lowering is one loop over partitions with the recorded mixed-precision dot."""
+    contract = key_contract()
+    for rows, physical in ((128, 64), (8, 4)):
+        arguments = key_chunk_arguments(rows)
+        whole = prompt_index_key_chunk(*arguments, contract=contract, physical_rows=physical)
+        parts = [
+            prompt_index_key_chunk(
+                arguments[0][start : start + physical],
+                arguments[1][start : start + physical],
+                *arguments[2:],
+                contract=contract,
+                physical_rows=physical,
+            )
+            for start in range(0, rows, physical)
+        ]
+        assert whole.dtype == jnp.float32 and whole.shape == (rows, 4)
+        assert np.asarray(whole).tobytes() == np.asarray(jnp.concatenate(parts)).tobytes()
+    arguments = key_chunk_arguments(8)
+    stablehlo = str(
+        jax.jit(lambda *a: prompt_index_key_chunk(*a, contract=contract, physical_rows=4))
+        .lower(*arguments)
+        .compiler_ir(dialect="stablehlo")
+    )
+    assert stablehlo.count("stablehlo.while") == 1
+    assert stablehlo.count("precision = [DEFAULT, HIGHEST]") == 1
+    assert "tensor<4x4xf32>" in stablehlo
+
+
+def test_prompt_key_chunk_refuses_malformed_inputs() -> None:
+    contract = key_contract()
+    normalized, positions, wk, weight, bias = key_chunk_arguments(8)
+    for physical in (0, True, -64):
+        with pytest.raises(ValueError, match="physical prompt-key rows"):
+            prompt_index_key_chunk(normalized, positions, wk, weight, bias, contract=contract, physical_rows=physical)
+    with pytest.raises(ValueError, match="divide"):
+        prompt_index_key_chunk(normalized[:6], positions[:6], wk, weight, bias, contract=contract, physical_rows=4)
+    with pytest.raises(ValueError, match="BF16"):
+        prompt_index_key_chunk(
+            normalized.astype(jnp.float32), positions, wk, weight, bias, contract=contract, physical_rows=4
+        )
+    with pytest.raises(ValueError, match="adapted FP32"):
+        prompt_index_key_chunk(
+            normalized, positions, wk.astype(jnp.bfloat16), weight, bias, contract=contract, physical_rows=4
+        )
+    with pytest.raises(ValueError, match="one integer row per token"):
+        prompt_index_key_chunk(normalized, positions[:4], wk, weight, bias, contract=contract, physical_rows=4)

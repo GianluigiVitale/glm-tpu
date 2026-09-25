@@ -3,9 +3,10 @@
 The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1), ``restructure.py --apply
 renames.toml`` (S4.2), ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
 modules), ``restructure.py --apply helper_names.toml`` (S4.4: renames plus ``[named_scopes]``, the
-``jax.named_scope`` names, see F) and ``restructure.py --apply test_moves.toml`` (S5 A2, moves between
-test modules). The tables describe one kind of change -- a top-level definition
-``(module, name)`` becomes ``(module', name')`` -- and share one reference pass:
+``jax.named_scope`` names, see F), ``restructure.py --apply test_moves.toml`` (S5 A2) and
+``restructure.py --apply owed_tests.toml`` (S5 D), moves between test modules. The tables describe
+one kind of change -- a top-level definition ``(module, name)`` becomes ``(module', name')`` -- and
+share one reference pass:
 
 A. *move* (``[moves]``, S4.1): every listed top-level definition is cut from its module and pasted
    verbatim (source text with its leading comments) into its destination: before the first

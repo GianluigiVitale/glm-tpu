@@ -7,8 +7,9 @@ Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.
 top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names),
 ``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules),
 ``helper_names.toml`` (S4.4, the public names of the private helpers other modules import and the
-``jax.named_scope`` names) and ``test_moves.toml`` (S5 A2, tests moved to the test module of their
-subject); the S4 kinds (and S5 A2's) are applied by ``symbols.py`` (its docstring has the rules).
+``jax.named_scope`` names), ``test_moves.toml`` (S5 A2, tests moved to the test module of their
+subject) and ``owed_tests.toml`` (S5 D, the reference cross-validation moved to the test module of its
+subject); the S4 kinds (and S5's) are applied by ``symbols.py`` (its docstring has the rules).
 ``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4 when a moved
 or renamed definition differs from its base-commit original (imports aside), a dissolved module or
 any tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
@@ -16,7 +17,7 @@ table is checked at its own step: a later table renames what an earlier one plac
 symbol_moves.toml`` reports the S4.2 renames as differences), S4.4 edits definitions the earlier
 tables placed (reviewed lint fixes; the public helper names), and S5 edits definitions the S4.4 table
 compares (its check compares docstrings too). So without a TABLE argument ``--check`` runs
-``move_map.toml`` only; each S4 table (and S5 A2's) is checked, by name, at the commit that applied it.
+``move_map.toml`` only; each S4 table (and each S5 one) is checked, by name, at the commit that applied it.
 
 S3, ``move_map.toml``:
 

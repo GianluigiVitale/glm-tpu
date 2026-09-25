@@ -1,6 +1,19 @@
-"""CPU multirow attention primitives; not TPU arithmetic or speed proof."""
+"""CPU multirow attention primitives; not TPU arithmetic or speed proof.
+
+The prefill attention block (``prefill_index_share_lse``) writes its rows' keys once and attends each query
+within its own causal bound: every row equals the block computed with only the rows up to it live, a later row
+never reaches an earlier one, padding and empty blocks are exact no-ops, and malformed selections, metadata or
+non-finite operands fail health; a non-finite key to be written refuses the whole block's write (ported from the
+research package's ``kernels/test_ws32_prefill_attention.py``, ``archive/research-20260922``; on 32 forced CPU
+devices with the frozen fixture's first layer).
+"""
 
 from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
 
 import jax.numpy as jnp
 import numpy as np
@@ -566,3 +579,152 @@ def test_attention_shape_and_dtype_contracts_fail_loudly() -> None:
             layout=small_layout(),
             contract=contract,
         )
+
+
+PREFILL_ATTENTION = r"""
+import json
+import jax, jax.numpy as jnp, numpy as np
+from jax.sharding import NamedSharding, PartitionSpec as P
+from jax._src.pallas.mosaic import tpu_info
+tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
+tpu_info.get_tpu_info.cache_clear()
+from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
+from glm_tpu.layers.attention.mla import PreparedAttention, prefill_index_share_lse, prefill_prepare_attention
+from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs
+from glm_tpu.runner.hlo_utils import parse_hlo_module
+from tests.fixtures.tiny_model import cpu_mesh, engine_inputs
+mesh = cpu_mesh()
+inputs = engine_inputs(mesh, panel_geometry=True)
+config = inputs.config
+contract = config.attention_contract
+layer, spec = inputs.weights.layers[0], bf16_weight_specs(config).layers[0]
+rng = np.random.default_rng(915)
+R = 17
+
+
+def bf(shape, scale=0.1):
+    return np.asarray(jnp.asarray(rng.normal(0, scale, shape), jnp.bfloat16))
+
+
+def put(value, sharding=P()):
+    return jax.device_put(value, NamedSharding(mesh, sharding))
+
+
+def bits(value):
+    return np.asarray(value).tobytes()
+
+
+residual = put(bf((R, config.geometry.hidden_size)), P(None, 'feature'))
+prepared = PreparedAttention(residual, residual, put(bf((R, config.geometry.q_lora_rank))),
+                             put(bf((R, contract.kv_lora_rank + contract.qk_rope_head_dim))))
+prep_spec = PreparedAttention(P(None, 'feature'), P(None, 'feature'), P(), P())
+cache = put(bf((config.page_count, config.logical_page_size, contract.packed_cache_width)), P(None, 'expert', None))
+table = put(np.asarray([[2, 0, 1]], np.int32))
+angles = rng.normal(size=(R, contract.qk_rope_head_dim // 2))
+rope = put(np.asarray(jnp.asarray(np.concatenate((np.cos(angles), np.sin(angles)), axis=1), jnp.bfloat16)))
+kwargs = dict(contract=contract, cache_layout=config.cache_layout, linear_interpret=True,
+              sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
+              sparse_attention_interpret=True)
+
+
+def body(r, p, c, s, n, offset, count, t, w, h):
+    out = prefill_index_share_lse(r, p, c, s, n, offset, count, t, w, main_rope_table_rows=h, **kwargs)
+    return out.output_local, out.cache_local, out.contract_valid[None, None]
+
+
+block = jax.jit(jax.shard_map(
+    body, mesh=mesh,
+    in_specs=(P(None, 'feature'), prep_spec, P(None, 'expert', None), P(), P(), P(), P(), P(), spec.attention, P()),
+    out_specs=(P(None, 'feature'), P(None, 'expert', None), P('expert', 'feature', None)), check_vma=False))
+
+
+def selections(offset, count):
+    positions, counts = np.full((R, contract.top_k), -1, np.int32), np.zeros(R, np.int32)
+    for i in range(count):
+        end = offset + i + 1
+        counts[i] = min(end, contract.top_k)
+        positions[i, : counts[i]] = np.arange(end - counts[i], end)  # ascending: the consumer canonicalizes
+    return put(positions), put(counts)
+
+
+def run(offset, count, p=prepared, h=rope, s=None, n=None, c=cache, r=residual):
+    if s is None:
+        s, n = selections(offset, count)
+    return jax.block_until_ready(block(r, p, c, s, n, put(np.int32(offset)), put(np.int32(count)), table,
+                                       layer.attention, h))
+
+
+def with_rows(offset, count, written):
+    # the input cache with the rows of positions offset..offset+count-1 taken from ``written``
+    expected, pages = np.asarray(cache).copy(), np.asarray(table)[0]
+    for position in range(offset, offset + count):
+        expected[pages[position // 512], position % 512] = written[pages[position // 512], position % 512]
+    return expected
+
+
+report = {}
+for offset, count in ((55, 17), (505, 17), (0, 11)):
+    out, end, health = (np.asarray(v) for v in run(offset, count))
+    assert health.all() and not out[count:].any(), (offset, count)
+    assert bits(end) == bits(with_rows(offset, count, end)), (offset, count)  # only the live rows' positions
+    # each row equals the block computed with only the rows up to it live: its causal prefix, same shape
+    for i in range(count):
+        o, e, h = (np.asarray(v) for v in run(offset, i + 1))
+        assert h.all() and bits(o[: i + 1]) == bits(out[: i + 1]), (offset, i)
+        assert bits(e) == bits(with_rows(offset, i + 1, end)), (offset, i)
+    report[f'{offset}+{count}'] = 'causal'
+base = run(55, 17)
+# a later row's query and key never reach an earlier row
+changed = prepared._replace(q_residual=prepared.q_residual.at[-1].set(2), current_kv=prepared.current_kv.at[-1].set(3))
+future = run(55, 17, p=changed)
+assert bits(np.asarray(future[0])[:-1]) == bits(np.asarray(base[0])[:-1])
+assert bits(np.asarray(future[0])[-1]) != bits(np.asarray(base[0])[-1])
+# padded garbage is ignored; a zero-live block is a healthy exact cache no-op with zero output
+poisoned = run(0, 11, p=jax.tree.map(lambda v: v.at[11:].set(jnp.nan), prepared), h=rope.at[11:].set(jnp.nan),
+               r=residual.at[11:].set(jnp.nan))
+assert all(bits(a) == bits(b) for a, b in zip(poisoned, run(0, 11)))
+empty = run(0, 0, p=jax.tree.map(lambda v: jnp.full_like(v, jnp.nan), prepared))
+assert np.asarray(empty[2]).all() and not np.asarray(empty[0]).any() and bits(empty[1]) == bits(cache)
+# a future selection (its key is physically present in the block) or a short count: row 0 unhealthy
+s, n = selections(55, 17)
+for label, result in (('future', run(55, 17, s=s.at[0, 55].set(56), n=n)), ('count', run(55, 17, s=s, n=n.at[0].set(55)))):
+    assert not np.asarray(result[2])[:, :, 0].any(), label
+# a bad offset, a NaN live key or a NaN live rotary row (both reach the written key): the whole block
+# unhealthy and the cache unchanged
+bad_key = prepared._replace(current_kv=prepared.current_kv.at[0, 0].set(jnp.nan))
+for label, result in (('offset', run(2147483647, 17, s=s, n=n)), ('key', run(55, 17, p=bad_key)),
+                      ('rope', run(55, 17, h=rope.at[0, 0].set(jnp.nan)))):
+    assert not np.asarray(result[2]).any() and bits(result[1]) == bits(cache), label
+# a NaN query: that row unhealthy, the others not; a NaN in an old cache row every row selects (position 40:
+# physical page 2): every row unhealthy
+bad_query = prepared._replace(q_residual=prepared.q_residual.at[0, 0].set(jnp.nan))
+health = np.asarray(run(55, 17, p=bad_query)[2])
+assert not health[:, :, 0].any() and health[:, :, 1:].all()
+assert not np.asarray(run(55, 17, c=cache.at[2, 40, 0].set(jnp.nan))[2]).any()
+# the block's only collectives are the expert-8 attention exchanges
+compiled = block.lower(residual, prepared, cache, s, n, put(np.int32(55)), put(np.int32(17)), table, layer.attention,
+                       rope).compile()
+collectives = parse_hlo_module(compiled.as_text()).collectives
+expert = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
+assert collectives and all(c.replica_groups == expert for c in collectives), {c.replica_groups for c in collectives}
+report['collectives'] = sorted({c.opcode for c in collectives})
+# preparation has no cross-row arithmetic: changing one row leaves every other row bitwise unchanged
+prepare = jax.jit(jax.shard_map(lambda r, w: prefill_prepare_attention(r, w, linear_interpret=True), mesh=mesh,
+                                in_specs=(P(None, 'feature'), spec.qkv_a), out_specs=prep_spec, check_vma=False))
+for x, y in zip(prepare(residual, layer.qkv_a), prepare(residual.at[5].set(3), layer.qkv_a)):
+    x, y = np.asarray(x), np.asarray(y)
+    assert bits(np.delete(x, 5, axis=0)) == bits(np.delete(y, 5, axis=0)) and bits(x[5]) != bits(y[5])
+print(json.dumps(report))
+"""  # noqa: E501 (child program text)
+
+
+@pytest.mark.cpu32
+def test_prefill_attention_is_causal_within_its_block_cpu32() -> None:
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    result = subprocess.run(
+        [sys.executable, "-c", PREFILL_ATTENTION], env=env, capture_output=True, text=True, timeout=900
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    blocks = ("55+17", "505+17", "0+11")
+    assert {key: report[key] for key in blocks} == dict.fromkeys(blocks, "causal")

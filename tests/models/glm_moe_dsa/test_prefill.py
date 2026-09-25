@@ -1,5 +1,8 @@
 """The production prefill program on the CPU mesh: health, its one-pass selector, atomic refusal of a
-finished state and exclusive state donation.
+finished state and exclusive state donation; and the B128/B114 programs over the real 78-layer checkpoint
+schema, by shape evaluation (``tests/fixtures/prefill_layer_schema.json``, the tensor schema of the checkpoint
+manifest, copied from ``archive/research-20260922``). The prefill block semantics are in
+``test_prefill_semantics.py``.
 
 Until S2f this test also compared every leaf with the independent frozen FP8 prefill program (raw
 path bitwise, BF16-resident path within rtol 0.02 / atol 0.0625). That oracle is archived at
@@ -68,4 +71,92 @@ print('Exclusive prefill state donation preserves every output leaf')
 def test_prefill_program_health_selector_refusal_and_donation_cpu32():
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", CODE], env=env, capture_output=True, text=True, timeout=900)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+SCHEMA = r"""
+import json
+from dataclasses import replace
+from pathlib import Path
+import jax, jax.numpy as jnp
+from jax.sharding import NamedSharding, PartitionSpec as P
+from glm_tpu.config.cache import CacheConfig
+from glm_tpu.config.model import geometry
+from glm_tpu.exceptions import PlanValidationError
+from glm_tpu.models.glm_moe_dsa.prefill import build_prefill_program
+from glm_tpu.models.glm_moe_dsa.weights import (
+    bf16_resident_weights, bind_decoder_weights, decoder_weight_names, decoder_weight_specs,
+)
+from glm_tpu.runner.programs import build_program_set
+import tests.fixtures
+from tests.fixtures.tiny_model import cpu_mesh
+mesh = cpu_mesh()
+config = CacheConfig(geometry(), 8192, host_main_rope_table=True)  # as the runtime builds it (8,192 slots)
+g = config.geometry
+assert g.num_layers == 78
+schema = json.loads(Path(tests.fixtures.__file__).with_name('prefill_layer_schema.json').read_text())
+source = {t['name']: t for t in schema['tensor_schema']}
+types = {'BF16': jnp.bfloat16, 'F32': jnp.float32, 'U8': jnp.uint8}
+def spec_tuple(spec):
+    spec = list(spec)
+    while spec and spec[-1] is None:
+        spec.pop()
+    return tuple(spec)
+pairs = jax.tree.leaves(jax.tree.map(lambda n, s: (n, s), decoder_weight_names(config), decoder_weight_specs(config)),
+                        is_leaf=lambda x: isinstance(x, tuple) and len(x) == 2 and isinstance(x[0], str))
+arrays, used = {}, set()
+for name, spec in pairs:
+    if name.startswith('model.layers.'):
+        layer, suffix = int(name.split('.')[2]), name.split('.', 3)[3]
+        # dense layers and every indexer tensor have layer 0's schema, MoE layers layer 3's
+        template = f'model.layers.{0 if layer < 3 or ".indexer." in name else 3}.{suffix}'
+        t = source[template]
+        used.add(template)
+        assert spec_tuple(spec) == spec_tuple(t['partition_spec']), (name, spec, t['partition_spec'])
+        shape, dtype = tuple(t['global_shape']), types[t['dtype']]
+    elif name == 'model.norm.weight':
+        shape, dtype = (g.hidden_size,), jnp.bfloat16
+    else:
+        shape, dtype = (g.vocab_size, g.hidden_size), jnp.bfloat16
+    arrays[name] = jax.ShapeDtypeStruct(shape, dtype, sharding=NamedSharding(mesh, spec))
+assert used == set(source), sorted(set(source) - used)
+raw = bind_decoder_weights(arrays, config)
+resident = jax.eval_shape(lambda w: bf16_resident_weights(mesh, config, w), raw)
+programs = build_program_set(mesh, config)
+state = jax.eval_shape(programs.cache_init.fn, jax.ShapeDtypeStruct((), jnp.int32))
+wk = tuple(jax.ShapeDtypeStruct((g.dsa_indexer_head_dim, g.hidden_size), jnp.float32) for _ in config.full_index_slots)
+rope = jax.ShapeDtypeStruct(config.main_rope_table_shape, jnp.bfloat16)
+for rows, spec in programs.prefill.items():
+    out = jax.eval_shape(spec.fn, jax.ShapeDtypeStruct((rows,), jnp.int32), jax.ShapeDtypeStruct((), jnp.int32),
+                         state, resident, wk, rope)
+    decoder = out.state.decoder
+    assert decoder.kv_cache_local.shape == config.kv_cache_shape, rows
+    assert decoder.index_cache_local.shape == out.state.repaired_index_local.shape == config.index_cache_shape, rows
+    assert decoder.selected_positions.shape == (1, g.dsa_top_k) and out.next_token.shape == (1,), rows
+    assert out.state.finished.shape == () and out.state.finished.dtype == jnp.bool_, rows
+for changed in (replace(config, exact_dsa=True), replace(config, strategy_nd_dense=True),
+                replace(config, host_main_rope_table=False)):
+    try:
+        build_prefill_program(mesh, changed, block_rows=128)
+        raise AssertionError('unsupported config accepted')
+    except PlanValidationError:
+        pass
+for rows in (0, 33, True, 129):
+    try:
+        build_prefill_program(mesh, config, block_rows=rows)
+        raise AssertionError('invalid row count accepted')
+    except PlanValidationError:
+        pass
+print('78-layer schema bound and both prefill programs evaluated')
+"""
+
+
+@pytest.mark.cpu32
+def test_prefill_programs_accept_the_78_layer_checkpoint_schema_cpu32():
+    """The production config's tensor names take the checkpoint's recorded shapes, dtypes and partition specs
+    (``tests/fixtures/prefill_layer_schema.json``: layer 0 for the dense layers and every indexer tensor, layer 3
+    for the MoE layers); bound, made resident and run through the B128 and B114 programs by shape evaluation only
+    (no weight is allocated). Other block sizes and research configs are refused."""
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    result = subprocess.run([sys.executable, "-c", SCHEMA], env=env, capture_output=True, text=True, timeout=900)
     assert result.returncode == 0, result.stdout + result.stderr

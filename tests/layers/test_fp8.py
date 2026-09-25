@@ -1,4 +1,5 @@
-"""BF16-resident non-routed weights: exact table decode, frozen partition specs, one decode step.
+"""BF16-resident non-routed weights: exact table decode, frozen partition specs, one decode step; the
+prefill repair key weight (``wk``): decoded to BF16, then widened to FP32.
 
 CPU semantics on the forced 32-device mesh. Until S2f the decode test also stepped the frozen FP8
 decoder beside the release decoder (same tokens and DSA selections, KV within one BF16 ulp on under
@@ -13,11 +14,18 @@ import os
 import subprocess
 import sys
 
+import jax
 import jax.numpy as jnp
+import ml_dtypes
 import numpy as np
 import pytest
 
-from glm_tpu.layers.fp8 import decode_fp8_table
+from glm_tpu.layers.contracts import DsaNumericalContract
+from glm_tpu.layers.fp8 import (
+    decode_fp8_table,
+    decode_stage_local_prefill_index_wk_bf16,
+    promote_stage_local_prefill_index_wk,
+)
 
 
 def test_decode_table_matches_reference_dequantizer_bitwise():
@@ -93,3 +101,58 @@ print(json.dumps(report))
     report = json.loads(result.stdout.strip().splitlines()[-1])
     assert report["valid"]
     assert all(0 <= t < 256 for t in report["tokens"]), report["tokens"]
+
+
+def wk_contract() -> DsaNumericalContract:
+    return DsaNumericalContract(hidden_size=8, q_lora_rank=4, num_heads=1, head_dim=4, rotary_dim=2, top_k=4)
+
+
+def test_prefill_repair_wk_is_rounded_to_bf16_before_fp32_promotion() -> None:
+    """The loader's repair weight: E4M3 bits times the block scale, rounded once to BF16 (the table the
+    unrepaired keys use), then widened exactly to FP32; ported from the research package's
+    ``kernels/test_prefill_index.py`` (``archive/research-20260922``)."""
+    contract = wk_contract()
+    # E4M3FN 0x38 is exactly 1.0 and the 2x2 block scales are one: the decoded table is all ones
+    ones = decode_stage_local_prefill_index_wk_bf16(
+        jnp.full((4, 8), 0x38, jnp.uint8), jnp.ones((2, 4), jnp.float32), contract=contract, fp8_block_shape=(2, 2)
+    )
+    assert ones.dtype == jnp.bfloat16 and np.all(np.asarray(ones, np.float32) == 1.0)
+    rng = np.random.default_rng(29)
+    bits = rng.integers(0, 256, (4, 8), dtype=np.uint8)
+    bits[(bits & 0x7F) == 0x7F] = 0x38  # no NaN encodings (a loader gate)
+    scale = rng.uniform(0.5, 1.5, (2, 4)).astype(np.float32)
+    decoded = decode_stage_local_prefill_index_wk_bf16(
+        jnp.asarray(bits), jnp.asarray(scale), contract=contract, fp8_block_shape=(2, 2)
+    )
+    promoted = promote_stage_local_prefill_index_wk(decoded, contract=contract)
+    # host arithmetic: the E4M3 value times its block's scale in FP32, one BF16 rounding, exact widening
+    product = bits.view(ml_dtypes.float8_e4m3fn).astype(np.float32) * np.repeat(np.repeat(scale, 2, 0), 2, 1)
+    expected = product.astype(ml_dtypes.bfloat16).astype(np.float32)
+    assert decoded.dtype == jnp.bfloat16 and promoted.dtype == jnp.float32
+    assert np.asarray(promoted).tobytes() == expected.tobytes()
+    stablehlo = str(
+        jax.jit(
+            lambda b, s: promote_stage_local_prefill_index_wk(
+                decode_stage_local_prefill_index_wk_bf16(b, s, contract=contract, fp8_block_shape=(2, 2)),
+                contract=contract,
+            )
+        )
+        .lower(jnp.asarray(bits), jnp.asarray(scale))
+        .compiler_ir(dialect="stablehlo")
+    )
+    rounded = stablehlo.index(": (tensor<4x8xf32>) -> tensor<4x8xbf16>")
+    assert stablehlo.index(": (tensor<4x8xbf16>) -> tensor<4x8xf32>", rounded) > rounded
+
+
+def test_prefill_repair_wk_refuses_malformed_tables() -> None:
+    contract = wk_contract()
+    bits, scale = jnp.zeros((4, 8), jnp.uint8), jnp.ones((2, 4), jnp.float32)
+    for bad_bits in (bits[:2], bits.astype(jnp.int8)):
+        with pytest.raises(ValueError, match="wk bits"):
+            decode_stage_local_prefill_index_wk_bf16(bad_bits, scale, contract=contract, fp8_block_shape=(2, 2))
+    for bad_scale in (scale[:1], scale.astype(jnp.bfloat16)):
+        with pytest.raises(ValueError, match="wk scales"):
+            decode_stage_local_prefill_index_wk_bf16(bits, bad_scale, contract=contract, fp8_block_shape=(2, 2))
+    for bad in (jnp.zeros((4, 8), jnp.float32), jnp.zeros((4, 4), jnp.bfloat16)):
+        with pytest.raises(ValueError, match="BF16 wk"):
+            promote_stage_local_prefill_index_wk(bad, contract=contract)

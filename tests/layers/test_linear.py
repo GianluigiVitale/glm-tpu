@@ -1,4 +1,12 @@
-"""Resident projection refusals and the canonical dense row placement of the production prefill.
+"""Resident projection refusals, the multirow prefill projection and the canonical dense row placement of the
+production prefill.
+
+``prefill_linear`` projects a block of prompt rows over the resident BF16 tables and reduces the FP32 partials
+over the feature-4 or expert-8 axis: the block, its one-row calls and the decode projection
+(``feature_linear``/``expert_linear``) all stay within the FP64 forward-error bound of the exact product, no row
+reaches another, and the only collectives are those reductions (ported from the research package's
+``kernels/test_ws32_prefill_linear.py``, ``archive/research-20260922``, whose research kernels were
+row-independent bit for bit; XLA's CPU dot is not, for a block's last rows).
 
 Until S2f ``test_bf16_canonical_dense_cpu32`` also compared the BF16-resident canonical dense MLP with
 the frozen FP8 one (output within rtol 0.02 / atol 0.01, routing and live masks equal); that oracle
@@ -66,6 +74,82 @@ print('BF16 canonical B114/B128 output, live masks and health checked')
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     p = subprocess.run([sys.executable, "-c", code], env=env, text=True, capture_output=True, timeout=300)
     assert p.returncode == 0, p.stdout + p.stderr
+
+
+PREFILL_LINEAR = r"""
+import json
+import jax, jax.numpy as jnp, numpy as np
+from jax.sharding import NamedSharding, PartitionSpec as P
+from glm_tpu.layers.linear import expert_linear, feature_linear, prefill_linear
+from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs
+from glm_tpu.runner.hlo_utils import parse_hlo_module
+from tests.fixtures.tiny_model import cpu_mesh, engine_inputs
+mesh = cpu_mesh()
+inputs = engine_inputs(mesh, panel_geometry=True)
+config = inputs.config
+layer, spec = inputs.weights.layers[0], bf16_weight_specs(config).layers[0]
+rng = np.random.default_rng(172)
+feature_groups = tuple(tuple(range(e * 4, e * 4 + 4)) for e in range(8))
+expert_groups = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
+report = {}
+for axis, table, table_spec, width, in_spec, out_spec, decode, groups in (
+    # q-a: hidden shards reduced over feature-4 (the attention preparation)
+    ('feature', layer.qkv_a.q_a_local, spec.qkv_a.q_a_local, config.geometry.hidden_size, P(None, 'feature'), P(),
+     feature_linear, feature_groups),
+    # o-proj: head shards reduced over expert-8 (the attention output)
+    ('expert', layer.attention.o_local, spec.attention.o_local, layer.attention.o_local.shape[1], P(None, 'expert'),
+     P(None, 'feature'), expert_linear, expert_groups),
+):
+    x = jnp.asarray(rng.normal(0, 0.15, (17, width)), jnp.bfloat16).at[7].set(0)
+    x = jax.device_put(x, NamedSharding(mesh, in_spec))
+    batch = jax.jit(jax.shard_map(lambda v, w: prefill_linear(v, w, reduction_axis=axis, interpret=True), mesh=mesh,
+                                  in_specs=(in_spec, table_spec), out_specs=out_spec, check_vma=False))
+    one = jax.jit(jax.shard_map(lambda v, w: decode(v, w, axis), mesh=mesh, in_specs=(in_spec, table_spec),
+                                out_specs=out_spec, check_vma=False))
+    compiled = batch.lower(x, table).compile()
+    actual = compiled(x, table)
+    assert actual.shape[0] == 17 and actual.dtype == jnp.bfloat16
+    # XLA's CPU dot may associate a row's FP32 sum differently with the row count (a block's last rows),
+    # so the block, its one-row calls and the decode projection are each judged against FP64 arithmetic
+    # with a dimension-derived bound: FP32 accumulation over the contracted width plus the reduction,
+    # then one BF16 rounding (unit roundoff 2**-8)
+    host, weight = np.asarray(x, np.float64), np.asarray(table, np.float64)
+    exact, magnitude = host @ weight.T, np.abs(host) @ np.abs(weight).T
+    n = width + 8
+    gamma = n * 2.0**-24 / (1 - n * 2.0**-24)
+    bound = gamma * magnitude + 2.0**-8 * (np.abs(exact) + gamma * magnitude)
+    rows = jnp.concatenate([batch(x[i : i + 1], table) for i in range(17)])
+    decoded = jnp.concatenate([one(x[i : i + 1], table) for i in range(17)])
+    for name, value in (('block', actual), ('one-row', rows), ('decode', decoded)):
+        assert np.all(np.abs(np.asarray(value, np.float64) - exact) <= bound), (axis, name)
+    # no row reaches another at the block's shape
+    other = batch(x.at[3].set(1), table)
+    assert np.delete(np.asarray(other), 3, 0).tobytes() == np.delete(np.asarray(actual), 3, 0).tobytes()
+    collectives = parse_hlo_module(compiled.as_text()).collectives
+    assert collectives and all(c.opcode == 'all-reduce' and c.replica_groups == groups for c in collectives), axis
+    report[axis] = [list(actual.shape), len(collectives)]
+print(json.dumps(report))
+"""
+
+
+@pytest.mark.cpu32
+def test_prefill_linear_matches_the_one_row_projections_cpu32():
+    env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
+    p = subprocess.run([sys.executable, "-c", PREFILL_LINEAR], env=env, text=True, capture_output=True, timeout=600)
+    assert p.returncode == 0, p.stdout + p.stderr
+
+
+def test_prefill_linear_rejects_invalid_rows_dtype_and_axis() -> None:
+    table = jnp.zeros((128, 128), jnp.bfloat16)
+    for value in (jnp.ones((128,), jnp.bfloat16), jnp.ones((0, 128), jnp.bfloat16)):
+        with pytest.raises(ValueError, match="nonempty"):
+            resident.prefill_linear(value, table, reduction_axis="feature")
+    with pytest.raises(ValueError, match="bfloat16"):
+        resident.prefill_linear(jnp.ones((8, 128), jnp.float32), table, reduction_axis="feature")
+    with pytest.raises(ValueError, match="feature or expert"):
+        resident.prefill_linear(jnp.ones((8, 128), jnp.bfloat16), table, reduction_axis="model")
+    with pytest.raises(ValueError, match="resident BF16 tables"):
+        resident.prefill_linear(jnp.ones((8, 128), jnp.bfloat16), table.astype(jnp.uint8), reduction_axis="feature")
 
 
 def test_linear_preserves_checkpoint_out_in_orientation_and_leading_shape() -> None:

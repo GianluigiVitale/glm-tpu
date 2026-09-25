@@ -9,8 +9,9 @@ of the engine's reference modules (``glm_tpu/layers``, S3) is exact it is reused
 ``model.py`` composes the layers in ``linear.py``, ``norm.py``,
 ``attention.py``, ``dsa.py`` and ``moe.py``. ``oracle_run.py`` is the 32-device
 CPU child that compares the reference with the production composition (until S2f
-also with the frozen FP8 oracle; ``floors.json`` keeps the production-to-oracle
-distances of its final run); ``VALIDATION.md`` is the acceptance receipt.
+also with the frozen FP8 oracle); ``tests/models/glm_moe_dsa/test_against_reference.py``
+runs it, with the production-to-oracle distances of the oracle's final run in
+``tests/models/glm_moe_dsa/floors.json``; ``VALIDATION.md`` is the acceptance receipt.
 
 Importing this package imports nothing.
 """

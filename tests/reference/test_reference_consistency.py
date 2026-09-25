@@ -1,20 +1,18 @@
-"""The unsharded reference model: unit semantics and cross-validation (DESIGN 7.6, S2e).
+"""The unsharded reference model: unit semantics and self-consistency (DESIGN 7.6, S2e).
 
 Fast tests run the reference alone on one CPU device over a tiny synthetic
 checkpoint (the fixture's tensor names, small dimensions), and compare it with
 :mod:`tests.reference.independent`, an FP64 NumPy restatement that shares no code
 with the reference, the oracles or production (the only check of the oracle
 functions the reference and production both execute). The ``slow`` tests read
-the frozen fixture v1 or run several block partitions. The ``cpu32`` test runs
-:mod:`tests.reference.oracle_run` in a child with 32 forced CPU devices and
-asserts the acceptance criteria of ``VALIDATION.md`` against the production
-composition: every DESIGN 7.6 criterion the two accepted engines (frozen FP8
-oracle, production) met against each other holds exactly for the reference; for
-the others the reference is no further from production than production was from
-the FP8 oracle (the measured floor, recorded from the oracle's final run in
-``floors.json``). ``test_reference_matches_frozen_fp8_oracle`` was archived
-together with the frozen FP8 oracle at S2f (``archive/research-20260922``);
-``VALIDATION.md`` is its receipt.
+the frozen fixture v1 or run several block partitions. The cross-validation
+against the production composition (the ``cpu32`` child
+:mod:`tests.reference.oracle_run`, the acceptance criteria of ``VALIDATION.md``
+and the recorded floors) is the test of its subject, production:
+``tests/models/glm_moe_dsa/test_against_reference.py``.
+``test_reference_matches_frozen_fp8_oracle`` was archived together with the
+frozen FP8 oracle at S2f (``archive/research-20260922``); ``VALIDATION.md`` is
+its receipt.
 """
 
 from __future__ import annotations
@@ -784,124 +782,3 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
                 rtol=0,
                 atol=0.01 * scale,
             )
-
-
-# ----------------------------------------------------------------------------- cross-validation (cpu32)
-# Floors: how far production was from the frozen FP8 oracle on the same prompt and schedule
-# (VALIDATION.md), recorded from the oracle's final run at S2f in ``floors.json``. Where even the
-# two accepted engines break a DESIGN 7.6 criterion, the reference must be no further from either
-# engine than they are from each other. These are a recorded deviation from the DESIGN 7.6 gate
-# (VALIDATION.md); they are dominated by the rows a flipped decision moves, so they bound the
-# reference loosely and the semantic checks are the independent-restatement tests above. Measured
-# worst on the four pairs (VALIDATION.md): bound ratio 1.087 x the floor, outside fraction 1.71 x
-# the floor, carried-layer set-unequal steps equal to the floor's.
-FLOOR_SLACK = 1.15  # worst |difference| / bound, a maximum over ~1e6-1e7 elements
-FRACTION_SLACK = 2.0  # elements outside the bound (a moved row moves as a whole)
-
-
-FLOORS = Path(__file__).with_name("floors.json")
-
-
-def recorded_floor(prompt: str) -> dict[str, Any]:
-    """The production:fp8-oracle report of ``prompt`` as far as the criteria read it."""
-    import json
-
-    return json.loads(FLOORS.read_text())["floors"][prompt]
-
-
-@pytest.fixture(scope="module")
-def reports() -> Any:
-    from tools.equivalence.common import run_child
-
-    cache: dict[tuple[str, str], dict[str, Any]] = {}
-
-    def get(pair: str, prompt: str) -> dict[str, Any]:
-        if (pair, prompt) not in cache:
-            cache[pair, prompt] = run_child(
-                "tests.reference.oracle_run",
-                "--pair",
-                pair,
-                "--prompt",
-                prompt,
-                timeout=1800,
-            )
-        return cache[pair, prompt]
-
-    return get
-
-
-def assert_criteria(report: dict[str, Any], floor: dict[str, Any], *, strict: tuple[str, ...]) -> None:
-    s, f = report["summary"], floor["summary"]
-    assert report["engine_inputs_equal_reference"] == dict(wk=True, rope=True)
-    failed = [key for key in strict if not s[key]]
-    assert not failed, (failed, s)
-    for phase in ("prefill", "decode"):
-        for leaf, ratio in s[phase + "_bound_ratio"].items():
-            # Within the bound wherever the engines are; otherwise within the engines' own distance.
-            engines = f[phase + "_bound_ratio"][leaf]
-            assert ratio <= (1.0 if engines <= 1.0 else FLOOR_SLACK * engines), (
-                phase,
-                leaf,
-                ratio,
-                f,
-            )
-        for leaf, fraction in s[phase + "_outside_fraction"].items():
-            # A zero floor fraction means the engines are within the bound: zero allowed.
-            assert fraction <= FRACTION_SLACK * f[phase + "_outside_fraction"][leaf], (
-                phase,
-                leaf,
-                fraction,
-                f,
-            )
-    carried = [r["selections"][str(max(map(int, r["selections"])))] for r in report["decode"]]
-    floor_carried = [next(iter(r["selections"].values())) for r in floor["decode"]]
-    assert sum(not c["set_equal"] for c in carried) <= sum(not c["set_equal"] for c in floor_carried)
-
-
-SHORT = (
-    "prefill_integer_leaves_equal",
-    "prefill_float_leaves_within",
-    "prefill_next_token_equal",
-    "decode_tokens_equal",
-    "decode_integer_state_equal",
-    "decode_selections_set_equal",
-    "decision_free_within",
-)
-PROMPT_A = (
-    "prefill_integer_state_equal",
-    "prefill_next_token_equal",
-    "decode_integer_state_equal",
-    "decision_free_within",
-    "tokens_equal_or_tied",
-    "selections_explained",
-)
-
-
-@pytest.mark.slow
-@pytest.mark.cpu32
-def test_reference_matches_production_composition(reports):
-    assert_criteria(
-        reports("reference:production", "short"),
-        recorded_floor("short"),
-        strict=SHORT,
-    )
-    assert_criteria(
-        reports("reference:production", "a"),
-        recorded_floor("a"),
-        strict=PROMPT_A,
-    )
-
-
-def test_recorded_floors_are_the_final_oracle_runs():
-    import json
-
-    value = json.loads(FLOORS.read_text())
-    assert value["pair"] == "production:fp8-oracle" and set(value["floors"]) == {"short", "a"}
-    for floor in value["floors"].values():
-        assert set(floor["summary"]) == {
-            "prefill_bound_ratio",
-            "prefill_outside_fraction",
-            "decode_bound_ratio",
-            "decode_outside_fraction",
-        }
-        assert floor["decode"] and all(len(r["selections"]) == 1 for r in floor["decode"])

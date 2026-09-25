@@ -19,7 +19,7 @@ TPU-v4 chip description):
 Until S2f a third system, ``fp8-oracle`` (the frozen raw-FP8 prefill and decoder programs),
 cross-validated both (VALIDATION.md). It is archived at ``archive/research-20260922``; the
 production-to-oracle distances the acceptance criteria use as floors were recorded from its final
-run in ``floors.json``.
+run in ``tests/models/glm_moe_dsa/floors.json`` (read by ``test_against_reference.py`` beside it).
 
 The baseline runs free (it decodes its own greedy tokens); the candidate is
 teacher-forced with the baseline's input token at every step, so every step
