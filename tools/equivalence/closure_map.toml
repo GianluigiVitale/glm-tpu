@@ -9,6 +9,19 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
+# S5 WU-S3 (DN-12 layering moves; each class key also maps its traced methods): the BF16 weight groups the layer
+# bodies take move from models to layers.contracts; the numerical contracts from layers.contracts to the JAX-free
+# config.cache (layers.contracts re-exports them); ApiError from the serving protocol to glm_tpu.exceptions
+# (protocol re-exports it).
+"glm_tpu.layers.contracts:Bf16QkvAWeights" = "glm_tpu.models.glm_moe_dsa.weights:Bf16QkvAWeights"
+"glm_tpu.layers.contracts:Bf16AttentionWeights" = "glm_tpu.models.glm_moe_dsa.weights:Bf16AttentionWeights"
+"glm_tpu.layers.contracts:Bf16DsaWeights" = "glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights"
+"glm_tpu.layers.contracts:Bf16DenseWeights" = "glm_tpu.models.glm_moe_dsa.weights:Bf16DenseWeights"
+"glm_tpu.config.cache:MlaNumericalContract" = "glm_tpu.layers.contracts:MlaNumericalContract"
+"glm_tpu.config.cache:StageLocalKvLayout" = "glm_tpu.layers.contracts:StageLocalKvLayout"
+"glm_tpu.config.cache:DsaNumericalContract" = "glm_tpu.layers.contracts:DsaNumericalContract"
+"glm_tpu.config.cache:GlmMoeNumericalContract" = "glm_tpu.layers.contracts:GlmMoeNumericalContract"
+"glm_tpu.exceptions:ApiError" = "glm_tpu.entrypoints.openai.protocol:ApiError"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"

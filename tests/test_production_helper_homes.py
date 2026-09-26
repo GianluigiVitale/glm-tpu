@@ -196,7 +196,14 @@ S2F_SPLIT = (
 # (``_s4_home``); the value is ``"<work unit or H number>: <kind>"``, kind ``renamed -> <new name>``, ``moved ->
 # <new home>`` (compared there, verbatim), ``rewritten``, ``docstring`` or ``removed`` (not compared). Rows are
 # added by the commit that makes the change; S7 retires this test with tools/migration/.
-S5_DECLARED: dict[tuple[str, str], str] = {}
+S5_DECLARED: dict[tuple[str, str], str] = {
+    # WU-S3 (DN-12 layering): the contracts are configuration, defined in config/cache.py, which imports no JAX
+    # (layers/contracts.py re-exports them); StageLocalKvLayout.owner gained the import of jax.numpy it runs.
+    ("glm_tpu/layers/contracts.py", "MlaNumericalContract"): "WU-S: moved -> glm_tpu/config/cache.py",
+    ("glm_tpu/layers/contracts.py", "StageLocalKvLayout"): "WU-S: rewritten",
+    ("glm_tpu/layers/contracts.py", "DsaNumericalContract"): "WU-S: moved -> glm_tpu/config/cache.py",
+    ("glm_tpu/layers/contracts.py", "GlmMoeNumericalContract"): "WU-S: moved -> glm_tpu/config/cache.py",
+}
 S5_DECLARATION = re.compile(
     r"(?:WU-[A-Z][A-Za-z]*|H[1-9][0-9]?): "
     r"(?:rewritten|docstring|removed|renamed -> [A-Za-z_][A-Za-z0-9_]*|moved -> glm_tpu/[A-Za-z0-9_/]+\.py)"

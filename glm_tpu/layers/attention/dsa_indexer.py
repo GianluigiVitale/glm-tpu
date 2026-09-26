@@ -15,11 +15,16 @@ from glm_tpu.layers.attention.kv_cache import (
     write_prefill_cache_block,
 )
 from glm_tpu.layers.attention.mla import PreparedAttention
-from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, StageLocalKvLayout, require_shape
+from glm_tpu.layers.contracts import (
+    Bf16DsaWeights,
+    DsaNumericalContract,
+    SelectedPositions,
+    StageLocalKvLayout,
+    require_shape,
+)
 from glm_tpu.layers.linear import dot_f32, head_weight_partial, resident_matmul_f32
 from glm_tpu.layers.norm import affine_layer_norm, affine_key_layer_norm
 from glm_tpu.layers.rope import apply_rotary, rotary_cos_sin, rotary_cos_sin_from_rows
-from glm_tpu.models.glm_moe_dsa.weights import Bf16DsaWeights
 
 
 # Keep module import backend-neutral: multi-host callers must be able to call

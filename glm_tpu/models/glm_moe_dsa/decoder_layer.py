@@ -23,6 +23,10 @@ from jax import lax
 
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
 from glm_tpu.layers.contracts import (
+    Bf16AttentionWeights,
+    Bf16DenseWeights,
+    Bf16DsaWeights,
+    Bf16QkvAWeights,
     MlaNumericalContract,
     DsaNumericalContract,
     GlmMoeNumericalContract,
@@ -31,11 +35,7 @@ from glm_tpu.layers.contracts import (
 from glm_tpu.layers.moe.router import router_from_shards, prefill_router
 from glm_tpu.layers.norm import sharded_fused_add_rms_norm
 from glm_tpu.models.glm_moe_dsa.weights import (
-    Bf16AttentionWeights,
-    Bf16DenseWeights,
-    Bf16DsaWeights,
     Bf16MoeWeights,
-    Bf16QkvAWeights,
     Bf16LayerWeights,
 )
 from glm_tpu.layers.attention.mla import (

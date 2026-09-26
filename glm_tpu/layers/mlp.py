@@ -14,7 +14,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.models.glm_moe_dsa.weights import Bf16DenseWeights
+from glm_tpu.layers.contracts import Bf16DenseWeights
 from glm_tpu.layers.linear import dot_f32, require_rows, resident_matmul_f32
 
 

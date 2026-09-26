@@ -382,10 +382,14 @@ def test_forward_is_causal(tiny):
         assert int(np.asarray(sa.positions)[-1].max()) <= 11
 
 
-# The engine's reference (oracle) definitions: the S2f reference package, at their S4.1 homes
-# (``module:name``; the remaining oracles are in tests/reference/).
+# The engine's reference (oracle) definitions: the S2f reference package, at their S4.1 homes, the four
+# numerical contracts at their S5 WU-S3 home (``module:name``; the remaining oracles are in tests/reference/).
 ORACLE_DEFINITIONS = frozenset(
     (
+        "glm_tpu.config.cache:DsaNumericalContract",
+        "glm_tpu.config.cache:GlmMoeNumericalContract",
+        "glm_tpu.config.cache:MlaNumericalContract",
+        "glm_tpu.config.cache:StageLocalKvLayout",
         "glm_tpu.kernels.sparse_mla.kernel:SparseAttentionResult",
         "glm_tpu.kernels.sparse_mla.kernel:sparse_mla_attention",
         "glm_tpu.layers.attention.dsa_indexer:ScoredSelectedPositions",
@@ -401,11 +405,7 @@ ORACLE_DEFINITIONS = frozenset(
         "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv",
         "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv_aligned",
         "glm_tpu.layers.attention.kv_cache:selected_positions_for_owner",
-        "glm_tpu.layers.contracts:DsaNumericalContract",
-        "glm_tpu.layers.contracts:GlmMoeNumericalContract",
-        "glm_tpu.layers.contracts:MlaNumericalContract",
         "glm_tpu.layers.contracts:SelectedPositions",
-        "glm_tpu.layers.contracts:StageLocalKvLayout",
         "glm_tpu.layers.contracts:require_int32",
         "glm_tpu.layers.contracts:require_shape",
         "glm_tpu.layers.fp8:decode_stage_local_prefill_index_wk_bf16",

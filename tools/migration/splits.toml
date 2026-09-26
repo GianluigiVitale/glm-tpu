@@ -3,241 +3,148 @@
 # definition now, compared by AST text after the declared rewrite with exactly the declared remaining lines, or is
 # removed; every definition now has an origin or is added, with its source. A later split rewrites this table
 # against its own base; each version is checked at the commit that applies it (history keeps them: S5 WU-E1 at
-# 43fa28cb, S5 WU-S1/S2 at 4f225279). S7 deletes tools/migration/.
+# 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99). S7 deletes tools/migration/.
 #
-# S5 WU-C1 (C = the command line; owner decisions DN-21 and DN-24(a)): the vLLM CLI layout for the `[split]` row
-# "glm_tpu/entrypoints/cli/main.py" = [cli/types.py, cli/prepare.py, cli/collect_env.py] of move_map.toml. The
-# one function `main` built every subcommand's parser and ran the chosen one; each subcommand is now a
-# CLISubcommand (cli/types.py) with its parser (subparser_init) and its run (cmd): prepare-request in the new
-# cli/prepare.py, doctor next to its report in cli/collect_env.py, info and ask in cli/main.py (ask's parser stays
-# here and cmd imports cli/ask.py when it runs, as main did). `main` registers the four in the help order and runs
-# the one named. Every parser statement and every branch body leaves `main` verbatim (sub -> subparsers); this
-# checker proves what left `main` and the added text, not where each line went (one origin, one definition; see
-# the unit's statement-cover log). No message, argument, default, exit code or output changes.
+# S5 WU-S3 (S = serving and structure; owner decisions DN-21 and DN-23(b)): the DN-12 layering moves, which close
+# three residuals of DESIGN 8.7. Definitions move down to the layer that uses them, verbatim; their old homes keep
+# importing them, so every other importer is unchanged and each name is the same object everywhere:
+# * layers -> models: the four BF16 weight groups the layer bodies take (Bf16QkvAWeights, Bf16AttentionWeights,
+#   Bf16DsaWeights, Bf16DenseWeights) move from models/glm_moe_dsa/weights.py to layers/contracts.py; the layer
+#   modules and decoder_layer.py import them from there, weights.py imports the ones it builds;
+# * engine -> entrypoints: ApiError moves from entrypoints/openai/protocol.py to glm_tpu/exceptions.py and
+#   final_channel from entrypoints/openai/tool_parser.py to engine/outputs.py (both re-exported from their old
+#   homes); the resident client imports them from there;
+# * config.cache -> layers.contracts (JAX): the four numerical contracts move to config/cache.py, which imports no
+#   JAX; layers/contracts.py re-exports them. The one non-verbatim line: StageLocalKvLayout.owner imports
+#   jax.numpy when it runs (its jax.Array annotations take jax from an `if TYPE_CHECKING:` import).
+# No message, value or signature changes.
 
 [stage]
-name = "S5 WU-C1"
+name = "S5 WU-S3"
 kind = "splits"
-base = "eb1a7f5d"   # the tree this table was written against
+base = "71f79523"   # the tree this table was written against
 files = [
-  "glm_tpu/entrypoints/cli/main.py",
-  "glm_tpu/entrypoints/cli/types.py",
-  "glm_tpu/entrypoints/cli/prepare.py",
-  "glm_tpu/entrypoints/cli/collect_env.py",
-]
-created = [
-  "glm_tpu/entrypoints/cli/types.py",
-  "glm_tpu/entrypoints/cli/prepare.py",
+  "glm_tpu/layers/contracts.py",
+  "glm_tpu/models/glm_moe_dsa/weights.py",
+  "glm_tpu/layers/linear.py",
+  "glm_tpu/layers/mlp.py",
+  "glm_tpu/layers/attention/mla.py",
+  "glm_tpu/layers/attention/dsa_indexer.py",
+  "glm_tpu/models/glm_moe_dsa/decoder_layer.py",
+  "glm_tpu/exceptions.py",
+  "glm_tpu/entrypoints/openai/protocol.py",
+  "glm_tpu/entrypoints/openai/tool_parser.py",
+  "glm_tpu/engine/outputs.py",
+  "glm_tpu/engine/resident_client.py",
+  "glm_tpu/config/cache.py",
+  "glm_tpu/config/__init__.py",
 ]
 
 [docstrings]
-"glm_tpu/entrypoints/cli/types.py" = "WU-C: the new module of the subcommand base class"
-"glm_tpu/entrypoints/cli/prepare.py" = "WU-C: the new module of the prepare-request subcommand"
+"glm_tpu/layers/contracts.py" = "WU-S: names where the contracts are defined and the BF16 weight groups it now holds"
+"glm_tpu/exceptions.py" = "WU-S: names ApiError, now defined here"
+"glm_tpu/entrypoints/openai/protocol.py" = "WU-S: names where ApiError is defined"
+"glm_tpu/entrypoints/openai/tool_parser.py" = "WU-S: names where final_channel is defined"
+"glm_tpu/engine/outputs.py" = "WU-S: names final_channel, now defined here"
+"glm_tpu/config/cache.py" = "WU-S: the contracts are defined here; the module imports no JAX"
+"glm_tpu/config/__init__.py" = "WU-S: no config module imports JAX any more"
 
-[imports."glm_tpu/entrypoints/cli/main.py"]
+[imports."glm_tpu/layers/contracts.py"]
 added = [
-  "glm_tpu.entrypoints.cli.collect_env:CollectEnvSubcommand",
-  "glm_tpu.entrypoints.cli.prepare:PrepareRequestSubcommand",
-  "glm_tpu.entrypoints.cli.types:CLISubcommand",
+  "glm_tpu.config.cache:DsaNumericalContract as DsaNumericalContract",
+  "glm_tpu.config.cache:GlmMoeNumericalContract as GlmMoeNumericalContract",
+  "glm_tpu.config.cache:MlaNumericalContract as MlaNumericalContract",
+  "glm_tpu.config.cache:StageLocalKvLayout as StageLocalKvLayout",
 ]
-removed = ["sys", "glm_tpu.entrypoints.cli.collect_env:environment_report"]
+removed = ["dataclasses:dataclass"]
 
-[imports."glm_tpu/entrypoints/cli/types.py"]
-added = ["__future__:annotations", "argparse"]
+[imports."glm_tpu/models/glm_moe_dsa/weights.py"]
+added = [
+  "glm_tpu.layers.contracts:Bf16AttentionWeights",
+  "glm_tpu.layers.contracts:Bf16DenseWeights",
+  "glm_tpu.layers.contracts:Bf16DsaWeights",
+  "glm_tpu.layers.contracts:Bf16QkvAWeights",
+]
 removed = []
 
-[imports."glm_tpu/entrypoints/cli/prepare.py"]
-added = ["__future__:annotations", "argparse", "json", "pathlib:Path", "sys", "glm_tpu.entrypoints.cli.types:CLISubcommand"]
+[imports."glm_tpu/layers/linear.py"]
+added = ["glm_tpu.layers.contracts:Bf16DsaWeights"]
+removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights"]
+
+[imports."glm_tpu/layers/mlp.py"]
+added = ["glm_tpu.layers.contracts:Bf16DenseWeights"]
+removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DenseWeights"]
+
+[imports."glm_tpu/layers/attention/mla.py"]
+added = ["glm_tpu.layers.contracts:Bf16AttentionWeights", "glm_tpu.layers.contracts:Bf16QkvAWeights"]
+removed = [
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16AttentionWeights",
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16QkvAWeights",
+]
+
+[imports."glm_tpu/layers/attention/dsa_indexer.py"]
+added = ["glm_tpu.layers.contracts:Bf16DsaWeights"]
+removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights"]
+
+[imports."glm_tpu/models/glm_moe_dsa/decoder_layer.py"]
+added = [
+  "glm_tpu.layers.contracts:Bf16AttentionWeights",
+  "glm_tpu.layers.contracts:Bf16DenseWeights",
+  "glm_tpu.layers.contracts:Bf16DsaWeights",
+  "glm_tpu.layers.contracts:Bf16QkvAWeights",
+]
+removed = [
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16AttentionWeights",
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16DenseWeights",
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights",
+  "glm_tpu.models.glm_moe_dsa.weights:Bf16QkvAWeights",
+]
+
+[imports."glm_tpu/entrypoints/openai/protocol.py"]
+added = ["glm_tpu.exceptions:ApiError as ApiError"]
 removed = []
 
-[imports."glm_tpu/entrypoints/cli/collect_env.py"]
-added = ["argparse", "glm_tpu.entrypoints.cli.types:CLISubcommand"]
+[imports."glm_tpu/entrypoints/openai/tool_parser.py"]
+added = ["glm_tpu.engine.outputs:final_channel as final_channel"]
 removed = []
+
+[imports."glm_tpu/engine/outputs.py"]
+added = ["re"]
+removed = []
+
+[imports."glm_tpu/engine/resident_client.py"]
+added = ["glm_tpu.engine.outputs:final_channel", "glm_tpu.exceptions:ApiError"]
+removed = ["glm_tpu.entrypoints.openai.tool_parser:final_channel", "glm_tpu.entrypoints.openai:protocol"]
+
+[imports."glm_tpu/config/cache.py"]
+added = ["typing:Any", "typing:TYPE_CHECKING"]
+removed = [
+  "glm_tpu.layers.contracts:DsaNumericalContract",
+  "glm_tpu.layers.contracts:GlmMoeNumericalContract",
+  "glm_tpu.layers.contracts:MlaNumericalContract",
+  "glm_tpu.layers.contracts:StageLocalKvLayout",
+]
+
+[statements."glm_tpu/config/cache.py"]
+# the jax.Array annotations of StageLocalKvLayout.owner (string annotations; nothing is imported at run time)
+diff = ["+if TYPE_CHECKING:", "+    import jax"]
 
 [definitions]
-# main keeps its signature, the top-level parser, `sub` and parse_args; the subcommands' parser statements and the
-# dispatch branches leave (to the [added] definitions below), the registration and the dispatch by name come in.
-# environment_manifest and environment_report (collect_env.py) are unchanged (implicit rows).
-"glm_tpu/entrypoints/cli/main.py:main" = { diff = [
-  "-    sub.add_parser('info', help='show supported scope and release limitations')",
-  "-    ask = sub.add_parser('ask', help='answer questions on the retained TPU site; optionally batch up to four')",
-  "-    inputs = ask.add_mutually_exclusive_group(required=True)",
-  "-    inputs.add_argument('question', nargs='?')",
-  "-    inputs.add_argument('--questions', type=Path, help='private JSON array of one to ten question strings')",
-  "-    ask.add_argument('--context', choices=('8k', '32k', '128k', '256k'), default='32k')",
-  "-    ask.add_argument('--keep-loaded', action='store_true', help='retain the ordinary model and fleet leases after answering; explicit stop required')",
-  "-    ask.add_argument('--concurrent', action='store_true', help='batch up to four conversations; requires --context 32k')",
-  "-    ask.add_argument('--max-new-tokens', type=int, help='optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space')",
-  "-    ask.add_argument('--wall-seconds', type=int, default=86400)",
-  "-    ask.add_argument('--prepare-only', action='store_true', help='prepare private inputs without launching the model')",
-  "-    ask.add_argument('--site', type=Path, help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')",
-  "-    doctor = sub.add_parser('doctor', help='check installed version metadata without initializing TPU')",
-  "-    doctor.add_argument('--profile', choices=('core', 'runtime', 'tpu', 'benchmark', 'dev'), default='core')",
-  "-    prepare = sub.add_parser('prepare-request', help='tokenize a private chat locally; does NOT launch inference')",
-  "-    prepare.add_argument('--messages', type=Path, required=True)",
-  "-    prepare.add_argument('--output', type=Path, required=True)",
-  "-    prepare.add_argument('--repo', type=Path, required=True)",
-  "-    prepare.add_argument('--tokenizer-root', type=Path, required=True)",
-  "-    prepare.add_argument('--request-id', required=True)",
-  "-    prepare.add_argument('--profile', choices=('ordinary-greedy-8k', 'ordinary-greedy-128k'), default='ordinary-greedy-8k')",
-  "-    prepare.add_argument('--max-new-tokens', type=int, required=True)",
-  "+    commands = {command.name: command for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand())}",
-  "+    for command in commands.values():",
-  "+        command.subparser_init(sub)",
-  "-    if args.command == 'ask':",
-  "-        from glm_tpu.entrypoints.cli.ask import main as ask_main",
-  "-        return ask_main(args)",
-  "-    if args.command == 'prepare-request':",
-  "-        try:",
-  "-            from glm_tpu.engine.request import prepare_file",
-  "-            extra = {} if args.profile == 'ordinary-greedy-8k' else dict(context_capacity=166912)",
-  "-            report = prepare_file(messages_path=args.messages, output=args.output, repo=args.repo, tokenizer_root=args.tokenizer_root, request_id=args.request_id, max_new_tokens=args.max_new_tokens, **extra)",
-  "-        except (ValueError, OSError, ImportError) as exc:",
-  "-            print(json.dumps(dict(error=type(exc).__name__, status='request preparation refused')), file=sys.stderr)",
-  "-            return 1",
-  "-        print(json.dumps(report, indent=2, sort_keys=True))",
-  "-        return 0",
-  "-    if args.command == 'doctor':",
-  "-        report = environment_report(args.profile)",
-  "-        print(json.dumps(report, indent=2, sort_keys=True))",
-  "-        return 0 if report['passed'] else 1",
-  "-    try:",
-  "-        version = metadata.version('glm-tpu')",
-  "-    except metadata.PackageNotFoundError:",
-  "-        version = 'source checkout (not installed)'",
-  "-    print(json.dumps(dict(project='glm-tpu', version=version, release_status='private project; see docs/release/STATUS.md for trained admission and promotion', engine='native JAX WS32_2D', hardware='8 hosts / 32 TPU v4 chips', ordinary_profile='greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope', concurrent_requests=4, model='zai-org/GLM-5.3', concurrent_validation='GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only', concurrent_context_capacity=32768, concurrent_scope='fixed submitted group; see STATUS for hardware evidence; no online request admission', queued_questions=10, resume='resident ordinary inbox reuses the live model; no process-restart or durable KV recovery', serving='site-specific protected request harness; no supported HTTP endpoint', installation='wheel contains Python components only; full deployment requires source checkout and external assets', quality='full benchmark/model-card parity not established'), indent=2, sort_keys=True))",
-  "-    return 0",
-  "+    return commands[args.command].cmd(args)",
+# the BF16 weight groups the layer bodies take: models -> layers (verbatim)
+"glm_tpu/layers/contracts.py:Bf16QkvAWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16QkvAWeights" }
+"glm_tpu/layers/contracts.py:Bf16AttentionWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16AttentionWeights" }
+"glm_tpu/layers/contracts.py:Bf16DsaWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16DsaWeights" }
+"glm_tpu/layers/contracts.py:Bf16DenseWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16DenseWeights" }
+# the numerical contracts: layers -> config (verbatim; their methods follow their classes, implicit rows)
+"glm_tpu/config/cache.py:MlaNumericalContract" = { from = "glm_tpu/layers/contracts.py:MlaNumericalContract" }
+"glm_tpu/config/cache.py:StageLocalKvLayout" = { from = "glm_tpu/layers/contracts.py:StageLocalKvLayout" }
+"glm_tpu/config/cache.py:StageLocalKvLayout.owner" = { from = "glm_tpu/layers/contracts.py:StageLocalKvLayout.owner", diff = [
+  "+    import jax.numpy as jnp",
 ] }
-
-[added]
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand" = "WU-C: the subcommand base class (vLLM's CLISubcommand: name, cmd, subparser_init)"
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand.cmd" = "WU-C: the base's cmd, not implemented"
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand.subparser_init" = "WU-C: the base's subparser_init, not implemented"
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand" = "WU-C: the prepare-request subcommand class"
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand.cmd" = "WU-C: main's prepare-request branch body, verbatim"
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand.subparser_init" = "WU-C: main's prepare-request parser statements (sub -> subparsers), and return the parser"
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand" = "WU-C: the doctor subcommand class (named for its module; the command becomes collect-env at WU-C3)"
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.cmd" = "WU-C: main's doctor branch body, verbatim"
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.subparser_init" = "WU-C: main's doctor parser statements (sub -> subparsers), and return the parser"
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand" = "WU-C: the info subcommand class"
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand.cmd" = "WU-C: main's info tail (version, the JSON, return 0), verbatim"
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand.subparser_init" = "WU-C: main's info add_parser expression (sub -> subparsers), returned"
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand" = "WU-C: the ask subcommand class"
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand.cmd" = "WU-C: main's ask branch body (the lazy import of ask.main), verbatim"
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand.subparser_init" = "WU-C: main's ask parser statements (sub -> subparsers), and return the parser"
-
-[added_source]
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand" = [
-  "class CLISubcommand:",
-  "    \"\"\"One ``glm-tpu`` subcommand: its ``name``, its parser (``subparser_init``) and what it runs (``cmd``).\"\"\"",
-  "    name: str",
-]
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand.cmd" = [
-  "@staticmethod",
-  "def cmd(args: argparse.Namespace) -> int:",
-  "    \"\"\"Run the subcommand on its parsed ``args``; return the process exit code.\"\"\"",
-  "    raise NotImplementedError",
-]
-"glm_tpu/entrypoints/cli/types.py:CLISubcommand.subparser_init" = [
-  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
-  "    \"\"\"Add the subcommand's parser to ``subparsers`` and return it.\"\"\"",
-  "    raise NotImplementedError",
-]
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand" = [
-  "class PrepareRequestSubcommand(CLISubcommand):",
-  "    \"\"\"Write a prepared request file from a private chat; a refusal names only the error type.\"\"\"",
-  "    name = 'prepare-request'",
-]
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand.cmd" = [
-  "@staticmethod",
-  "def cmd(args: argparse.Namespace) -> int:",
-  "    try:",
-  "        from glm_tpu.engine.request import prepare_file",
-  "        extra = {} if args.profile == 'ordinary-greedy-8k' else dict(context_capacity=166912)",
-  "        report = prepare_file(messages_path=args.messages, output=args.output, repo=args.repo, tokenizer_root=args.tokenizer_root, request_id=args.request_id, max_new_tokens=args.max_new_tokens, **extra)",
-  "    except (ValueError, OSError, ImportError) as exc:",
-  "        print(json.dumps(dict(error=type(exc).__name__, status='request preparation refused')), file=sys.stderr)",
-  "        return 1",
-  "    print(json.dumps(report, indent=2, sort_keys=True))",
-  "    return 0",
-]
-"glm_tpu/entrypoints/cli/prepare.py:PrepareRequestSubcommand.subparser_init" = [
-  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
-  "    prepare = subparsers.add_parser('prepare-request', help='tokenize a private chat locally; does NOT launch inference')",
-  "    prepare.add_argument('--messages', type=Path, required=True)",
-  "    prepare.add_argument('--output', type=Path, required=True)",
-  "    prepare.add_argument('--repo', type=Path, required=True)",
-  "    prepare.add_argument('--tokenizer-root', type=Path, required=True)",
-  "    prepare.add_argument('--request-id', required=True)",
-  "    prepare.add_argument('--profile', choices=('ordinary-greedy-8k', 'ordinary-greedy-128k'), default='ordinary-greedy-8k')",
-  "    prepare.add_argument('--max-new-tokens', type=int, required=True)",
-  "    return prepare",
-]
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand" = [
-  "class CollectEnvSubcommand(CLISubcommand):",
-  "    \"\"\"``glm-tpu doctor``: the environment report of one profile; exit 0 only when it passed.\"\"\"",
-  "    name = 'doctor'",
-]
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.cmd" = [
-  "@staticmethod",
-  "def cmd(args: argparse.Namespace) -> int:",
-  "    report = environment_report(args.profile)",
-  "    print(json.dumps(report, indent=2, sort_keys=True))",
-  "    return 0 if report['passed'] else 1",
-]
-"glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.subparser_init" = [
-  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
-  "    doctor = subparsers.add_parser('doctor', help='check installed version metadata without initializing TPU')",
-  "    doctor.add_argument('--profile', choices=('core', 'runtime', 'tpu', 'benchmark', 'dev'), default='core')",
-  "    return doctor",
-]
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand" = [
-  "class InfoSubcommand(CLISubcommand):",
-  "    \"\"\"``glm-tpu info``: the supported scope and the release limitations, as JSON.\"\"\"",
-  "    name = 'info'",
-]
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand.cmd" = [
-  "@staticmethod",
-  "def cmd(args: argparse.Namespace) -> int:",
-  "    try:",
-  "        version = metadata.version('glm-tpu')",
-  "    except metadata.PackageNotFoundError:",
-  "        version = 'source checkout (not installed)'",
-  "    print(json.dumps(dict(project='glm-tpu', version=version, release_status='private project; see docs/release/STATUS.md for trained admission and promotion', engine='native JAX WS32_2D', hardware='8 hosts / 32 TPU v4 chips', ordinary_profile='greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope', concurrent_requests=4, model='zai-org/GLM-5.3', concurrent_validation='GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only', concurrent_context_capacity=32768, concurrent_scope='fixed submitted group; see STATUS for hardware evidence; no online request admission', queued_questions=10, resume='resident ordinary inbox reuses the live model; no process-restart or durable KV recovery', serving='site-specific protected request harness; no supported HTTP endpoint', installation='wheel contains Python components only; full deployment requires source checkout and external assets', quality='full benchmark/model-card parity not established'), indent=2, sort_keys=True))",
-  "    return 0",
-]
-"glm_tpu/entrypoints/cli/main.py:InfoSubcommand.subparser_init" = [
-  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
-  "    return subparsers.add_parser('info', help='show supported scope and release limitations')",
-]
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand" = [
-  "class AskSubcommand(CLISubcommand):",
-  "    \"\"\"``glm-tpu ask``: answer questions on the retained TPU site (``glm_tpu.entrypoints.cli.ask``).",
-  "",
-  "    Its parser is defined here and ``cmd`` imports ``ask`` only when it runs: ``ask`` imports the request module at",
-  "    load time, and registering the parser must not load it for the other subcommands.",
-  "    \"\"\"",
-  "    name = 'ask'",
-]
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand.cmd" = [
-  "@staticmethod",
-  "def cmd(args: argparse.Namespace) -> int:",
-  "    from glm_tpu.entrypoints.cli.ask import main as ask_main",
-  "    return ask_main(args)",
-]
-"glm_tpu/entrypoints/cli/main.py:AskSubcommand.subparser_init" = [
-  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
-  "    ask = subparsers.add_parser('ask', help='answer questions on the retained TPU site; optionally batch up to four')",
-  "    inputs = ask.add_mutually_exclusive_group(required=True)",
-  "    inputs.add_argument('question', nargs='?')",
-  "    inputs.add_argument('--questions', type=Path, help='private JSON array of one to ten question strings')",
-  "    ask.add_argument('--context', choices=('8k', '32k', '128k', '256k'), default='32k')",
-  "    ask.add_argument('--keep-loaded', action='store_true', help='retain the ordinary model and fleet leases after answering; explicit stop required')",
-  "    ask.add_argument('--concurrent', action='store_true', help='batch up to four conversations; requires --context 32k')",
-  "    ask.add_argument('--max-new-tokens', type=int, help='optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space')",
-  "    ask.add_argument('--wall-seconds', type=int, default=86400)",
-  "    ask.add_argument('--prepare-only', action='store_true', help='prepare private inputs without launching the model')",
-  "    ask.add_argument('--site', type=Path, help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')",
-  "    return ask",
-]
+"glm_tpu/config/cache.py:DsaNumericalContract" = { from = "glm_tpu/layers/contracts.py:DsaNumericalContract" }
+"glm_tpu/config/cache.py:GlmMoeNumericalContract" = { from = "glm_tpu/layers/contracts.py:GlmMoeNumericalContract" }
+# the API error and the answer split: entrypoints -> the leaf exceptions module and engine/outputs.py (verbatim)
+"glm_tpu/exceptions.py:ApiError" = { from = "glm_tpu/entrypoints/openai/protocol.py:ApiError" }
+"glm_tpu/engine/outputs.py:final_channel" = { from = "glm_tpu/entrypoints/openai/tool_parser.py:final_channel" }
+# the resident client raises the class it now imports by name (was protocol.ApiError, the same class)
+"glm_tpu/engine/resident_client.py:Resident.prepare_api" = { rewrite = { "protocol.ApiError" = "ApiError" } }

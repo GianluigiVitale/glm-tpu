@@ -29,38 +29,11 @@ from typing import Any, NamedTuple
 from jax.sharding import PartitionSpec as P
 
 from glm_tpu.config.cache import CacheConfig
+from glm_tpu.layers.contracts import Bf16AttentionWeights, Bf16DenseWeights, Bf16DsaWeights, Bf16QkvAWeights
 from glm_tpu.layers.fp8 import _decode_program
 
 
 # ----------------------------------------------------------------------------- weights
-class Bf16QkvAWeights(NamedTuple):
-    input_norm_weight_local: Any
-    q_a_local: Any  # bf16 [q_lora, local_hidden]
-    q_a_norm_weight: Any
-    kv_a_local: Any  # bf16 [kv_lora + rope, local_hidden]
-    kv_a_norm_weight: Any
-
-
-class Bf16AttentionWeights(NamedTuple):
-    q_b_local: Any  # bf16 [local_heads * qk_head, q_lora]
-    kv_b_local: Any  # bf16 [local_heads * 448, 512]
-    o_local: Any  # bf16 [local_hidden, local_heads * v_head]
-
-
-class Bf16DsaWeights(NamedTuple):
-    wq_b_local: Any  # bf16 [local_dsa_heads * 128, q_lora]
-    wk_local: Any  # bf16 [128, local_hidden]
-    key_norm_weight: Any
-    key_norm_bias: Any
-    head_weight_local: Any
-
-
-class Bf16DenseWeights(NamedTuple):
-    gate_local: Any
-    up_local: Any
-    down_local: Any
-
-
 class Bf16MoeWeights(NamedTuple):
     router_weight_local: Any
     correction_bias_local: Any

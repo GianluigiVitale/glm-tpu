@@ -4,7 +4,9 @@
 
 A work unit that splits a class by method, folds a function into a method or changes the callers of the
 split (S5 WU-E1 first) cannot be applied by the S4 engine (``symbols.py`` moves and renames whole top-level
-definitions). Its table (``[stage] kind = "splits"``; ``base``, the commit it was written against; ``files``,
+definitions); nor can a move whose old home keeps importing the moved name for its importers (S5 WU-S3), which
+the engine would rewrite, and whose ``--check`` compares no whole file and ignores every import, function-local
+ones included. Its table (``[stage] kind = "splits"``; ``base``, the commit it was written against; ``files``,
 the production files the unit touches; ``created``, those of them that do not exist at ``base``, compared as
 empty modules there) declares how every definition of those files at ``base`` relates to the current tree, and
 this checker compares them:
@@ -28,8 +30,11 @@ this checker compares them:
 * ``[docstrings]``: ``"path" = "<token>: reason"``, a module docstring the unit rewrote (not compared).
 * ``[imports."path"]``: ``added`` / ``removed``, the top-level import bindings the file gains and loses
   (``module:name``, ``module`` for ``import module``, `` as alias`` appended); the bindings it keeps must
-  keep their order (from S5 WU-C1; where a gained binding goes is not checked), and the other top-level
-  statements must be unchanged, in order.
+  keep their order (from S5 WU-C1; where a gained binding goes is not checked).
+* ``[statements."path"]``: ``diff``, what differs between the file's other top-level statements (neither
+  definitions nor imports, e.g. constants or an ``if TYPE_CHECKING:`` block) at ``base`` and now, as ``diff``
+  of ``[definitions]`` prints it over their ``ast.unparse`` text in order (from S5 WU-S3); without an entry
+  they must be unchanged, in order.
 
 Definitions are top-level functions and classes and the functions and classes directly in a top-level
 class; nested functions, lambdas and comprehensions are part of the definition that contains them. A class
@@ -201,7 +206,9 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     report: list[str] = []
     if stage.get("kind") != "splits":
         return [f"{table_path.name}: [stage] kind must be 'splits'"], report
-    unknown = sorted(set(table) - {"stage", "definitions", "added", "added_source", "removed", "docstrings", "imports"})
+    unknown = sorted(
+        set(table) - {"stage", "definitions", "added", "added_source", "removed", "docstrings", "imports", "statements"}
+    )
     if unknown:
         problems.append(f"unknown tables {unknown}")
     base, files, created = stage["base"], list(stage["files"]), list(stage.get("created", []))
@@ -213,12 +220,17 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     removed: dict[str, str] = table.get("removed", {})
     docstrings: dict[str, str] = table.get("docstrings", {})
     imports: dict[str, dict[str, list[str]]] = table.get("imports", {})
+    statements: dict[str, dict[str, list[str]]] = table.get("statements", {})
     for section, entries in (("added", added), ("removed", removed), ("docstrings", docstrings)):
         problems += [
             f"[{section}] {k}: reason must start with a token" for k, v in entries.items() if not REASON.match(v)
         ]
     problems += [f"[docstrings] / [imports] {p}: not a listed file" for p in (*docstrings, *imports) if p not in files]
     problems += [f"[imports] {p}: only added and removed" for p, v in imports.items() if set(v) - {"added", "removed"}]
+    problems += [f"[statements] {p}: not a listed file" for p in statements if p not in files]
+    problems += [
+        f"[statements] {p}: only a non-empty diff" for p, v in statements.items() if set(v) != {"diff"} or not v["diff"]
+    ]
     problems += [f"[definitions] {k}: only from, rewrite and diff" for k, v in rows.items() if set(v) - ROW_KEYS]
 
     problems += [f"[added] {k}: no [added_source] entry" for k in sorted(set(added) - set(added_source))]
@@ -248,9 +260,16 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
         if kept_old != kept_new:
             problems.append(f"{path}: the import bindings it keeps changed order")
             problems += [f"    {line}" for line in changed_lines("\n".join(kept_old), "\n".join(kept_new))]
-        if old_other != new_other:
+        actual = changed_lines("\n".join(old_other), "\n".join(new_other))
+        expected = list(statements.get(path, {}).get("diff", []))
+        if actual != expected or (old_other != new_other and not actual):
             problems.append(f"{path}: top-level statements other than definitions and imports differ")
-            problems += [f"    {line}" for line in changed_lines("\n".join(old_other), "\n".join(new_other))]
+            problems += [f"    {line}" for line in actual]
+            if expected:
+                problems.append("    declared:")
+                problems += [f"    {line}" for line in expected]
+        elif actual:
+            report.append(f"{path}: other top-level statements {actual}")
 
     # Origins: declared rows, then the implicit ones (same qualname, or the same method of a renamed class).
     origins: dict[str, str] = {}

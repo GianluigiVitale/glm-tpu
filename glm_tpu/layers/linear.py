@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import jax
 from jax import lax
 
-from glm_tpu.models.glm_moe_dsa.weights import Bf16DsaWeights
+from glm_tpu.layers.contracts import Bf16DsaWeights
 
 
 def _require_table(weight, scale):

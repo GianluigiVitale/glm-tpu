@@ -1,8 +1,11 @@
-"""Generated text: GLM ``<tool_call>`` parsing and the split of reasoning from the final answer."""
+"""Generated text: GLM ``<tool_call>`` parsing and the split of reasoning from the final answer
+(``final_channel``, defined in :mod:`glm_tpu.engine.outputs` for the resident client; the same function)."""
 
 import json
 import re
 import uuid
+
+from glm_tpu.engine.outputs import final_channel as final_channel
 
 
 # GLM emits <tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>...</tool_call>
@@ -34,11 +37,3 @@ def parse(answer):
         )
     content = CALL.sub("", answer).strip()
     return content, calls
-
-
-def final_channel(text):
-    if "</think>" not in text:
-        return text.removeprefix("<think>").strip(), ""
-    thinking, answer = text.split("</think>", 1)
-    answer = re.split(r"<\|(?:user|endoftext|observation)\|>", answer, maxsplit=1)[0]
-    return thinking.removeprefix("<think>").strip(), answer.strip()

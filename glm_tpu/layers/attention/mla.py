@@ -25,7 +25,13 @@ from glm_tpu.layers.attention.kv_cache import (
     require_decode_metadata,
     gather_stage_local_selected_kv_aligned,
 )
-from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
+from glm_tpu.layers.contracts import (
+    Bf16AttentionWeights,
+    Bf16QkvAWeights,
+    MlaNumericalContract,
+    StageLocalKvLayout,
+    SelectedPositions,
+)
 from glm_tpu.layers.linear import (
     residual_add,
     resident_matmul,
@@ -38,7 +44,6 @@ from glm_tpu.layers.linear import (
 )
 from glm_tpu.layers.norm import rms_norm, sharded_rms_norm
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round
-from glm_tpu.models.glm_moe_dsa.weights import Bf16AttentionWeights, Bf16QkvAWeights
 from glm_tpu.kernels.sparse_mla.partial_kernel import gathered_partial_attention
 
 

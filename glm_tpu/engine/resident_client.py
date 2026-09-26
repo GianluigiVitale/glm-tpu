@@ -6,8 +6,8 @@ import json
 import os
 from pathlib import Path
 
-from glm_tpu.entrypoints.openai import protocol
-from glm_tpu.entrypoints.openai.tool_parser import final_channel
+from glm_tpu.engine.outputs import final_channel
+from glm_tpu.exceptions import ApiError
 from glm_tpu.utils.io_utils import atomic
 
 
@@ -78,7 +78,7 @@ class Resident:
         )
         remaining = context_capacity - len(ids)
         if remaining <= 0:
-            raise protocol.ApiError(
+            raise ApiError(
                 "this conversation fills the %d-slot context; send less history "  # noqa: UP031 (%d formats any number as an integer)
                 "or smaller tool output" % context_capacity
             )

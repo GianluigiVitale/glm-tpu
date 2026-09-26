@@ -9,6 +9,8 @@ import pytest
 
 from glm_tpu.entrypoints.serve.job_queue import JobQueue
 from glm_tpu.engine.resident_client import Resident
+from glm_tpu.entrypoints.openai.serving_chat import OpenAIServingChat
+from glm_tpu.entrypoints.openai.serving_models import OpenAIServingModels
 from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
 from glm_tpu.entrypoints.openai.tool_parser import final_channel
 from glm_tpu.entrypoints.serve.http_handler import handler
@@ -226,3 +228,105 @@ def test_completion_requires_matching_eight_host_receipts(tmp_path, corruption):
     else:
         result = backend.observe(job)
         assert result["status"] == "complete" and result["answer"] == "42"
+
+
+class StubTokenizer:
+    """Renders any chat to ``length`` token ids: the context-overflow refusal needs no real tokenizer."""
+
+    def __init__(self, length):
+        self.length = length
+
+    def apply_chat_template(self, messages, **options):
+        return [1] * self.length
+
+
+def resident(prompt_tokens):
+    """A ``Resident`` without its controller: its real ``prepare_api`` over a stub tokenizer."""
+    backend = Resident.__new__(Resident)
+    backend.check = lambda: None
+    backend.template = None
+    backend.tokenizer = StubTokenizer(prompt_tokens)
+    return backend
+
+
+def completions(tmp_path, backend, body):
+    """POST ``body`` to ``/v1/chat/completions`` of the server as ``serve.server`` composes it (the queue with its
+    conversation store, the chat and model services at 32K) while the queue worker runs; return the status, the
+    content type, the body bytes and the queue."""
+    queue = JobQueue(tmp_path / "state", backend)
+    chat = OpenAIServingChat(queue, backend, capacity=32768)
+    models = OpenAIServingModels(capacity=chat.capacity, wait_seconds=chat.wait_seconds)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(ConversationStore(queue), chat, models, "secret-key"))
+    stop = threading.Event()
+
+    def work():
+        while not stop.is_set():
+            queue.step()
+            stop.wait(0.01)
+
+    threads = [threading.Thread(target=server.serve_forever, daemon=True), threading.Thread(target=work, daemon=True)]
+    for thread in threads:
+        thread.start()
+    request = Request(
+        f"http://127.0.0.1:{server.server_port}/v1/chat/completions",
+        data=json.dumps(body).encode(),
+        headers={"Authorization": "Bearer secret-key"},
+    )
+    try:
+        try:
+            with urlopen(request, timeout=60) as response:
+                answer = response.status, response.headers["Content-Type"], response.read()
+        except HTTPError as error:
+            answer = error.code, error.headers["Content-Type"], error.read()
+    finally:
+        stop.set()
+        server.shutdown()
+        server.server_close()
+        for thread in threads:
+            thread.join()
+    return (*answer, queue)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_context_overflow_from_the_resident_is_a_complete_error_body(tmp_path, stream):
+    # Resident.prepare_api raises the engine's ApiError and the handler catches protocol.ApiError, the same class,
+    # so the client gets ApiError.body() (the (ValueError, OSError) fallback would answer without param and code).
+    # A stream is refused at its first chunk, before the event-stream headers: the same JSON answer.
+    body = dict(model="glm-5.3", messages=[dict(role="user", content="hello")], stream=stream)
+    status, kind, raw, queue = completions(tmp_path, resident(32768), body)
+    assert (status, kind) == (400, "application/json; charset=utf-8")
+    assert json.loads(raw) == dict(
+        error=dict(
+            message="this conversation fills the 32768-slot context; send less history or smaller tool output",
+            type="invalid_request_error",
+            param=None,
+            code=None,
+        )
+    )
+    assert queue.db["jobs"] == []
+
+
+def test_a_stream_failing_after_its_headers_ends_with_an_in_band_error(tmp_path):
+    # An admitted stream whose job then fails: the headers and the role chunk are out, so the error is the last
+    # event before [DONE].
+    backend = resident(3)
+    backend.next_sequence = lambda: 771
+    backend.publish = lambda job, root: None
+
+    def observe(job):
+        raise OSError("receipt unreadable")
+
+    backend.observe = observe
+    body = dict(model="glm-5.3", messages=[dict(role="user", content="hello")], stream=True)
+    status, kind, raw, queue = completions(tmp_path, backend, body)
+    assert (status, kind) == (200, "text/event-stream; charset=utf-8")
+    events = raw.split(b"\n\n")
+    assert len(events) == 4 and events[-1] == b"" and all(e.startswith(b"data: ") for e in events[:3])
+    first = json.loads(events[0].removeprefix(b"data: "))
+    assert first["object"] == "chat.completion.chunk"
+    assert first["choices"][0]["delta"] == dict(role="assistant", content="")
+    assert json.loads(events[1].removeprefix(b"data: ")) == dict(
+        error=dict(message="receipt unreadable", type="server_error", param=None, code=None)
+    )
+    assert events[2] == b"data: [DONE]"
+    assert queue.error == "receipt unreadable" and len(queue.db["jobs"]) == 1
