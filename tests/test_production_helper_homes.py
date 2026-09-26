@@ -223,14 +223,62 @@ S5_NOT_COMPARED = ("rewritten", "docstring", "removed")
 # S5 WU-Docs (decision DN-30, extending DN-27): the compared definitions whose docstrings or raise messages an S5 unit
 # reworded, keyed like S5_DECLARED; the value is ``"<work unit>: docstring"``, ``"<work unit>: messages"`` or
 # ``"<work unit>: docstring, messages"``. A declared definition stays compared, under the name and home S5_DECLARED
-# gives it, with every docstring in it removed and the string constants of its raise statements' message arguments
-# blanked on both sides (``_text_aside``); the unit's table proves the text change at the commit that made it
-# (tools/migration/splits.toml for docstrings, work_units.toml [messages] for messages).
+# gives it, with what its value names set aside on both sides (``_text_aside``): every docstring in it removed
+# ("docstring"), the string constants of its raise statements' message arguments blanked ("messages"); the unit's
+# table proves the text change at the commit that made it (tools/migration/splits.toml for docstrings,
+# work_units.toml [messages] for messages).
 S5_TEXT: dict[tuple[str, str], str] = {
-    ("glm_tpu/distributed/mesh.py", "MeshContract"): "WU-Docs: docstring",
+    ("glm_tpu/config/cache.py", "CacheConfig"): "WU-Docs: messages",
+    ("glm_tpu/config/model.py", "ModelGeometry"): "WU-Docs: messages",
+    ("glm_tpu/distributed/mesh.py", "MeshContract"): "WU-Docs: docstring, messages",
+    ("glm_tpu/distributed/mesh.py", "PhysicalMesh"): "WU-Docs: messages",
+    ("glm_tpu/distributed/mesh.py", "build_physical_mesh"): "WU-Docs: messages",
     ("glm_tpu/distributed/parallel_state.py", "_batched_fleet_all"): "WU-Docs: docstring",
+    ("glm_tpu/distributed/parallel_state.py", "initialize_runtime"): "WU-Docs: messages",
+    ("glm_tpu/distributed/topology.py", "validate_topology_fleet"): "WU-Docs: messages",
     ("glm_tpu/exceptions.py", "ConfigValidationError"): "WU-Docs: docstring",
+    ("glm_tpu/layers/attention/mla.py", "_require_block"): "WU-Docs: messages",
+    ("glm_tpu/layers/embed.py", "embed_tokens"): "WU-Docs: messages",
+    ("glm_tpu/layers/embed.py", "require_vocabulary_geometry"): "WU-Docs: messages",
+    ("glm_tpu/layers/linear.py", "require_rows"): "WU-Docs: messages",
+    ("glm_tpu/layers/moe/router.py", "prefill_router"): "WU-Docs: messages",
+    ("glm_tpu/layers/moe/router.py", "router_from_shards"): "WU-Docs: messages",
+    ("glm_tpu/layers/norm.py", "sharded_fused_add_rms_norm"): "WU-Docs: messages",
+    ("glm_tpu/layers/norm.py", "sharded_rms_norm"): "WU-Docs: messages",
+    ("glm_tpu/layers/rope.py", "build_main_rope_table"): "WU-Docs: messages",
+    ("glm_tpu/layers/sampler.py", "compute_logits"): "WU-Docs: messages",
+    ("glm_tpu/layers/sampler.py", "greedy_sample"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "RuntimePlacementReport"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "SourcePlacement"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "_require_source_contract"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "_slice_bounds"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "_slot"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "build_runtime_placement_report"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/placement.py", "placements_for_source_tensor"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/format.py", "RuntimePackConfig"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/format.py", "_validate_finite_chunk"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/format.py", "build_runtime_file_plans"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/format.py", "destination_record"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/loader.py", "_host_tensor"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/loader.py", "load_runtime_checkpoint"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "_read_runtime_metadata"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_files"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_value"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "verify_runtime_checkpoint"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_build_runtime_manifest"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_commit_runtime_manifest"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_flat_contiguous_offset"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_pwrite_all"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_verify_source_header"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "_write_slot_files"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "finalize_runtime_checkpoint"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "pack_runtime_checkpoint"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/writer.py", "pack_runtime_slots"): "WU-Docs: messages",
+    ("glm_tpu/models/glm_moe_dsa/state.py", "validate_local_state"): "WU-Docs: messages",
     ("glm_tpu/models/glm_moe_dsa/weights.py", "Fp8StrategyNdDenseWeights"): "WU-Docs: docstring",
+    ("glm_tpu/models/glm_moe_dsa/weights.py", "_bind_weight_name_tree"): "WU-Docs: messages",
+    ("glm_tpu/models/glm_moe_dsa/weights.py", "_weight_name_leaves"): "WU-Docs: messages",
+    ("glm_tpu/models/glm_moe_dsa/weights.py", "bind_decoder_weights"): "WU-Docs: messages",
     ("glm_tpu/runner/kv_cache_manager.py", "build_cache_initializer"): "WU-Docs: docstring",
 }
 S5_TEXT_DECLARATION = re.compile(r"WU-[A-Z][A-Za-z]*: (?:docstring|messages|docstring, messages)")
@@ -358,24 +406,27 @@ def _as_renamed_in(home: str, node: ast.AST, name: str) -> ast.AST:
 
 
 def _text_aside(home: str, name: str, node: ast.AST) -> ast.AST:
-    """S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` without its docstrings and with the
-    string constants of its raise statements' message arguments blanked, when it is declared there; else ``node``."""
+    """S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` with what its row names set aside --
+    its docstrings removed ("docstring"), the string constants of its raise statements' message arguments blanked
+    ("messages") -- when it is declared there; else ``node``."""
     import copy
 
-    if _s4_home(home, name) not in S5_TEXT:
+    kinds = S5_TEXT.get(_s4_home(home, name), "").partition(": ")[2].split(", ")
+    if kinds == [""]:
         return node
     node = copy.deepcopy(node)
     for inner in ast.walk(node):
         body = getattr(inner, "body", None)
         if (
-            isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            "docstring" in kinds
+            and isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
             and body
             and isinstance(body[0], ast.Expr)
             and isinstance(body[0].value, ast.Constant)
             and isinstance(body[0].value.value, str)
         ):
             inner.body = body[1:]
-        elif isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):
+        elif "messages" in kinds and isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):
             for argument in inner.exc.args:
                 for part in argument.values if isinstance(argument, ast.JoinedStr) else [argument]:
                     if isinstance(part, ast.Constant) and isinstance(part.value, str):

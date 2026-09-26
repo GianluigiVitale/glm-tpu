@@ -37,10 +37,10 @@ def prefill_dense(
 
     require_rows(hidden_local)
     if gate_local.ndim != 2 or (gate_local.shape != up_local.shape or gate_local.shape[1] != hidden_local.shape[1]):
-        raise ValueError("WS32 prefill gate/up geometry drifted")
+        raise ValueError("prefill gate/up geometry drifted")
     local_intermediate, local_hidden = gate_local.shape
     if down_local.shape != (local_hidden, local_intermediate):
-        raise ValueError("WS32 prefill down geometry drifted")
+        raise ValueError("prefill down geometry drifted")
     gate_partial = resident_matmul_f32(hidden_local, gate_local, interpret=interpret)
     up_partial = resident_matmul_f32(hidden_local, up_local, interpret=interpret)
     with jax.named_scope("prefill_dense/feature_gate_up_reduce"):

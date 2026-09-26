@@ -20,13 +20,13 @@ from glm_tpu.layers.contracts import Bf16DsaWeights
 
 def _require_table(weight, scale):
     if weight.ndim != 2 or weight.dtype != jnp.bfloat16 or scale is not None:
-        raise ValueError("D8 prefill requires resident BF16 tables with no scale argument")
+        raise ValueError("prefill requires resident BF16 tables with no scale argument")
 
 
 def resident_matmul_f32(lhs, weight, scale=None, *, interpret=False):
     _require_table(weight, scale)
     if lhs.ndim != 2 or lhs.dtype != jnp.bfloat16 or lhs.shape[1] != weight.shape[1]:
-        raise ValueError("D8 prefill matmul requires matching BF16 operands")
+        raise ValueError("prefill matmul requires matching BF16 operands")
     # CPU's batched DotThunk cannot execute BF16 x BF16 -> FP32. The
     # interpret path widens already-rounded BF16 operands exactly, matching
     # the reference Pallas interpreter; production keeps BF16 MXU operands.
@@ -40,11 +40,11 @@ def resident_matmul(lhs, weight, scale=None, *, interpret=False):
 def resident_q_absorb(query, weight, scale=None, *, interpret=False):
     _require_table(weight, scale)
     if query.ndim != 3 or query.dtype != jnp.bfloat16 or weight.shape[0] % query.shape[1]:
-        raise ValueError("D8 prefill structured query geometry drifted")
+        raise ValueError("prefill structured query geometry drifted")
     heads, qwidth = query.shape[1:]
     table = weight.reshape(heads, -1, weight.shape[1])
     if table.shape[1] <= qwidth:
-        raise ValueError("D8 prefill structured table needs key and value rows")
+        raise ValueError("prefill structured table needs key and value rows")
     key = table[:, :qwidth]
     if interpret:
         query, key = query.astype(jnp.float32), key.astype(jnp.float32)
@@ -59,10 +59,10 @@ def resident_value(latent, weight, scale=None, *, qk_nope_head_dim=192, interpre
         or weight.shape[0] % latent.shape[1]
         or weight.shape[1] != latent.shape[2]
     ):
-        raise ValueError("D8 prefill structured value geometry drifted")
+        raise ValueError("prefill structured value geometry drifted")
     table = weight.reshape(latent.shape[1], -1, latent.shape[2])
     if not 0 < qk_nope_head_dim < table.shape[1]:
-        raise ValueError("D8 prefill structured key/value split drifted")
+        raise ValueError("prefill structured key/value split drifted")
     value = table[:, qk_nope_head_dim:]
     if interpret:
         latent, value = latent.astype(jnp.float32), value.astype(jnp.float32)
@@ -81,9 +81,9 @@ def residual_add(residual: jax.Array, update: jax.Array) -> jax.Array:
 
 def require_rows(value: Any) -> None:
     if value.ndim != 2 or min(value.shape) <= 0:
-        raise ValueError("WS32 prefill requires nonempty [rows,features]")
+        raise ValueError("prefill requires nonempty [rows,features]")
     if value.dtype != jnp.bfloat16:
-        raise ValueError("WS32 prefill activations must be bfloat16")
+        raise ValueError("prefill activations must be bfloat16")
 
 
 def prefill_linear(
@@ -103,7 +103,7 @@ def prefill_linear(
 
     require_rows(lhs_local)
     if reduction_axis not in ("feature", "expert"):
-        raise ValueError("WS32 prefill reduction must be feature or expert")
+        raise ValueError("prefill reduction must be feature or expert")
     partial = resident_matmul_f32(lhs_local, weight_local, interpret=interpret)
     with jax.named_scope(f"prefill_linear/{reduction_axis}_reduce"):
         return lax.psum(partial, axis_name=reduction_axis).astype(jnp.bfloat16)

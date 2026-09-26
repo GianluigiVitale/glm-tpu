@@ -69,12 +69,12 @@ def router_from_shards(
     from glm_tpu.layers.moe.router import route_glm_noaux_tc_logits
 
     if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
-        raise ValueError("WS32 router requires one live hidden row")
+        raise ValueError("router requires one live hidden row")
     if router_weight_local.ndim != 2 or (router_weight_local.shape[1] != hidden_local.shape[1]):
-        raise ValueError("WS32 router weight geometry drifted")
+        raise ValueError("router weight geometry drifted")
     local_experts = router_weight_local.shape[0]
     if correction_bias_local.shape != (local_experts,):
-        raise ValueError("WS32 router bias geometry drifted")
+        raise ValueError("router bias geometry drifted")
     local_logits = lax.dot_general(
         hidden_local.astype(jnp.float32),
         router_weight_local.astype(jnp.float32),
@@ -115,7 +115,7 @@ def prefill_router(
     zero execution cost. Final-block executables should use narrow static rows.
     """
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
-        raise ValueError("prefill router requires WS32 expert8/feature4 mesh")
+        raise ValueError("prefill router requires the expert8/feature4 mesh")
     if hidden_local.ndim != 2 or not 1 <= hidden_local.shape[0] <= 128 or hidden_local.dtype != jnp.bfloat16:
         raise ValueError("prefill router requires1..128 BF16 feature rows")
     rows = hidden_local.shape[0]

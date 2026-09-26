@@ -561,7 +561,7 @@ def prefill_dsa_inputs(
     Padded rows are sanitized before arithmetic; live nonfinite operands fail health.
     """
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
-        raise ValueError("prefill DSA requires WS32 expert8/feature4 mesh")
+        raise ValueError("prefill DSA requires the expert8/feature4 mesh")
     normalized = prepared.normalized_local
     if (
         normalized.ndim != 2

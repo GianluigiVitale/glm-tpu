@@ -452,7 +452,7 @@ def _weight_name_leaves(value: object) -> tuple[str, ...]:
         return (value,)
     if isinstance(value, tuple):
         return tuple(name for item in value for name in _weight_name_leaves(item))
-    raise TypeError("WS32 weight-name tree contains a non-string leaf")
+    raise TypeError("weight-name tree contains a non-string leaf")
 
 
 def _bind_weight_name_tree(value: object, arrays: Mapping[str, Any]) -> object:
@@ -465,7 +465,7 @@ def _bind_weight_name_tree(value: object, arrays: Mapping[str, Any]) -> object:
         if hasattr(value, "_fields"):
             return type(value)(*children)
         return children
-    raise TypeError("WS32 weight-name tree contains a non-string leaf")
+    raise TypeError("weight-name tree contains a non-string leaf")
 
 
 def bind_decoder_weights(
@@ -478,15 +478,15 @@ def bind_decoder_weights(
     leaves = _weight_name_leaves(names)
     expected = set(leaves)
     if len(expected) != len(leaves):
-        raise ValueError("WS32 decoder weight names are not bijective")
+        raise ValueError("decoder weight names are not bijective")
     observed = set(arrays)
     if observed != expected:
         missing = sorted(expected - observed)[:5]
         unexpected = sorted(observed - expected)[:5]
-        raise ValueError(f"WS32 decoder tensor set drifted: missing={missing}, unexpected={unexpected}")
+        raise ValueError(f"decoder tensor set drifted: missing={missing}, unexpected={unexpected}")
     result = _bind_weight_name_tree(names, arrays)
     if not isinstance(result, Fp8DecoderWeights):
-        raise AssertionError("WS32 decoder binding lost its typed root")
+        raise AssertionError("decoder binding lost its typed root")
     return result
 
 

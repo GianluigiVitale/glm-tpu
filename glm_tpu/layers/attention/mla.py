@@ -49,7 +49,7 @@ from glm_tpu.kernels.sparse_mla.partial_kernel import gathered_partial_attention
 
 def _require_block(value: Any) -> int:
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
-        raise ValueError("prefill attention requires WS32 expert8/feature4 mesh")
+        raise ValueError("prefill attention requires the expert8/feature4 mesh")
     if value.ndim != 2 or not 1 <= value.shape[0] <= 32 or value.shape[1] <= 0 or value.dtype != jnp.bfloat16:
         raise ValueError("prefill attention requires1..32 BF16 feature rows")
     return value.shape[0]

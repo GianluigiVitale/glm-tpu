@@ -42,7 +42,7 @@ def compute_logits(
 
     local_vocab, local_hidden = require_vocabulary_geometry(lm_head_local, vocab_size=vocab_size)
     if hidden_local.shape != (1, local_hidden) or (hidden_local.dtype != jnp.bfloat16):
-        raise ValueError("WS32 logits require one BF16 hidden feature shard")
+        raise ValueError("logits require one BF16 hidden feature shard")
     partial = lax.dot_general(
         hidden_local.astype(jnp.float32),
         lm_head_local.astype(jnp.float32),
@@ -50,7 +50,7 @@ def compute_logits(
         preferred_element_type=jnp.float32,
     )
     if partial.shape != (1, local_vocab):
-        raise ValueError("WS32 local vocabulary projection geometry drifted")
+        raise ValueError("local vocabulary projection geometry drifted")
     with jax.named_scope("logits/feature_reduce"):
         return lax.psum(partial, axis_name=feature_axis).astype(jnp.bfloat16)
 
@@ -64,10 +64,10 @@ def greedy_sample(
     """Select the exact lowest token id among globally tied maxima."""
 
     if local_logits.ndim != 2 or local_logits.shape[0] != 1 or (local_logits.dtype != jnp.bfloat16):
-        raise ValueError("WS32 sampler requires one BF16 local logit row")
+        raise ValueError("sampler requires one BF16 local logit row")
     local_vocab = local_logits.shape[1]
     if local_vocab <= 0 or local_vocab * 8 != vocab_size:
-        raise ValueError("WS32 sampler vocabulary ownership drifted")
+        raise ValueError("sampler vocabulary ownership drifted")
     finite = jnp.all(jnp.isfinite(local_logits))
     safe_logits = jnp.where(
         jnp.isfinite(local_logits),

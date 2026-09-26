@@ -123,20 +123,20 @@ def validate_local_state(
         geometry.dsa_indexer_head_dim,
     )
     if state.kv_cache_local.shape != expected_kv or (state.kv_cache_local.dtype != jnp.bfloat16):
-        raise ValueError("WS32 local KV state geometry drifted")
+        raise ValueError("local KV state geometry drifted")
     if state.index_cache_local.shape != expected_index or (state.index_cache_local.dtype != jnp.bfloat16):
-        raise ValueError("WS32 local index state geometry drifted")
+        raise ValueError("local index state geometry drifted")
     if state.selected_positions.shape != (1, geometry.dsa_top_k) or (state.selected_positions.dtype != jnp.int32):
-        raise ValueError("WS32 selected-position state geometry drifted")
+        raise ValueError("selected-position state geometry drifted")
     if state.selected_valid_counts.shape != (1,) or (state.selected_valid_counts.dtype != jnp.int32):
-        raise ValueError("WS32 selected-count state geometry drifted")
+        raise ValueError("selected-count state geometry drifted")
     if state.selected_scores.shape != (1, geometry.dsa_top_k) or (state.selected_scores.dtype != jnp.float32):
-        raise ValueError("WS32 selected-score state geometry drifted")
+        raise ValueError("selected-score state geometry drifted")
     if state.position.shape != (1,) or state.position.dtype != jnp.int32:
-        raise ValueError("WS32 position state geometry drifted")
+        raise ValueError("position state geometry drifted")
     if state.block_tables.shape != (1, config.page_count) or (state.block_tables.dtype != jnp.int32):
-        raise ValueError("WS32 block-table state geometry drifted")
+        raise ValueError("block-table state geometry drifted")
     if state.context_lengths.shape != (1,) or (state.context_lengths.dtype != jnp.int32):
-        raise ValueError("WS32 context-length state geometry drifted")
+        raise ValueError("context-length state geometry drifted")
     if state.contract_valid.shape != (1,) or (state.contract_valid.dtype != jnp.bool_):
-        raise ValueError("WS32 decoder health must be one boolean row")
+        raise ValueError("decoder health must be one boolean row")

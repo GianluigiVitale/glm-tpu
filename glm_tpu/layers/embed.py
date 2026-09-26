@@ -20,12 +20,12 @@ def require_vocabulary_geometry(
     vocab_size: int,
 ) -> tuple[int, int]:
     if table_local.ndim != 2 or table_local.dtype != jnp.bfloat16:
-        raise ValueError("WS32 vocabulary table must be rank-two BF16")
+        raise ValueError("vocabulary table must be rank-two BF16")
     if not isinstance(vocab_size, int) or isinstance(vocab_size, bool) or (vocab_size <= 0):
-        raise ValueError("WS32 vocabulary size must be a positive integer")
+        raise ValueError("vocabulary size must be a positive integer")
     local_vocab, local_hidden = table_local.shape
     if local_vocab <= 0 or local_hidden <= 0 or local_vocab * 8 != vocab_size:
-        raise ValueError("WS32 vocabulary table must shard exactly over expert-8")
+        raise ValueError("vocabulary table must shard exactly over expert-8")
     return local_vocab, local_hidden
 
 
@@ -40,7 +40,7 @@ def embed_tokens(
 
     local_vocab, _ = require_vocabulary_geometry(embedding_local, vocab_size=vocab_size)
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
-        raise ValueError("WS32 embedding requires one int32 token")
+        raise ValueError("embedding requires one int32 token")
     token = token_ids[0]
     owner = lax.axis_index(expert_axis)
     start = owner.astype(jnp.int32) * jnp.int32(local_vocab)

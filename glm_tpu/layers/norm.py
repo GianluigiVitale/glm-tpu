@@ -37,20 +37,20 @@ def sharded_rms_norm(
     """RMSNorm one persistent hidden shard with one feature-4 reduction."""
 
     if hidden_local.ndim < 1 or hidden_local.shape[-1] <= 0:
-        raise ValueError("WS32 RMSNorm requires a nonempty hidden shard")
+        raise ValueError("RMSNorm requires a nonempty hidden shard")
     if hidden_local.dtype != jnp.bfloat16:
-        raise ValueError("WS32 RMSNorm activation must be bfloat16")
+        raise ValueError("RMSNorm activation must be bfloat16")
     if weight_local.shape != (hidden_local.shape[-1],):
-        raise ValueError("WS32 RMSNorm weight must match the local hidden shard")
+        raise ValueError("RMSNorm weight must match the local hidden shard")
     if (
         not isinstance(global_hidden_size, int)
         or isinstance(global_hidden_size, bool)
         or global_hidden_size < hidden_local.shape[-1]
         or global_hidden_size % hidden_local.shape[-1]
     ):
-        raise ValueError("WS32 RMSNorm global hidden geometry is invalid")
+        raise ValueError("RMSNorm global hidden geometry is invalid")
     if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (epsilon <= 0):
-        raise ValueError("WS32 RMSNorm epsilon must be positive")
+        raise ValueError("RMSNorm epsilon must be positive")
 
     value = hidden_local.astype(jnp.float32)
     local_square_sum = jnp.sum(lax.square(value), axis=-1, keepdims=True)
@@ -79,22 +79,22 @@ def sharded_fused_add_rms_norm(
     """
 
     if hidden_update_local.shape != carried_residual_local.shape:
-        raise ValueError("WS32 split residual shapes differ")
+        raise ValueError("split residual shapes differ")
     if hidden_update_local.dtype != jnp.bfloat16 or (carried_residual_local.dtype != jnp.bfloat16):
-        raise ValueError("WS32 split residual inputs must be bfloat16")
+        raise ValueError("split residual inputs must be bfloat16")
     if hidden_update_local.ndim < 1 or hidden_update_local.shape[-1] <= 0:
-        raise ValueError("WS32 split residual requires a nonempty hidden shard")
+        raise ValueError("split residual requires a nonempty hidden shard")
     if weight_local.shape != (hidden_update_local.shape[-1],) or (weight_local.dtype != jnp.bfloat16):
-        raise ValueError("WS32 split RMSNorm weight must match the hidden shard")
+        raise ValueError("split RMSNorm weight must match the hidden shard")
     if (
         not isinstance(global_hidden_size, int)
         or isinstance(global_hidden_size, bool)
         or global_hidden_size < hidden_update_local.shape[-1]
         or global_hidden_size % hidden_update_local.shape[-1]
     ):
-        raise ValueError("WS32 split RMSNorm global hidden geometry is invalid")
+        raise ValueError("split RMSNorm global hidden geometry is invalid")
     if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (epsilon <= 0):
-        raise ValueError("WS32 split RMSNorm epsilon must be positive")
+        raise ValueError("split RMSNorm epsilon must be positive")
 
     summed = hidden_update_local.astype(jnp.float32) + (carried_residual_local.astype(jnp.float32))
     carried = summed.astype(jnp.bfloat16)

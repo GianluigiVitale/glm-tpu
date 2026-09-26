@@ -61,19 +61,19 @@ def decode_step(
     if active is not None and (active.shape != () or active.dtype != jnp.bool_):
         raise ValueError("decoder active mask must be a boolean scalar")
     if config.exact_dsa or config.strategy_nd_dense:
-        raise PlanValidationError("WS32 challenger decoder supports the raw default path only")
+        raise PlanValidationError("decoder supports the raw default path only")
     if config.host_main_rope_table != (main_rope_table is not None):
-        raise ValueError("WS32 host main-rotary table flag/input presence drifted")
+        raise ValueError("host main-rotary table flag/input presence drifted")
     main_rope_table_row = None
     if main_rope_table is not None:
         if main_rope_table.shape != config.main_rope_table_shape or main_rope_table.dtype != jnp.bfloat16:
-            raise ValueError("WS32 main rotary table geometry drifted")
+            raise ValueError("main rotary table geometry drifted")
         with jax.named_scope("main_rope_table_lookup"):
             main_rope_table_row = jnp.take(main_rope_table, state.position, axis=0, mode="clip")[0]
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
-        raise ValueError("WS32 decoder input must be one int32 token")
+        raise ValueError("decoder input must be one int32 token")
     if len(weights.layers) != config.geometry.num_layers:
-        raise ValueError("WS32 decoder weight layer count drifted")
+        raise ValueError("decoder weight layer count drifted")
     embedded = embed_tokens(token_ids, weights.embedding_local, vocab_size=config.geometry.vocab_size)
     hidden_update = embedded.residual_local
     carried_residual = jnp.zeros_like(hidden_update)
@@ -178,7 +178,7 @@ def build_decoder_program(
     import numpy as np
 
     if tuple(mesh.axis_names) != ("expert", "feature") or tuple(np.asarray(mesh.devices, dtype=object).shape) != (8, 4):
-        raise PlanValidationError("WS32 challenger decoder requires one exact expert8 x feature4 mesh")
+        raise PlanValidationError("decoder requires one exact expert8 x feature4 mesh")
     if type(mask_finished) is not bool:
         raise ValueError("mask_finished must be a static boolean")
     weight_specs = bf16_weight_specs(config)
@@ -191,7 +191,7 @@ def build_decoder_program(
     def body(tokens: Any, state: Any, weights: Any, *extra: Any) -> Any:
         expected = int(config.host_main_rope_table) + int(mask_finished)
         if len(extra) != expected:
-            raise ValueError("challenger decoder input/config presence drifted")
+            raise ValueError("decoder input/config presence drifted")
         rope = extra[0] if config.host_main_rope_table else None
         with jax.named_scope("complete_decoder"):
             return decode_step(

@@ -49,14 +49,14 @@ def prefill_moe_from_routes(
     for all three routed projections.
     """
     if contract.stage_size != 8:
-        raise ValueError("WS32 prefill MoE requires stage_size=8")
+        raise ValueError("prefill MoE requires stage_size=8")
     if (
         hidden_local.ndim != 2
         or hidden_local.shape[0] <= 0
         or hidden_local.dtype != jnp.bfloat16
         or hidden_local.shape[1] * 4 != contract.hidden_size
     ):
-        raise ValueError("WS32 prefill MoE requires BF16 live rows and feature4 hidden shards")
+        raise ValueError("prefill MoE requires BF16 live rows and feature4 hidden shards")
     rows, local_hidden = hidden_local.shape
     expected_routes = (rows, contract.top_k)
     if route_indices.shape != expected_routes or route_weights.shape != expected_routes:
@@ -217,34 +217,34 @@ def moe_grouped_routes(
     """
 
     if contract.stage_size != 8:
-        raise ValueError("WS32 grouped MoE requires stage_size=8")
+        raise ValueError("grouped MoE requires stage_size=8")
     if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
-        raise ValueError("WS32 grouped MoE input must contain one live row")
+        raise ValueError("grouped MoE input must contain one live row")
     if hidden_local.dtype != jnp.bfloat16:
-        raise ValueError("WS32 grouped MoE input must be bfloat16")
+        raise ValueError("grouped MoE input must be bfloat16")
     if route_indices.shape != (1, contract.top_k) or route_indices.dtype != jnp.int32:
-        raise ValueError("WS32 grouped MoE routes must contain one exact int32 row")
+        raise ValueError("grouped MoE routes must contain one exact int32 row")
     if route_weights.shape != (1, contract.top_k) or route_weights.dtype != jnp.float32:
-        raise ValueError("WS32 grouped MoE route weights must contain one FP32 row")
+        raise ValueError("grouped MoE route weights must contain one FP32 row")
     local_hidden = hidden_local.shape[-1]
     local_experts = expert_gate_bits_local.shape[0]
     if local_experts != contract.local_experts:
-        raise ValueError("WS32 grouped MoE local expert ownership drifted")
+        raise ValueError("grouped MoE local expert ownership drifted")
     expected_gate = (local_experts, contract.intermediate_size, local_hidden)
     expected_down = (local_experts, local_hidden, contract.intermediate_size)
     if expert_gate_bits_local.shape != expected_gate or (expert_up_bits_local.shape != expected_gate):
-        raise ValueError("WS32 grouped MoE routed gate/up shapes drifted")
+        raise ValueError("grouped MoE routed gate/up shapes drifted")
     if expert_down_bits_local.shape != expected_down:
-        raise ValueError("WS32 grouped MoE routed down shape drifted")
+        raise ValueError("grouped MoE routed down shape drifted")
     if (
         len(shared_bf16) != 3
         or any(t.dtype != jnp.bfloat16 for t in shared_bf16)
         or shared_bf16[0].shape != expected_gate[1:]
         or (shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:])
     ):
-        raise ValueError("WS32 grouped MoE BF16 shared tables drifted")
+        raise ValueError("grouped MoE BF16 shared tables drifted")
     if tuple(config.block_shape) != tuple(contract.fp8_block_shape):
-        raise ValueError("WS32 grouped MoE tile config block differs from the contract")
+        raise ValueError("grouped MoE tile config block differs from the contract")
 
     top_k = contract.top_k
     expert_start = lax.axis_index(expert_axis).astype(jnp.int32) * local_experts

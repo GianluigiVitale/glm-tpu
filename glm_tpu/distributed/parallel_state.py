@@ -35,7 +35,7 @@ def initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, An
         or len(jax.local_devices()) != 4
         or jax.process_count() != 8
     ):
-        raise RuntimeError("WS32 runner did not initialize the exact 8x4 TPU runtime")
+        raise RuntimeError("runner did not initialize the exact 8x4 TPU runtime")
     captures = tuple(
         json.loads((args.topology_capture_root / f"topology.rank{launch_process_id}.json").read_text(encoding="utf-8"))
         for launch_process_id in range(8)
@@ -55,10 +55,10 @@ def initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, An
         raise RuntimeError("WS32 launch/JAX/topology fleet mapping drifted")
     physical_mesh = build_physical_mesh(topology)
     if physical_mesh.mesh_hash != args.mesh_sha256:
-        raise ValueError("WS32 physical mesh hash drifted")
+        raise ValueError("physical mesh hash drifted")
     runtime_by_id = {int(device.id): device for device in jax.devices()}
     if set(runtime_by_id) != set(physical_mesh.flattened_device_ids):
-        raise ValueError("WS32 runtime device ids differ from physical mesh")
+        raise ValueError("runtime device ids differ from physical mesh")
     for captured in topology.devices:
         if (
             device_record(
@@ -67,7 +67,7 @@ def initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, An
             )
             != captured.to_dict()
         ):
-            raise ValueError(f"WS32 runtime topology drifted at {captured.device_id}")
+            raise ValueError(f"runtime topology drifted at {captured.device_id}")
     mesh = Mesh(
         np.asarray(
             [runtime_by_id[item] for item in physical_mesh.flattened_device_ids],

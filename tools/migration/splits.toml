@@ -4,402 +4,86 @@
 # removed; every definition now has an origin or is added, with its source. A later split rewrites this table
 # against its own base; each version is checked at the commit that applies it (history keeps them: S5 WU-E1 at
 # 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99, S5 WU-S3 at fd3086b0, S5 IMP-23 at 2864a184, S5 WU-E2 at
-# b1271cf4, S5 WU-F at f0e8bc8a, S5 WU-C3 at 66842e0e, S5 WU-C2 at fd72f5a3). S7 deletes tools/migration/.
+# b1271cf4, S5 WU-F at f0e8bc8a, S5 WU-C3 at 66842e0e, S5 WU-C2 at fd72f5a3, S5 WU-Docs 1/2 at 007e67eb). S7 deletes
+# tools/migration/.
 #
-# S5 WU-Docs 1/2 (text only; owner decision DN-23, the plan's WU-Docs): docstrings and help text lose the research
-# wording (the labels WS32, challenger and greenfield used as names of this code, "Mirror of ws32_*", "frozen" for the
-# research-era kernels, the retained site and the protected workflow in the help), stale docstrings are corrected
-# (FOLLOWUPS 84, 112, 141, 167, 172, 173, 180, 188) and the harness and migration texts follow (FOLLOWUPS 69, 92, 123,
-# 131, 153, 199). Every file the commit changes that this checker reads is listed: its definitions compare verbatim
-# except the declared lines below, which are docstrings, argparse help strings and the tests that pin them, and the
-# provenance test's S5_TEXT table (decision DN-30: a compared definition whose docstring or raise messages were
-# reworded stays compared with that text aside). No statement other than a docstring or a help string changes in
-# glm_tpu/ or tools/.
+# S5 WU-Docs 2/2 (owner decision DN-23(d)): the campaign labels leave the unrecorded error messages. The production
+# files are proved by tools/migration/work_units.toml (the [messages] table, AST and tokens); this table covers the
+# test modules the commit touches: the provenance test's S5_TEXT rows (decision DN-30) for the 48 compared definitions
+# whose raise messages are reworded (MeshContract also keeps its 1/2 docstring row), _text_aside setting aside only
+# what a row's value names, and the new tests/test_error_messages.py, which allows a label only in the six recorded
+# messages.
 
 [stage]
-name = "S5 WU-Docs 1/2"
+name = "S5 WU-Docs 2/2"
 kind = "splits"
-base = "e6fdd113"   # the tree this table was written against
+base = "007e67eb"   # the tree this table was written against
 files = [
-  "glm_tpu/distributed/mesh.py",
-  "glm_tpu/distributed/parallel_state.py",
-  "glm_tpu/engine/request_session.py",
-  "glm_tpu/entrypoints/__init__.py",
-  "glm_tpu/entrypoints/cli/ask.py",
-  "glm_tpu/entrypoints/cli/main.py",
-  "glm_tpu/entrypoints/serve/server.py",
-  "glm_tpu/entrypoints/ui/__init__.py",
-  "glm_tpu/exceptions.py",
-  "glm_tpu/executor/multihost_executor.py",
-  "glm_tpu/kernels/fp8_grouped_matmul/kernel.py",
-  "glm_tpu/kernels/sparse_mla/partial_kernel.py",
-  "glm_tpu/layers/attention/dsa_indexer.py",
-  "glm_tpu/layers/attention/mla.py",
-  "glm_tpu/layers/fp8.py",
-  "glm_tpu/layers/linear.py",
-  "glm_tpu/layers/mlp.py",
-  "glm_tpu/layers/moe/routed_experts.py",
-  "glm_tpu/model_loader/pack_worker.py",
-  "glm_tpu/models/glm_moe_dsa/model.py",
-  "glm_tpu/models/glm_moe_dsa/weights.py",
-  "glm_tpu/runner/admission.py",
-  "glm_tpu/runner/kv_cache_manager.py",
-  "glm_tpu/utils/io_utils.py",
-  "glm_tpu/worker/tpu_worker.py",
-  "tests/engine/test_request_session.py",
-  "tests/entrypoints/cli/test_main.py",
-  "tests/entrypoints/serve/test_server.py",
-  "tests/executor/test_multihost_executor.py",
-  "tests/layers/test_mlp.py",
   "tests/test_production_helper_homes.py",
-  "tools/equivalence/fixture.py",
-  "tools/equivalence/gates.py",
-  "tools/equivalence/verdicts.py",
-  "tools/migration/restructure.py",
+  "tests/test_error_messages.py",
 ]
-created = []
+created = ["tests/test_error_messages.py"]
 
-# docstring (research wording)
-[definitions."glm_tpu/distributed/mesh.py:MeshContract"]
+# DN-30: a row sets aside only what its value names (docstring, messages)
+[definitions."tests/test_production_helper_homes.py:_text_aside"]
 diff = [
-  "-    \"\"\"Compile-relevant WS32 logical mesh and ownership geometry.\"\"\"",
-  "+    \"\"\"Compile-relevant logical mesh (expert-8 x feature-4) and its ownership geometry.\"\"\"",
-]
-
-# docstring (FOLLOWUPS 84: the vote runs per token too)
-[definitions."glm_tpu/distributed/parallel_state.py:_batched_fleet_all"]
-diff = [
-  "-    \"\"\"Declared host-boundary consensus, never per-layer or per-token dispatch.\"\"\"",
-  "+    \"\"\"The all-host boolean vote at the declared host boundaries: each runtime phase, and each token's",
-  "+    validity and delivery.",
-  "+",
-  "+    Every call is one all-gather of the eight hosts' votes, run on the host between device calls; never",
-  "+    inside a layer or a compiled program.",
-  "+    \"\"\"",
-]
-
-# docstring (FOLLOWUPS 180 (c))
-[definitions."glm_tpu/engine/request_session.py:RequestPolicy"]
-diff = [
-  "-    The checks, their order and their exceptions are those of the frozen sampled",
-  "-    ``ws32_request_session.RequestPolicy`` at seed 0 (the release's value): the request id must be a",
-  "-    nonempty, UTF-8-encodable string (the frozen policy hashed it for its uniform draws).",
-  "+    The checks, their order and their exceptions are those of the sampled policy this one replaced (the",
-  "+    ``RequestPolicy`` archived at ``archive/research-20260922``) at seed 0 (the release's value): the request id",
-  "+    must be a nonempty, UTF-8-encodable string (that policy hashed it for its uniform draws).",
-]
-
-# docstring (FOLLOWUPS 180 (d))
-[definitions."glm_tpu/engine/request_session.py:RequestSession"]
-diff = [
-  "-    authenticated worker's all-host boolean vote (identity in CPU-only tests).",
-  "+    authenticated worker's all-host boolean vote (identity in CPU-only tests);",
-  "+    each call performs one real all-host vote.",
-]
-
-# docstring (FOLLOWUPS 180 (a))
-[definitions."glm_tpu/engine/request_session.py:RequestSession.accept_prefill"]
-diff = [
-  "-    \"\"\"Deliver the sampled FIRST token now, before any decode call.\"\"\"",
-  "+    \"\"\"Deliver the prefill's greedy FIRST token now, before any decode call.\"\"\"",
-]
-
-# docstring (FOLLOWUPS 180 (b): it had none)
-[definitions."glm_tpu/engine/request_session.py:RequestSession.step"]
-diff = [
-  "+    \"\"\"Decode, vote on and deliver the next greedy token.",
-  "+",
-  "+        One validity vote on the packed status row, then the state is committed, then one delivery vote.",
-  "+        \"\"\"",
-]
-
-# docstring: the configured site, not the retained one
-[definitions."glm_tpu/entrypoints/cli/main.py:AskSubcommand"]
-diff = [
-  "-    \"\"\"``glm-tpu ask``: answer questions on the retained TPU site (``glm_tpu.entrypoints.cli.ask``).",
-  "+    \"\"\"``glm-tpu ask``: answer questions on the configured TPU site (``glm_tpu.entrypoints.cli.ask``).",
-]
-
-# the ask help string
-[definitions."glm_tpu/entrypoints/cli/main.py:AskSubcommand.subparser_init"]
-diff = [
-  "-    ask = subparsers.add_parser('ask', help='answer questions on the retained TPU site; optionally batch up to four')",
-  "+    ask = subparsers.add_parser('ask', help='answer questions on the configured TPU site; optionally batch up to four')",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/exceptions.py:ConfigValidationError"]
-diff = [
-  "-    \"\"\"Base class for an invalid immutable greenfield configuration.\"\"\"",
-  "+    \"\"\"Base class for an invalid immutable configuration.\"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/kernels/fp8_grouped_matmul/kernel.py:_scale_entry"]
-diff = [
-  "-    Same masked reduction as the frozen ``_scale_value``: Mosaic on TPU v4 has",
-  "+    Same masked reduction as ``_scale_value`` of the archived per-expert kernel: Mosaic on TPU v4 has",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/dsa_indexer.py:two_stage_topk"]
-diff = [
-  "-    \"\"\"Return frozen score/position pairs and whether the exact fallback ran.",
-  "+    \"\"\"Return the score/position pairs of the full-K selection and whether the exact fallback ran.",
-  "-    the frozen full-K selection. No score arithmetic is changed.",
-  "+    the full-K selection. No score arithmetic is changed.",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/dsa_indexer.py:score_cache_pages"]
-diff = [
-  "-    The projection/FP32 DSA arithmetic is the frozen dsa_scores. Page mapping",
-  "+    The projection/FP32 DSA arithmetic is that of ``dsa_scores``. Page mapping",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/dsa_indexer.py:prefill_dsa_one_pass"]
-diff = [
-  "-    \"\"\"P2: one score row and one shortlist per prefill tile, with frozen health.",
-  "+    \"\"\"One score row and one shortlist per prefill tile, and the selection's health flag.",
-  "-    This is opt-in and keeps causal lengths and finite-score admission intact.",
-  "+    Causal lengths and finite-score admission stay intact.",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/dsa_indexer.py:dsa_bf16"]
-diff = [
-  "-    \"\"\"Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables and the two-stage selection.\"\"\"",
-  "+    \"\"\"The decode DSA step (raw path) on BF16 wq_b / wk tables with the two-stage selection.",
-  "+",
-  "+    Otherwise as the FP8-table ``ws32_dsa_mapped`` archived at ``archive/research-20260922``.",
-  "+    \"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/mla.py:prepare_attention_bf16"]
-diff = [
-  "-    \"\"\"Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables.\"\"\"",
-  "+    \"\"\"Decode attention preparation (raw path) on BF16 tables.",
-  "+",
-  "+    Otherwise as the FP8-table ``ws32_prepare_attention_mapped`` archived at ``archive/research-20260922``.",
-  "+    \"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/attention/mla.py:index_share_attention_bf16"]
-diff = [
-  "-    \"\"\"Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables.\"\"\"",
-  "+    \"\"\"IndexShare decode attention (host rotary table path) on BF16 tables.",
-  "+",
-  "+    Otherwise as the FP8-table ``ws32_index_share_attention_mapped`` archived at ``archive/research-20260922``.",
-  "+    \"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/fp8.py:decode_fp8_table"]
-diff = [
-  "-    \"\"\"Exactly the frozen kernels' per-element decode: ``bf16(f32(bits) * scale_block)``.\"\"\"",
-  "+    \"\"\"Exactly the FP8 kernels' per-element decode: ``bf16(f32(bits) * scale_block)``.\"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/linear.py:dot_f32"]
-diff = [
-  "-    \"\"\"``x @ W.T`` with BF16 operands and an FP32 accumulator (the frozen MXU boundary).\"\"\"",
-  "+    \"\"\"``x @ W.T`` with BF16 operands and an FP32 accumulator (the MXU boundary of the FP8 kernels).\"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/mlp.py:prefill_dense"]
-diff = [
-  "-    This is a candidate building block with the same numerical boundaries as",
-  "-    ``ws32_dense_pallas_mapped``. It is not automatically interchangeable with",
-  "-    the promoted decoder's StrategyND dense association. A future layer path",
-  "-    must earn its own bounded comparisons and \u00a721 decoder evidence.",
-  "+    It has the numerical boundaries of the FP8-table ``ws32_dense_pallas_mapped``",
-  "+    (archived at ``archive/research-20260922``; :func:`dense_bf16` follows it), but it",
-  "+    is not interchangeable with the decoder's StrategyND dense association: a layer",
-  "+    path that switches between them needs its own bounded comparisons and",
-  "+    decoder-level evidence.",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/mlp.py:dense_bf16"]
-diff = [
-  "-    \"\"\"Mirror of ``ws32_dense_pallas_mapped`` on BF16 tables.\"\"\"",
-  "+    \"\"\"The decode dense MLP on BF16 tables.",
-  "+",
-  "+    Otherwise as the FP8-table ``ws32_dense_pallas_mapped`` archived at ``archive/research-20260922``.",
-  "+    \"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/layers/moe/routed_experts.py:moe_grouped_routes"]
-diff = [
-  "-    \"\"\"Route-grouped challenger for ``ws32_moe_pallas_from_routes_mapped``.",
-  "+    \"\"\"The decode MoE of one row with route-grouped routed experts.",
-  "-    frozen body.  Structural differences only: all routed gate/up partials and the",
-  "+    per-expert form it replaced (``ws32_moe_pallas_from_routes_mapped``, archived at",
-  "+    ``archive/research-20260922``).  Structural differences only: all routed gate/up partials and the",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/models/glm_moe_dsa/model.py:decode_step"]
-diff = [
-  "-    \"\"\"One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``).\"\"\"",
-  "+    \"\"\"One greedy decode step over every layer (as the FP8-table ``_ws32_decode_impl`` archived at",
-  "+    ``archive/research-20260922``, with the BF16-resident layer bodies).\"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/models/glm_moe_dsa/model.py:build_decoder_program"]
-diff = [
-  "-    \"\"\"Jitted shard_map with the frozen decoder's argument order.",
-  "+    \"\"\"Jitted shard_map of the decode step, with the argument order of the archived FP8-table decoder.",
-  "-    ``config.host_main_rope_table``. Same in/out specs as the frozen programs (weights: the",
-  "-    resident BF16 tree). ``mask_finished=True`` appends one scalar boolean active argument and",
-  "+    ``config.host_main_rope_table``. Same in/out specs as the archived FP8-table programs (weights:",
-  "+    the resident BF16 tree). ``mask_finished=True`` appends one scalar boolean active argument and",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/models/glm_moe_dsa/weights.py:Fp8StrategyNdDenseWeights"]
-diff = [
-  "-    \"\"\"Four ordered legacy-rank shards in their final WS32 ownership.\"\"\"",
-  "+    \"\"\"Four ordered legacy-rank shards in their final expert-8 x feature-4 ownership.\"\"\"",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/runner/admission.py:check_hlo_collectives"]
-diff = [
-  "-    \"\"\"Fresh WS32 graph check: physical axis groups and bounded exchanges.",
-  "+    \"\"\"Fresh graph check on the expert-8 x feature-4 mesh: physical axis groups and bounded exchanges.",
-  "-    This is a deliberately scoped structural check, not the frozen graph's",
-  "-    exact opcode/identity proof. CPU/TPU numerical evidence remains separate.",
-  "-    Both operands and results are checked, including async collective forms",
-  "-    normalized by the retained parser. Full-pod consensus is limited to4KiB.",
-  "+    This is a deliberately scoped structural check, not an exact opcode/identity",
-  "+    proof of the graph (no HLO seal is inherited). CPU/TPU numerical evidence",
-  "+    remains separate. Both operands and results are checked, including async",
-  "+    collective forms normalized by the HLO parser (``hlo_utils.parse_hlo_module``).",
-  "+    Full-pod consensus is limited to 4 KiB.",
-]
-
-# docstring (research wording)
-[definitions."glm_tpu/runner/kv_cache_manager.py:build_cache_initializer"]
-diff = [
-  "-    Same values/sharding as make_ws32_batched_prefill_state; no model execution,",
-  "-    host-sized cache, existing-state donation or prompt-specific compilation.",
-  "-    The protected caller inspects its actual memory analysis BEFORE invocation.",
-  "+    Same values/sharding as a fresh prefill state (``batched_prefill_state_specs``); no model",
-  "+    execution, host-sized cache, existing-state donation or prompt-specific compilation.",
-  "+    The caller (the runner's memory admission) inspects its actual memory analysis BEFORE invocation.",
-]
-
-# docstring (FOLLOWUPS 188)
-[definitions."glm_tpu/utils/io_utils.py:read_bounded"]
-diff = [
-  "-    range while it is read. ``OSError`` from the open (a missing or unreadable file) propagates. The descriptor is",
-  "-    closed on every path.\"\"\"",
-  "+    range while it is read. ``OSError`` from the open or the read (a missing, unreadable or unopenable file such as a",
-  "+    socket) propagates. The descriptor is closed on every path.\"\"\"",
-]
-
-# the glm-tpu description literal (A2(d))
-[definitions."tests/entrypoints/cli/test_main.py:test_every_argument_is_unchanged"]
-diff = [
-  "-    assert [(p.prog, p.description) for p in parsers.values()] == [('glm-tpu', 'Release information, local preparation and protected question submission.'), *((f'glm-tpu {ALIASES.get(name, name)}', None) for name in list(ARGUMENTS)[1:])]",
-  "+    assert [(p.prog, p.description) for p in parsers.values()] == [('glm-tpu', 'Release information, environment and checkpoint checks, local request preparation and question submission.'), *((f'glm-tpu {ALIASES.get(name, name)}', None) for name in list(ARGUMENTS)[1:])]",
-]
-
-# DN-30: a text-declared definition's original is compared with its text aside
-[definitions."tests/test_production_helper_homes.py:_as_renamed_in"]
-diff = [
-  "-    return node",
-  "+    return _text_aside(home, name, node)",
-]
-
-# DN-30: and so is the definition now
-[definitions."tests/test_production_helper_homes.py:_moved_definition"]
-diff = [
-  "-    return node",
-  "+    return _text_aside(home, name, node)",
-]
-
-# DN-30: the S5_TEXT rows are validated too
-[definitions."tests/test_production_helper_homes.py:test_s5_declarations_are_well_formed_and_name_compared_definitions"]
-diff = [
-  "+    for key, value in S5_TEXT.items():",
-  "+        assert key in compared, key",
-  "+        assert S5_TEXT_DECLARATION.fullmatch(value), value",
-  "+        assert S5_DECLARED.get(key, '_: compared').partition(': ')[2] not in S5_NOT_COMPARED, key",
+  "-    \"\"\"S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` without its docstrings and with the",
+  "-    string constants of its raise statements' message arguments blanked, when it is declared there; else ``node``.\"\"\"",
+  "+    \"\"\"S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` with what its row names set aside --",
+  "+    its docstrings removed (\"docstring\"), the string constants of its raise statements' message arguments blanked",
+  "+    (\"messages\") -- when it is declared there; else ``node``.\"\"\"",
+  "-    if _s4_home(home, name) not in S5_TEXT:",
+  "+    kinds = S5_TEXT.get(_s4_home(home, name), '').partition(': ')[2].split(', ')",
+  "+    if kinds == ['']:",
+  "-        if isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):",
+  "+        if 'docstring' in kinds and isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):",
+  "-        elif isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):",
+  "+        elif 'messages' in kinds and isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):",
 ]
 
 [added]
-"tests/test_production_helper_homes.py:_text_aside" = "WU-Docs: DN-30, a text-declared definition without its docstrings and raise-message literals"
+"tests/test_error_messages.py:labelled_raise_constants" = "WU-Docs: the labelled string constants of the raise statements under glm_tpu/"
+"tests/test_error_messages.py:test_only_the_recorded_messages_keep_a_campaign_label" = "WU-Docs: the behaviour-change test, a label only in the six recorded messages"
+"tests/test_error_messages.py:test_the_kept_messages_are_the_recorded_ones" = "WU-Docs: each kept message is in its record"
 
 [added_source]
-"tests/test_production_helper_homes.py:_text_aside" = [
-  "def _text_aside(home: str, name: str, node: ast.AST) -> ast.AST:",
-  "    \"\"\"S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` without its docstrings and with the",
-  "    string constants of its raise statements' message arguments blanked, when it is declared there; else ``node``.\"\"\"",
-  "    import copy",
-  "    if _s4_home(home, name) not in S5_TEXT:",
-  "        return node",
-  "    node = copy.deepcopy(node)",
-  "    for inner in ast.walk(node):",
-  "        body = getattr(inner, 'body', None)",
-  "        if isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):",
-  "            inner.body = body[1:]",
-  "        elif isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):",
-  "            for argument in inner.exc.args:",
-  "                for part in argument.values if isinstance(argument, ast.JoinedStr) else [argument]:",
-  "                    if isinstance(part, ast.Constant) and isinstance(part.value, str):",
-  "                        part.value = ''",
-  "    return node",
+"tests/test_error_messages.py:labelled_raise_constants" = [
+  "def labelled_raise_constants() -> set[tuple[str, str]]:",
+  "    found = set()",
+  "    for path in sorted((REPO / 'glm_tpu').rglob('*.py')):",
+  "        for node in ast.walk(ast.parse(path.read_text(), filename=str(path))):",
+  "            if not isinstance(node, ast.Raise):",
+  "                continue",
+  "            for inner in ast.walk(node):",
+  "                if isinstance(inner, ast.Constant) and isinstance(inner.value, str) and LABEL.search(inner.value):",
+  "                    found.add((path.relative_to(REPO).as_posix(), inner.value))",
+  "    return found",
+]
+"tests/test_error_messages.py:test_only_the_recorded_messages_keep_a_campaign_label" = [
+  "def test_only_the_recorded_messages_keep_a_campaign_label():",
+  "    assert labelled_raise_constants() == set(RECORDED)",
+]
+"tests/test_error_messages.py:test_the_kept_messages_are_the_recorded_ones" = [
+  "def test_the_kept_messages_are_the_recorded_ones():",
+  "    for (_, text), record in RECORDED.items():",
+  "        assert text in (REPO / 'tests' / 'golden' / 'data' / record).read_text(), (record, text)",
 ]
 
 [docstrings]
-"glm_tpu/entrypoints/__init__.py" = "WU-Docs: FOLLOWUPS 141, the serving and UI packages' contents"
-"glm_tpu/entrypoints/cli/ask.py" = "WU-Docs: the controller named, not the protected one"
-"glm_tpu/entrypoints/cli/main.py" = "WU-Docs: the glm-tpu --help description (environment and checkpoint checks)"
-"glm_tpu/entrypoints/serve/server.py" = "WU-Docs: the --help description names the OpenAI-compatible API"
-"glm_tpu/entrypoints/ui/__init__.py" = "WU-Docs: FOLLOWUPS 141, the conversation store"
-"glm_tpu/executor/multihost_executor.py" = "WU-Docs: the --help description, the configured site"
-"glm_tpu/kernels/fp8_grouped_matmul/kernel.py" = "WU-Docs: FOLLOWUPS 167, two kernel launches"
-"glm_tpu/kernels/sparse_mla/partial_kernel.py" = "WU-Docs: the selected-KV exchange named, not frozen"
-"glm_tpu/model_loader/pack_worker.py" = "WU-Docs: the --help description, the host-level role"
-"glm_tpu/models/glm_moe_dsa/model.py" = "WU-Docs: FOLLOWUPS 69, no frozen attention or Ws32PerfOptions"
-"glm_tpu/models/glm_moe_dsa/weights.py" = "WU-Docs: the FP8-table step and kernels named, not frozen"
-"glm_tpu/worker/tpu_worker.py" = "WU-Docs: the --help description, the per-host worker"
-"tests/engine/test_request_session.py" = "WU-Docs: FOLLOWUPS 172 and 173"
-"tests/layers/test_mlp.py" = "WU-Docs: FOLLOWUPS 112"
-"tests/test_production_helper_homes.py" = "WU-Docs: DN-30, the S5_TEXT declarations"
-"tools/equivalence/fixture.py" = "WU-Docs: FOLLOWUPS 69, the historical fixture path marked archived"
-"tools/equivalence/verdicts.py" = "WU-Docs: FOLLOWUPS 123 (b), what WU-R and H11 changed"
-"tools/migration/restructure.py" = "WU-Docs: FOLLOWUPS 199, work_units.toml also held H11"
-
-[statements."tests/entrypoints/cli/test_main.py"]
-diff = [
-  "-HELP = {'': 'usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...\\n\\nRelease information, local preparation and protected question submission.\\n\\npositional arguments:\\n  {info,ask,collect-env,doctor,prepare-request,checkpoint}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the retained TPU site; optionally batch up to four\\n    collect-env (doctor)\\n                        check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n    checkpoint          inventory a checkpoint source or verify a sealed checkpoint on local files\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'collect-env': 'usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n', 'checkpoint': \"usage: glm-tpu checkpoint [-h] {inventory,verify} ...\\n\\npositional arguments:\\n  {inventory,verify}\\n    inventory         write the inventory of a local safetensors source (no payload is read)\\n    verify            verify a local sealed runtime checkpoint against the site file's pins\\n\\noptions:\\n  -h, --help          show this help message and exit\\n\", 'checkpoint inventory': 'usage: glm-tpu checkpoint inventory [-h] --output OUTPUT --model-id MODEL_ID --revision REVISION\\n                                    source\\n\\npositional arguments:\\n  source               directory of model.safetensors.index.json, its shards and config.json\\n\\noptions:\\n  -h, --help           show this help message and exit\\n  --output OUTPUT      the new inventory file (never overwritten)\\n  --model-id MODEL_ID  the model id to record, e.g. zai-org/GLM-5.3\\n  --revision REVISION  the source revision to record\\n', 'checkpoint verify': \"usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]\\n                                 [--local-slot-layout]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n  --root ROOT           checkpoint root (default: the site's checkpoint.root)\\n  --slots SLOT [SLOT ...]\\n                        hash only these device slots, 0..31 (default: all)\\n  --local-slot-layout   the root holds only the --slots files (a worker's layout); any other slot\\n                        file is refused\\n\"}",
-  "+HELP = {'': 'usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...\\n\\nRelease information, environment and checkpoint checks, local request preparation and question\\nsubmission.\\n\\npositional arguments:\\n  {info,ask,collect-env,doctor,prepare-request,checkpoint}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the configured TPU site; optionally batch up to four\\n    collect-env (doctor)\\n                        check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n    checkpoint          inventory a checkpoint source or verify a sealed checkpoint on local files\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'collect-env': 'usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n', 'checkpoint': \"usage: glm-tpu checkpoint [-h] {inventory,verify} ...\\n\\npositional arguments:\\n  {inventory,verify}\\n    inventory         write the inventory of a local safetensors source (no payload is read)\\n    verify            verify a local sealed runtime checkpoint against the site file's pins\\n\\noptions:\\n  -h, --help          show this help message and exit\\n\", 'checkpoint inventory': 'usage: glm-tpu checkpoint inventory [-h] --output OUTPUT --model-id MODEL_ID --revision REVISION\\n                                    source\\n\\npositional arguments:\\n  source               directory of model.safetensors.index.json, its shards and config.json\\n\\noptions:\\n  -h, --help           show this help message and exit\\n  --output OUTPUT      the new inventory file (never overwritten)\\n  --model-id MODEL_ID  the model id to record, e.g. zai-org/GLM-5.3\\n  --revision REVISION  the source revision to record\\n', 'checkpoint verify': \"usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]\\n                                 [--local-slot-layout]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n  --root ROOT           checkpoint root (default: the site's checkpoint.root)\\n  --slots SLOT [SLOT ...]\\n                        hash only these device slots, 0..31 (default: all)\\n  --local-slot-layout   the root holds only the --slots files (a worker's layout); any other slot\\n                        file is refused\\n\"}",
-]
-
-[statements."tests/entrypoints/serve/test_server.py"]
-diff = [
-  "-HELP = 'usage: server.py [-h] --run RUN --dispatch DISPATCH --state STATE [--port PORT]\\n                 [--api-key-file API_KEY_FILE] [--no-api] [--repo REPO] [--site SITE]\\n\\nLoopback chat UI attached to an existing resident GLM controller. This process never initializes\\ndevices, starts workers, or sends a stop command. Private chat history and requests live outside\\nthe checkout.\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --run RUN\\n  --dispatch DISPATCH\\n  --state STATE\\n  --port PORT\\n  --api-key-file API_KEY_FILE\\n                        default: <state>/api-key, created 0600 on first start\\n  --no-api              serve only the browser workspace, without /v1\\n  --repo REPO\\n  --site SITE           site file for the tokenizer location (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n'",
-  "+HELP = 'usage: server.py [-h] --run RUN --dispatch DISPATCH --state STATE [--port PORT]\\n                 [--api-key-file API_KEY_FILE] [--no-api] [--repo REPO] [--site SITE]\\n\\nLoopback chat UI and OpenAI-compatible API attached to an existing resident GLM controller. This\\nprocess never initializes devices, starts workers, or sends a stop command. Private chat history\\nand requests live outside the checkout.\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --run RUN\\n  --dispatch DISPATCH\\n  --state STATE\\n  --port PORT\\n  --api-key-file API_KEY_FILE\\n                        default: <state>/api-key, created 0600 on first start\\n  --no-api              serve only the browser workspace, without /v1\\n  --repo REPO\\n  --site SITE           site file for the tokenizer location (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n'",
-]
-
-[statements."tests/executor/test_multihost_executor.py"]
-diff = [
-  "-HELP = \"usage: multihost_executor.py [-h] --request REQUEST [--wall-seconds WALL_SECONDS]\\n                             [--print-answers] [--keep-loaded] [--site SITE] [--repo REPO]\\n\\nOne private greedy request on the retained 32-chip site; no automatic retries. The site's [launch]\\npolicy decides which checkout may launch (branch patterns, origin, clean, pushed;\\nglm_tpu.executor.launch_policy), and the staged source is `git archive` of the pinned commit of\\nthat checkout, which must be this controller's own (--repo and the site's paths.repo may only name\\nit: the controller's code and the remote helper texts come from it). This controller holds the\\nworkload leases through authenticated cleanup, and never creates or resizes resources. Every site\\nvalue (fleet, interpreters, paths, pins, locks) comes from the validated site file (--site, else\\n$GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged\\nto every host as site.json and bound by --site-sha256. Remote work is done by the stdlib helper\\nprograms of glm_tpu.executor.remote, sent as `<interpreter> -c <file text> <one JSON argument>`\\n(glm_tpu.executor.fleet). Their texts are read once, right after the launch policy: the helper\\nblobs of the pinned commit, each required equal to this checkout's file; their SHA-256s are\\nrecorded in the run's helpers.json, and every remote command of the run is built from that\\nsnapshot (an edit of the checkout during the run changes nothing that is sent). After the workers\\nend (stop, completion or failure) and idle_after has verified every host, the local SSH clients\\nget a bounded time to exit (a stalled one is ended and listed in controller_terminal.json as\\nstalled_ssh_clients), then every host's records are collected once, host by host: a record the\\nresident receipt already holds is skipped when equal, and a different one is kept as final/<name>\\nand listed (divergent_records); a host whose fetch fails is listed (uncollected_ranks) without\\nlosing the others' records. Nothing is overwritten; a resident failure (recorded as failure) is\\nreported only after collection and is never replaced by a collection error (recorded as\\ncollect_error).\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --request REQUEST\\n  --wall-seconds WALL_SECONDS\\n  --print-answers       print completed local outputs after cleanup\\n  --keep-loaded\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n  --repo REPO           git checkout to stage; must be this controller's own (default: the site\\n                        paths.repo, else this checkout)\\n\"",
-  "+HELP = \"usage: multihost_executor.py [-h] --request REQUEST [--wall-seconds WALL_SECONDS]\\n                             [--print-answers] [--keep-loaded] [--site SITE] [--repo REPO]\\n\\nOne private greedy request on the configured 32-chip site; no automatic retries. The site's\\n[launch] policy decides which checkout may launch (branch patterns, origin, clean, pushed;\\nglm_tpu.executor.launch_policy), and the staged source is `git archive` of the pinned commit of\\nthat checkout, which must be this controller's own (--repo and the site's paths.repo may only name\\nit: the controller's code and the remote helper texts come from it). This controller holds the\\nworkload leases through authenticated cleanup, and never creates or resizes resources. Every site\\nvalue (fleet, interpreters, paths, pins, locks) comes from the validated site file (--site, else\\n$GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged\\nto every host as site.json and bound by --site-sha256. Remote work is done by the stdlib helper\\nprograms of glm_tpu.executor.remote, sent as `<interpreter> -c <file text> <one JSON argument>`\\n(glm_tpu.executor.fleet). Their texts are read once, right after the launch policy: the helper\\nblobs of the pinned commit, each required equal to this checkout's file; their SHA-256s are\\nrecorded in the run's helpers.json, and every remote command of the run is built from that\\nsnapshot (an edit of the checkout during the run changes nothing that is sent). After the workers\\nend (stop, completion or failure) and idle_after has verified every host, the local SSH clients\\nget a bounded time to exit (a stalled one is ended and listed in controller_terminal.json as\\nstalled_ssh_clients), then every host's records are collected once, host by host: a record the\\nresident receipt already holds is skipped when equal, and a different one is kept as final/<name>\\nand listed (divergent_records); a host whose fetch fails is listed (uncollected_ranks) without\\nlosing the others' records. Nothing is overwritten; a resident failure (recorded as failure) is\\nreported only after collection and is never replaced by a collection error (recorded as\\ncollect_error).\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --request REQUEST\\n  --wall-seconds WALL_SECONDS\\n  --print-answers       print completed local outputs after cleanup\\n  --keep-loaded\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n  --repo REPO           git checkout to stage; must be this controller's own (default: the site\\n                        paths.repo, else this checkout)\\n\"",
-]
+"tests/test_error_messages.py" = "WU-Docs: the created module (DN-23(d), the recorded messages)"
 
 [statements."tests/test_production_helper_homes.py"]
 diff = [
-  "+S5_TEXT: dict[tuple[str, str], str] = {('glm_tpu/distributed/mesh.py', 'MeshContract'): 'WU-Docs: docstring', ('glm_tpu/distributed/parallel_state.py', '_batched_fleet_all'): 'WU-Docs: docstring', ('glm_tpu/exceptions.py', 'ConfigValidationError'): 'WU-Docs: docstring', ('glm_tpu/models/glm_moe_dsa/weights.py', 'Fp8StrategyNdDenseWeights'): 'WU-Docs: docstring', ('glm_tpu/runner/kv_cache_manager.py', 'build_cache_initializer'): 'WU-Docs: docstring'}",
-  "+S5_TEXT_DECLARATION = re.compile('WU-[A-Z][A-Za-z]*: (?:docstring|messages|docstring, messages)')",
+  "-S5_TEXT: dict[tuple[str, str], str] = {('glm_tpu/distributed/mesh.py', 'MeshContract'): 'WU-Docs: docstring', ('glm_tpu/distributed/parallel_state.py', '_batched_fleet_all'): 'WU-Docs: docstring', ('glm_tpu/exceptions.py', 'ConfigValidationError'): 'WU-Docs: docstring', ('glm_tpu/models/glm_moe_dsa/weights.py', 'Fp8StrategyNdDenseWeights'): 'WU-Docs: docstring', ('glm_tpu/runner/kv_cache_manager.py', 'build_cache_initializer'): 'WU-Docs: docstring'}",
+  "+S5_TEXT: dict[tuple[str, str], str] = {('glm_tpu/config/cache.py', 'CacheConfig'): 'WU-Docs: messages', ('glm_tpu/config/model.py', 'ModelGeometry'): 'WU-Docs: messages', ('glm_tpu/distributed/mesh.py', 'MeshContract'): 'WU-Docs: docstring, messages', ('glm_tpu/distributed/mesh.py', 'PhysicalMesh'): 'WU-Docs: messages', ('glm_tpu/distributed/mesh.py', 'build_physical_mesh'): 'WU-Docs: messages', ('glm_tpu/distributed/parallel_state.py', '_batched_fleet_all'): 'WU-Docs: docstring', ('glm_tpu/distributed/parallel_state.py', 'initialize_runtime'): 'WU-Docs: messages', ('glm_tpu/distributed/topology.py', 'validate_topology_fleet'): 'WU-Docs: messages', ('glm_tpu/exceptions.py', 'ConfigValidationError'): 'WU-Docs: docstring', ('glm_tpu/layers/attention/mla.py', '_require_block'): 'WU-Docs: messages', ('glm_tpu/layers/embed.py', 'embed_tokens'): 'WU-Docs: messages', ('glm_tpu/layers/embed.py', 'require_vocabulary_geometry'): 'WU-Docs: messages', ('glm_tpu/layers/linear.py', 'require_rows'): 'WU-Docs: messages', ('glm_tpu/layers/moe/router.py', 'prefill_router'): 'WU-Docs: messages', ('glm_tpu/layers/moe/router.py', 'router_from_shards'): 'WU-Docs: messages', ('glm_tpu/layers/norm.py', 'sharded_fused_add_rms_norm'): 'WU-Docs: messages', ('glm_tpu/layers/norm.py', 'sharded_rms_norm'): 'WU-Docs: messages', ('glm_tpu/layers/rope.py', 'build_main_rope_table'): 'WU-Docs: messages', ('glm_tpu/layers/sampler.py', 'compute_logits'): 'WU-Docs: messages', ('glm_tpu/layers/sampler.py', 'greedy_sample'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', 'RuntimePlacementReport'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', 'SourcePlacement'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', '_require_source_contract'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', '_slice_bounds'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', '_slot'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', 'build_runtime_placement_report'): 'WU-Docs: messages', ('glm_tpu/model_loader/placement.py', 'placements_for_source_tensor'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/format.py', 'RuntimePackConfig'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/format.py', '_validate_finite_chunk'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/format.py', 'build_runtime_file_plans'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/format.py', 'destination_record'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/loader.py', '_host_tensor'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/loader.py', 'load_runtime_checkpoint'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/verify.py', '_read_runtime_metadata'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/verify.py', '_verify_runtime_files'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/verify.py', '_verify_runtime_value'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/verify.py', 'verify_runtime_checkpoint'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_build_runtime_manifest'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_commit_runtime_manifest'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_flat_contiguous_offset'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_pwrite_all'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_verify_source_header'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', '_write_slot_files'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', 'finalize_runtime_checkpoint'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', 'pack_runtime_checkpoint'): 'WU-Docs: messages', ('glm_tpu/model_loader/sharded_state/writer.py', 'pack_runtime_slots'): 'WU-Docs: messages', ('glm_tpu/models/glm_moe_dsa/state.py', 'validate_local_state'): 'WU-Docs: messages', ('glm_tpu/models/glm_moe_dsa/weights.py', 'Fp8StrategyNdDenseWeights'): 'WU-Docs: docstring', ('glm_tpu/models/glm_moe_dsa/weights.py', '_bind_weight_name_tree'): 'WU-Docs: messages', ('glm_tpu/models/glm_moe_dsa/weights.py', '_weight_name_leaves'): 'WU-Docs: messages', ('glm_tpu/models/glm_moe_dsa/weights.py', 'bind_decoder_weights'): 'WU-Docs: messages', ('glm_tpu/runner/kv_cache_manager.py', 'build_cache_initializer'): 'WU-Docs: docstring'}",
+]
+
+[imports."tests/test_error_messages.py"]
+added = ["__future__:annotations", "ast", "pathlib:Path", "re"]
+
+[statements."tests/test_error_messages.py"]
+diff = [
+  "+REPO = Path(__file__).resolve().parents[1]",
+  "+LABEL = re.compile('WS32|\\\\bD8\\\\b|[Rr]esearch|[Cc]hallenger|[Gg]reenfield')",
+  "+RECORDED = {('glm_tpu/distributed/parallel_state.py', 'WS32 launch/JAX/topology fleet mapping drifted'): 'wire.json', ('glm_tpu/model_loader/sharded_state/loader.py', 'WS32 tensor checksum drifted while loading '): 'checkpoint_identity.json', ('glm_tpu/model_loader/sharded_state/verify.py', 'WS32 local slot layout must not contain foreign slot '): 'checkpoint_identity.json', ('glm_tpu/model_loader/sharded_state/verify.py', 'WS32 runtime file/tensor checksum drifted: '): 'checkpoint_identity.json', ('glm_tpu/model_loader/sharded_state/verify.py', 'WS32 runtime manifest identity drifted'): 'checkpoint_identity.json', ('glm_tpu/model_loader/sharded_state/verify.py', 'WS32 runtime SUCCESS identity drifted'): 'checkpoint_identity.json'}",
 ]

@@ -187,7 +187,7 @@ class RuntimePackConfig:
         object.__setattr__(self, "output_dir", Path(self.output_dir))
         # The approved buckets are the site's storage.allowed_source_uri_prefixes.
         if not approved_source_uri(self.source_uri):
-            raise ValueError("WS32 source URI must use the approved bucket")
+            raise ValueError("source URI must use the approved bucket")
         require_digest(self.code_hash, field="code_hash", lengths=(40, 64))
         require_digest(self.mesh_hash, field="mesh_hash")
 
@@ -254,7 +254,7 @@ def build_runtime_file_plans(
                 placement.global_shape,
                 placement.partition_spec,
             ):
-                raise CheckpointValidationError(f"WS32 destination schema drifted for {key!r}")
+                raise CheckpointValidationError(f"destination schema drifted for {key!r}")
     plans = []
     for slot in range(32):
         offset = 0
@@ -276,7 +276,7 @@ def build_runtime_file_plans(
             )
             offset += byte_count
         if not tensors:
-            raise CheckpointValidationError(f"WS32 slot {slot} has no tensors")
+            raise CheckpointValidationError(f"slot {slot} has no tensors")
         header = _header_bytes(
             slot=slot,
             tensors=tensors,
@@ -298,9 +298,9 @@ def build_runtime_file_plans(
         )
     reference = tuple(item.schema_dict() for item in plans[0].tensors)
     if any(tuple(item.schema_dict() for item in plan.tensors) != reference for plan in plans[1:]):
-        raise CheckpointValidationError("WS32 final-owner tensor schemas must be identical on all slots")
+        raise CheckpointValidationError("final-owner tensor schemas must be identical on all slots")
     if any(plan.payload_bytes != report.bytes_by_slot[plan.device_slot] for plan in plans):
-        raise CheckpointValidationError("WS32 file plans disagree with placement bytes")
+        raise CheckpointValidationError("file plans disagree with placement bytes")
     return report, tuple(plans)
 
 
@@ -310,7 +310,7 @@ def _validate_finite_chunk(raw: bytes, dtype: str) -> None:
     if dtype == "U8":
         values = np.frombuffer(raw, dtype=np.uint8)
         if bool(np.any((values == 0x7F) | (values == 0xFF))):
-            raise CheckpointValidationError("WS32 FP8 payload contains non-finite bits")
+            raise CheckpointValidationError("FP8 payload contains non-finite bits")
         return
     if dtype == "F32":
         values = np.frombuffer(raw, dtype=np.float32)
@@ -319,9 +319,9 @@ def _validate_finite_chunk(raw: bytes, dtype: str) -> None:
 
         values = np.frombuffer(raw, dtype=ml_dtypes.bfloat16)
     else:
-        raise CheckpointValidationError(f"unsupported WS32 dtype {dtype!r}")
+        raise CheckpointValidationError(f"unsupported dtype {dtype!r}")
     if not bool(np.all(np.isfinite(values))):
-        raise CheckpointValidationError(f"WS32 {dtype} payload is non-finite")
+        raise CheckpointValidationError(f"checkpoint {dtype} payload is non-finite")
 
 
 def destination_record(
@@ -338,7 +338,7 @@ def destination_record(
     with path.open("rb", buffering=0) as stream:
         header = stream.read(len(plan.header))
         if header != plan.header:
-            raise CheckpointValidationError(f"WS32 destination header drifted for {plan.filename!r}")
+            raise CheckpointValidationError(f"destination header drifted for {plan.filename!r}")
         file_digest.update(header)
         file_crc32c.update(header)
         for tensor in plan.tensors:
@@ -352,7 +352,7 @@ def destination_record(
                     requested = alignment
                 raw = stream.read(requested)
                 if len(raw) != requested:
-                    raise CheckpointValidationError(f"WS32 tensor {tensor.name!r} is truncated")
+                    raise CheckpointValidationError(f"tensor {tensor.name!r} is truncated")
                 _validate_finite_chunk(raw, tensor.dtype)
                 digest.update(raw)
                 file_digest.update(raw)
@@ -360,9 +360,9 @@ def destination_record(
                 remaining -= len(raw)
             tensor_hashes.append(digest.hexdigest())
         if stream.read(1):
-            raise CheckpointValidationError(f"WS32 destination {plan.filename!r} has trailing bytes")
+            raise CheckpointValidationError(f"destination {plan.filename!r} has trailing bytes")
     if path.stat().st_size != plan.file_bytes:
-        raise CheckpointValidationError(f"WS32 destination size drifted for {plan.filename!r}")
+        raise CheckpointValidationError(f"destination size drifted for {plan.filename!r}")
     return {
         "device_slot": plan.device_slot,
         "crc32c": base64.b64encode(file_crc32c.digest()).decode("ascii"),

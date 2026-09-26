@@ -233,5 +233,5 @@ def build_main_rope_table(config: CacheConfig) -> Any:
         theta=MAIN_ROPE_THETA,
     )
     if table.shape != config.main_rope_table_shape:
-        raise PlanValidationError("WS32 main rotary table geometry drifted")
+        raise PlanValidationError("main rotary table geometry drifted")
     return table

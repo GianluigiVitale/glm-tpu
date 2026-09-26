@@ -53,7 +53,7 @@ def _canonical_json(value: Any) -> str:
 
 def _slot(expert: int, feature: int) -> int:
     if not 0 <= expert < 8 or not 0 <= feature < 4:
-        raise PlanValidationError("WS32 logical coordinates are out of range")
+        raise PlanValidationError("logical coordinates are out of range")
     return expert * 4 + feature
 
 
@@ -91,9 +91,9 @@ def _require_source_contract(
         layer = int(layer_text)
         expert = int(expert_text)
         if geometry.mlp_layer_types[layer] != "sparse":
-            raise PlanValidationError("WS32 routed expert appears in a dense layer")
+            raise PlanValidationError("routed expert appears in a dense layer")
         if not 0 <= expert < geometry.num_routed_experts:
-            raise PlanValidationError("WS32 routed expert id is out of range")
+            raise PlanValidationError("routed expert id is out of range")
         weight_shape = (
             (geometry.hidden_size, geometry.moe_intermediate_size)
             if projection == "down_proj"
@@ -104,7 +104,7 @@ def _require_source_contract(
         layer_text, projection, role = shared.groups()
         layer = int(layer_text)
         if geometry.mlp_layer_types[layer] != "sparse":
-            raise PlanValidationError("WS32 shared expert appears in a dense layer")
+            raise PlanValidationError("shared expert appears in a dense layer")
         weight_shape = (
             (geometry.hidden_size, geometry.moe_intermediate_size)
             if projection == "down_proj"
@@ -115,7 +115,7 @@ def _require_source_contract(
         layer_text, projection, role = dense.groups()
         layer = int(layer_text)
         if geometry.mlp_layer_types[layer] != "dense":
-            raise PlanValidationError("WS32 dense MLP appears in a sparse layer")
+            raise PlanValidationError("dense MLP appears in a sparse layer")
         weight_shape = (
             (geometry.hidden_size, geometry.dense_intermediate_size)
             if projection == "down_proj"
@@ -126,7 +126,7 @@ def _require_source_contract(
         layer_text, role = router.groups()
         layer = int(layer_text)
         if geometry.mlp_layer_types[layer] != "sparse":
-            raise PlanValidationError("WS32 router appears in a dense layer")
+            raise PlanValidationError("router appears in a dense layer")
         expected = (
             ("BF16", (geometry.num_routed_experts, geometry.hidden_size))
             if role == "weight"
@@ -182,13 +182,13 @@ def _require_source_contract(
                 expected = _fp8_contract(weight_shape, geometry)[1]
                 break
     if expected is None:
-        raise PlanValidationError(f"WS32 has no source geometry contract for {source.name!r}")
+        raise PlanValidationError(f"no source geometry contract for {source.name!r}")
     if source.layer_id is not None and ".self_attn.indexer." in source.name:
         if geometry.indexer_types[source.layer_id] != "full":
-            raise PlanValidationError("WS32 full indexer tensor appears in a shared layer")
+            raise PlanValidationError("full indexer tensor appears in a shared layer")
     if (source.dtype, source.shape) != expected:
         raise PlanValidationError(
-            f"WS32 source geometry drifted for {source.name!r}: "
+            f"source geometry drifted for {source.name!r}: "
             f"observed={(source.dtype, source.shape)!r}, expected={expected!r}"
         )
 
@@ -199,7 +199,7 @@ def _slice_bounds(
     coordinates: tuple[int, ...],
 ) -> tuple[tuple[int, ...], tuple[int, ...]]:
     if len(shape) != len(partitions):
-        raise PlanValidationError("WS32 slice rank and partition rank disagree")
+        raise PlanValidationError("slice rank and partition rank disagree")
     starts: list[int] = []
     stops: list[int] = []
     for dimension, partition_axis in zip(shape, partitions, strict=True):
@@ -210,7 +210,7 @@ def _slice_bounds(
         divisor = (8, 4)[partition_axis]
         coordinate = coordinates[partition_axis]
         if dimension % divisor:
-            raise PlanValidationError(f"WS32 dimension {dimension} does not divide over {divisor}")
+            raise PlanValidationError(f"dimension {dimension} does not divide over {divisor}")
         width = dimension // divisor
         starts.append(coordinate * width)
         stops.append((coordinate + 1) * width)
@@ -264,14 +264,14 @@ class SourcePlacement:
         for field in tuple_fields:
             object.__setattr__(self, field, tuple(getattr(self, field)))
         if self.source_dtype not in _DTYPE_BYTES or (self.destination_dtype not in _DTYPE_BYTES):
-            raise PlanValidationError("WS32 placement dtype is unsupported")
+            raise PlanValidationError("placement dtype is unsupported")
         if self.source_dtype == "F8_E4M3":
             if self.destination_dtype != "U8" or self.transform != "fp8_bits":
-                raise PlanValidationError("WS32 FP8 storage must remain exact U8 bits")
+                raise PlanValidationError("FP8 storage must remain exact U8 bits")
         elif self.source_dtype != self.destination_dtype or self.transform != "identity":
-            raise PlanValidationError("WS32 non-FP8 placement must be identity")
+            raise PlanValidationError("non-FP8 placement must be identity")
         if self.slot != _slot(self.expert_coordinate, self.feature_coordinate):
-            raise PlanValidationError("WS32 placement slot/coordinate mismatch")
+            raise PlanValidationError("placement slot/coordinate mismatch")
         for shape, starts, stops, label in (
             (
                 self.source_shape,
@@ -287,15 +287,15 @@ class SourcePlacement:
             ),
         ):
             if len(shape) != len(starts) or len(shape) != len(stops):
-                raise PlanValidationError(f"WS32 {label} slice rank drifted")
+                raise PlanValidationError(f"placement {label} slice rank drifted")
             if any(
                 not 0 <= start < stop <= dimension for dimension, start, stop in zip(shape, starts, stops, strict=True)
             ):
-                raise PlanValidationError(f"WS32 {label} slice is out of range")
+                raise PlanValidationError(f"placement {label} slice is out of range")
         if self.source_element_count != self.destination_element_count:
-            raise PlanValidationError("WS32 source/destination slice bytes drifted")
+            raise PlanValidationError("source/destination slice bytes drifted")
         if len(self.global_shape) != len(self.partition_spec):
-            raise PlanValidationError("WS32 global shape/spec rank drifted")
+            raise PlanValidationError("global shape/spec rank drifted")
 
     @property
     def source_element_count(self) -> int:
@@ -347,9 +347,9 @@ class RuntimePlacementReport:
     def __post_init__(self) -> None:
         object.__setattr__(self, "bytes_by_slot", tuple(self.bytes_by_slot))
         if len(self.bytes_by_slot) != 32 or len(set(self.bytes_by_slot)) != 1:
-            raise PlanValidationError("WS32 runtime placements must balance 32 slots")
+            raise PlanValidationError("runtime placements must balance 32 slots")
         if sum(self.bytes_by_slot) != self.packed_bytes:
-            raise PlanValidationError("WS32 runtime placement bytes do not reconcile")
+            raise PlanValidationError("runtime placement bytes do not reconcile")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -425,7 +425,7 @@ def placements_for_source_tensor(
     router = _ROUTER.fullmatch(source.name)
     if ".mlp." in source.name:
         if sum(value is not None for value in (routed, shared, dense, router)) != 1:
-            raise PlanValidationError(f"WS32 has no unique MLP placement for {source.name!r}")
+            raise PlanValidationError(f"no unique MLP placement for {source.name!r}")
         if routed is not None:
             _, expert_text, projection, _ = routed.groups()
             expert_id = int(expert_text)
@@ -554,7 +554,7 @@ def placements_for_source_tensor(
     ):
         partitions = (1, 0)
     else:
-        raise PlanValidationError(f"WS32 has no non-MLP placement rule for {source.name!r}")
+        raise PlanValidationError(f"no non-MLP placement rule for {source.name!r}")
     return tuple(
         _placement(
             source,
@@ -582,7 +582,7 @@ def build_runtime_placement_report(
     """Hash and reconcile every declarative base-checkpoint placement."""
 
     if inventory.model_id != geometry.model_id:
-        raise PlanValidationError("WS32 inventory/model ids disagree")
+        raise PlanValidationError("inventory/model ids disagree")
     base_tensors = tuple(
         tensor for tensor in inventory.tensors if tensor.layer_id is None or tensor.layer_id < geometry.num_layers
     )
@@ -615,20 +615,20 @@ def build_runtime_placement_report(
             != invariant
             for item in placements[1:]
         ):
-            raise PlanValidationError(f"WS32 destination schema disagrees for slot {slot} tensor {destination_name!r}")
+            raise PlanValidationError(f"destination schema disagrees for slot {slot} tensor {destination_name!r}")
         if len(placements) == 1:
             item = placements[0]
             if item.destination_starts != (0,) * len(item.destination_shape) or (
                 item.destination_stops != item.destination_shape
             ):
-                raise PlanValidationError(f"WS32 singleton destination {destination_name!r} is incomplete")
+                raise PlanValidationError(f"singleton destination {destination_name!r} is incomplete")
             continue
         if len(placements) != geometry.num_routed_experts // 8:
-            raise PlanValidationError(f"WS32 aggregate destination {destination_name!r} has wrong arity")
+            raise PlanValidationError(f"aggregate destination {destination_name!r} has wrong arity")
         ordered = sorted(placements, key=lambda item: item.destination_starts)
         for local_expert, item in enumerate(ordered):
             if _ROUTED.fullmatch(item.source_name) is None:
-                raise PlanValidationError(f"WS32 non-routed destination {destination_name!r} overlaps")
+                raise PlanValidationError(f"non-routed destination {destination_name!r} overlaps")
             if item.destination_starts != (
                 local_expert,
                 *(0 for _ in item.destination_shape[1:]),
@@ -636,7 +636,7 @@ def build_runtime_placement_report(
                 local_expert + 1,
                 *item.destination_shape[1:],
             ):
-                raise PlanValidationError(f"WS32 routed destination {destination_name!r} has a gap or overlap")
+                raise PlanValidationError(f"routed destination {destination_name!r} has a gap or overlap")
     return RuntimePlacementReport(
         source_inventory_sha256=inventory.inventory_sha256,
         geometry_sha256=geometry.geometry_hash,

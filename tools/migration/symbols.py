@@ -43,7 +43,10 @@ G. ``[messages."<path>"]`` (S5 WU-R): reviewed rewrites of whole string literals
    spelling of a key -- an f-string part, an implicit concatenation, escapes -- is refused); ``--check``
    compares renamed or moved definitions with their base originals with the file's messages applied to
    the originals' string constants, compares each listed file whole with its base-commit text through
-   the table's renames and messages (imports aside), and reports a key left in the file.
+   the table's renames and messages twice -- by AST (imports aside) and, from S5 WU-Docs, by token (every
+   token but the layout ones, so imports and comments included; a string literal compared by its value, an
+   f-string part by its text; formatting aside) -- and reports a key left in the file. A key must be one
+   whole literal or f-string part (the token comparison maps no implicit concatenation).
 
 Formatting, ruff and docstrings are S4.4 and the work units. Standard library plus libcst.
 """
@@ -55,11 +58,13 @@ from collections.abc import Iterable
 import copy
 from collections import defaultdict
 from dataclasses import dataclass, field
+import io
 import json
 import re
 import subprocess
 import symtable
 import textwrap
+import tokenize
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -1939,18 +1944,43 @@ def apply_messages(plan: Plan) -> list[str]:
     return changed
 
 
+_LAYOUT_TOKENS = frozenset({tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENDMARKER})
+
+
+def message_tokens(text: str, table: dict[str, str] | None = None, renames: dict[str, str] | None = None) -> list:
+    """The tokens ``--check`` compares for a ``[messages]`` file (S5 WU-Docs; FOLLOWUPS 124, 196): every token but
+    the layout ones in order, as ``(type, text)``; a string literal as the repr of its value and an f-string part
+    as its text, each mapped through ``table``, and a name through ``renames`` (both given for the base side)."""
+    table, renames, tokens = table or {}, renames or {}, []
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.type in _LAYOUT_TOKENS:
+            continue
+        value = token.string
+        if token.type == tokenize.STRING:
+            literal = ast.literal_eval(value)
+            value = repr(table.get(literal, literal) if isinstance(literal, str) else literal)
+        elif token.type == tokenize.FSTRING_MIDDLE:
+            value = table.get(value, value)
+        elif token.type == tokenize.NAME:
+            value = renames.get(value, value)
+        tokens.append((tokenize.tok_name[token.type], value))
+    return tokens
+
+
 def check_messages(plan: Plan) -> list[str]:
     """Problems of an applied ``[messages]``: a listed file differs from its base-commit text other than by
-    the table's renames and messages (imports aside), or a key is left in it."""
+    the table's renames and messages, by AST (imports aside) or by token (layout aside), or a key is left in it."""
     problems = []
     mapping = plan.mapping()
     for path, table in sorted(plan.messages.items()):
         try:
-            base = ast.parse(git("show", f"{plan.base}:{path}"))
+            text = git("show", f"{plan.base}:{path}")
         except subprocess.CalledProcessError:
             problems.append(f"{path}: not in {plan.base}")
             continue
-        current = ast.parse((REPO / path).read_text())
+        base = ast.parse(text)
+        current_text = (REPO / path).read_text()
+        current = ast.parse(current_text)
         renames = _renames_for(base, module_name(path), mapping)
         want = ast.dump(
             _Normalize(_module_aliases(base, plan.base), renames, plan.scopes, table).visit(copy.deepcopy(base))
@@ -1958,6 +1988,8 @@ def check_messages(plan: Plan) -> list[str]:
         have = ast.dump(_Normalize(_module_aliases(current), {}).visit(copy.deepcopy(current)))
         if want != have:
             problems.append(f"{path}: differs from {plan.base} other than by the table's renames and messages")
+        if message_tokens(text, table, renames) != message_tokens(current_text):
+            problems.append(f"{path}: tokens differ from {plan.base} other than by the table's renames and messages")
         problems += [f"{path}:{n.lineno}: message {n.value!r} is left" for n in _message_literals(current, table)]
     return problems
 

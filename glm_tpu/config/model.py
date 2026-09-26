@@ -172,7 +172,7 @@ class ModelGeometry:
             raise GeometryValidationError(f"expected model_type='glm_moe_dsa', got {config.get('model_type')!r}")
         quant = config.get("quantization_config")
         if not isinstance(quant, Mapping) or quant.get("quant_method") != "fp8":
-            raise GeometryValidationError("the greenfield target requires FP8 weights")
+            raise GeometryValidationError("the target model requires FP8 weights")
         fmt = require_nonempty(quant.get("fmt"), "quantization_config.fmt", GeometryValidationError)
         block_shape = quant.get("weight_block_size")
         if not isinstance(block_shape, Sequence) or isinstance(block_shape, str):

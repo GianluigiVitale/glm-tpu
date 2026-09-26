@@ -55,10 +55,10 @@ def validate_topology_fleet(
     if len(captures) != 8 or any(
         not isinstance(item, Mapping) or set(item) != _TOPOLOGY_CAPTURE_KEYS for item in captures
     ):
-        raise ValueError("WS32 topology fleet schema drifted")
+        raise ValueError("topology fleet schema drifted")
     ordered = tuple(sorted(captures, key=lambda item: item["launch_process_id"]))
     if [item["launch_process_id"] for item in ordered] != list(range(8)):
-        raise ValueError("WS32 topology launch identities drifted")
+        raise ValueError("topology launch identities drifted")
     contract = ordered[0]["contract"]
     contract_hash = sha256(
         json.dumps(
@@ -83,15 +83,15 @@ def validate_topology_fleet(
         or not item["captured_utc"]
         for item in ordered
     ):
-        raise ValueError("WS32 topology fleet contract drifted")
+        raise ValueError("topology fleet contract drifted")
     if sorted(item["jax_process_index"] for item in ordered) != list(range(8)):
-        raise ValueError("WS32 topology JAX process identities drifted")
+        raise ValueError("topology JAX process identities drifted")
     if len({item["hostname"] for item in ordered}) != 8:
-        raise ValueError("WS32 topology hostnames are not unique")
+        raise ValueError("topology hostnames are not unique")
 
     topology = PhysicalTopology.from_dict(contract["topology"])
     if topology.slice_name != slice_name or (topology.topology_hash != expected_topology_sha256):
-        raise ValueError("WS32 topology identity drifted")
+        raise ValueError("topology identity drifted")
     runtime_order = [
         [
             device.device_id
@@ -103,13 +103,13 @@ def validate_topology_fleet(
         for process_index in range(8)
     ]
     if runtime_order != [[process_index * 4 + offset for offset in range(4)] for process_index in range(8)]:
-        raise ValueError("WS32 topology runtime device order drifted")
+        raise ValueError("topology runtime device order drifted")
     if any(
         item["fleet_local_device_ids_in_runtime_order"] != runtime_order
         or item["local_device_ids"] != runtime_order[item["jax_process_index"]]
         for item in ordered
     ):
-        raise ValueError("WS32 topology local ownership drifted")
+        raise ValueError("topology local ownership drifted")
     projection = {
         "fleet_local_device_ids_in_runtime_order": runtime_order,
         "records": [
@@ -136,7 +136,7 @@ def validate_topology_fleet(
         ).encode("utf-8")
     ).hexdigest()
     if observed_fleet_sha256 != expected_fleet_sha256:
-        raise ValueError("WS32 topology fleet identity drifted")
+        raise ValueError("topology fleet identity drifted")
     return topology, ordered, observed_fleet_sha256
 
 

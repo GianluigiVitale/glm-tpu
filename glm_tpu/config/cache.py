@@ -233,48 +233,48 @@ class CacheConfig:
     def __post_init__(self) -> None:
         geometry = self.geometry
         if geometry.num_layers <= 0:
-            raise PlanValidationError("WS32 decoder requires transformer layers")
+            raise PlanValidationError("decoder requires transformer layers")
         if (
             not isinstance(self.context_capacity, int)
             or isinstance(self.context_capacity, bool)
             or not (0 < self.context_capacity <= geometry.max_position_embeddings)
         ):
-            raise PlanValidationError("WS32 decoder context capacity is invalid")
+            raise PlanValidationError("decoder context capacity is invalid")
         if self.logical_page_size <= 0 or self.logical_page_size % 8:
-            raise PlanValidationError("WS32 decoder page must divide over expert-8")
+            raise PlanValidationError("decoder page must divide over expert-8")
         if self.packed_cache_width != (geometry.kv_lora_rank + geometry.qk_rope_head_dim + 64):
-            raise PlanValidationError("WS32 packed cache width contract drifted")
+            raise PlanValidationError("packed cache width contract drifted")
         if self.sparse_segment_block <= 0 or (geometry.dsa_top_k % self.sparse_segment_block):
-            raise PlanValidationError("WS32 sparse segment does not divide DSA top-k")
+            raise PlanValidationError("sparse segment does not divide DSA top-k")
         if self.sparse_segment_block % 128:
-            raise PlanValidationError("WS32 compiled sparse segment must divide into 128")
+            raise PlanValidationError("compiled sparse segment must divide into 128")
         if (
             not isinstance(self.rms_norm_epsilon, (int, float))
             or isinstance(self.rms_norm_epsilon, bool)
             or self.rms_norm_epsilon <= 0
         ):
-            raise PlanValidationError("WS32 RMS epsilon must be positive")
+            raise PlanValidationError("RMS epsilon must be positive")
         if not isinstance(self.exact_dsa, bool):
-            raise PlanValidationError("WS32 exact DSA flag must be boolean")
+            raise PlanValidationError("exact DSA flag must be boolean")
         if not isinstance(self.strategy_nd_dense, bool):
-            raise PlanValidationError("WS32 StrategyND dense flag must be boolean")
+            raise PlanValidationError("StrategyND dense flag must be boolean")
         if not isinstance(self.host_main_rope_table, bool):
-            raise PlanValidationError("WS32 host main-rotary table flag must be boolean")
+            raise PlanValidationError("host main-rotary table flag must be boolean")
         if self.strategy_nd_dense and (
             geometry.hidden_size != 6144
             or geometry.dense_intermediate_size != 12288
             or geometry.first_dense_layers != 3
             or geometry.fp8_block_shape != (128, 128)
         ):
-            raise PlanValidationError("WS32 StrategyND dense path requires exact GLM-5.2 geometry")
+            raise PlanValidationError("StrategyND dense path requires exact GLM-5.2 geometry")
         if not self.full_index_slots or self.full_index_slots[0] != 0:
-            raise PlanValidationError("WS32 layer zero must seed IndexShare state")
+            raise PlanValidationError("layer zero must seed IndexShare state")
         producer: int | None = None
         for layer_id, indexer_kind in enumerate(geometry.indexer_types):
             if indexer_kind == "full":
                 producer = layer_id
             elif producer is None or layer_id - producer >= geometry.index_share_group_size:
-                raise PlanValidationError("WS32 IndexShare schedule drifted")
+                raise PlanValidationError("IndexShare schedule drifted")
 
     @property
     def main_rope_table_shape(self) -> tuple[int, int]:
