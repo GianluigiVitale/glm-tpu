@@ -64,9 +64,9 @@
  "gate": "G2-protocol",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "WU-R"
+  "reason": "H11"
  },
- "recorded_unix": 1790322547,
+ "recorded_unix": 1790421515,
  "runtime": {
   "166912+donated": {
    "admissions": [
@@ -1239,7 +1239,7 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "f5745edbb1e5157b5f22d7558a6ed463de046400",
+  "head": "e61145fc357317f13ff9cddc2bf59d2b031339da",
   "production_paths_equal_baseline": false
  },
  "tier": "production",
@@ -1268,7 +1268,7 @@
      "maximum_collective_payload_bytes": 32768,
      "num_partitions": 32,
      "passed": true,
-     "profile": "research_ws32_axis_payload_v1"
+     "profile": "ws32_axis_payload_v1"
     },
     "verdict": "accepted"
    },
