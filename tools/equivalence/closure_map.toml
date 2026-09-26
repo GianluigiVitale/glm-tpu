@@ -12,9 +12,6 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-# S5 WU-C1: cli/main.py imports the subcommand base class and the prepare-request subcommand at module level.
-"glm_tpu.entrypoints.cli.types" = "WU-C: the subcommand base class, CLISubcommand (G6 controller stage)"
-"glm_tpu.entrypoints.cli.prepare" = "WU-C: the prepare-request subcommand split out of cli.main (G6 controller stage)"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
