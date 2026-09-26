@@ -2,7 +2,7 @@
 
 A private, loopback web interface with saved conversations, streamed thinking
 and answers, copy, rename/delete, light/dark themes and a mobile layout. It
-attaches to an **already running 32K resident session**. It never loads weights,
+attaches to an **already running resident session**. It never loads weights,
 starts TPU workers or unloads the model when the browser or UI server closes.
 
 ## Open the workspace
@@ -37,7 +37,8 @@ Each turn includes that conversation's previous user messages and completed
 final answers. Thinking is displayed separately and is not replayed as an
 assistant answer. Other conversations' histories never enter the request.
 The complete template/history/input is tokenized without truncation; thinking
-and answer receive **all remaining slots of the 32,768-slot cache**. There is
+and answer receive **all remaining slots of the session's cache** (32,768 slots
+for a session started with the default `--context 32k`). There is
 no separate short-output default or thinking budget. Oversized input is rejected
 before submission. Context exhaustion is visibly incomplete.
 
@@ -69,30 +70,19 @@ startup and queue wait. This UI does not change the model's measured performance
 ## Design provenance
 
 The palette, sidebar, message layout, composer and responsive styling are adapted
-from the owner's private [as-pt](https://github.com/GianluigiVitale/as-pt) project,
-`aspt_rag/web/index.html`, commit
-`4ed7937910538eef2754b31d0af316c6888ad9ba`. Original file SHA256:
-`3b93ef59be703bf7caba4bdee9b74d3c0f10e00d3dbb944867110560feb925d3`.
-The GLM resident bridge and conversation frontend are implemented here; the
-reference archive's retrieval/citation logic and private data are not included.
-
-Read-only inspection confirmed that the exact same HTML is backed up at
-`repos/aspt/aspt_rag/web/index.html` in both reference buckets:
-
-| Bucket | Exact generation | Region |
-|---|---:|---|
-| `driftbench-storage` | `1783351597625998` | EUROPE-WEST4 |
-| `driftbench-v5e-euw4` | `1788025839615601` | EUROPE-WEST4 |
-
-Neither reference bucket was changed. New GLM source backups remain in the
-approved US-CENTRAL2 bucket. Reuse is owner-authorized inside this private
-project; this notice does not assign a new license to the reference UI.
+from the owner's own private `as-pt` project, file `aspt_rag/web/index.html` at
+commit `4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256
+`3b93ef59be703bf7caba4bdee9b74d3c0f10e00d3dbb944867110560feb925d3`; the owner's
+backups of that file were checked to be byte-identical and were not changed).
+The GLM resident bridge and conversation frontend are implemented here; that
+project's retrieval and citation logic and its private data are not included.
+The owner contributes the adaptation under this repository's license; nothing
+else of `as-pt` is licensed by it ([notices](../THIRD_PARTY_NOTICES.md)).
 
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/serve/test_http_handler.py tests/entrypoints/ui/test_conversations.py
-node --check glm_tpu/entrypoints/ui/static/app.js
+JAX_PLATFORMS=cpu python -m pytest -q -p no:cacheprovider tests/entrypoints/serve/test_http_handler.py tests/entrypoints/ui/test_conversations.py
 ```
 
 The CPU checks use a synthetic resident adapter to verify queue ordering, history
@@ -101,10 +91,10 @@ rejection and HTTP origin boundaries. They require no weights, TPU or cloud.
 Real-model and browser validation receipts remain outside Git; only their
 sanitized summary belongs in the release documentation.
 
-On September22, two real browser turns completed at normal EOS: an arithmetic
+On September 22, two real browser turns completed at normal EOS: an arithmetic
 answer and a follow-up recalling both its result and a supplied project name.
-They used the existing loaded model (resident sequences771–772), with37/127
-input tokens,279/90 output tokens and13.51/13.46 decode tokens/s. Both eight-host
+They used the existing loaded model (resident sequences 771–772), with 37/127
+input tokens, 279/90 output tokens and 13.51/13.46 decode tokens/s. Both eight-host
 receipts passed. Browser checks covered desktop, mobile without horizontal
 overflow, dark mode and restored conversation history after reload. These are
 interface smoke checks, not additional GSM8K benchmark results. Raw prompts,

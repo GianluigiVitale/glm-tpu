@@ -14,7 +14,8 @@ therefore share one sequential queue.
 
 The API is on by default when the workspace starts; `--no-api` serves only the
 browser. A key is created at `<state>/api-key` (0600) on first start and printed
-by path, never by value:
+by path, never by value (`--api-key-file` names another location). Run the server
+on the resident controller's host, from the published checkout:
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
@@ -31,7 +32,7 @@ must be 8011. Requests to `/v1` do not use the browser's `X-GLM-UI` gate, and th
 API key does not open `/api/chat`.
 
 ```bash
-export GLM_API_KEY="$(ssh tpubox cat /path/to/private-chats/api-key)"
+export GLM_API_KEY="$(ssh <controller-host> cat /absolute/path/outside-the-repository/private-chats/api-key)"
 curl -s http://127.0.0.1:8011/v1/models -H "Authorization: Bearer $GLM_API_KEY"
 ```
 
@@ -83,7 +84,7 @@ the resident token stream at roughly four per second, not one per token.
 
 ## Limits that will shape an agent loop
 
-The retained session decodes **one request at a time** at about 13.5 tokens/s.
+The resident session decodes **one request at a time** at about 13.5 tokens/s.
 Concurrent client requests queue rather than run together; up to ten may wait.
 There is no way to make this parallel without a different session.
 
@@ -120,13 +121,14 @@ repeatedly refilling a small one.
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/openai/test_serving_chat.py tests/entrypoints/openai/test_serving_models.py tests/entrypoints/serve/test_http_handler.py
+JAX_PLATFORMS=cpu python -m pytest -q -p no:cacheprovider tests/entrypoints/openai/test_serving_chat.py tests/entrypoints/openai/test_serving_models.py tests/entrypoints/serve/test_http_handler.py tests/entrypoints/serve/test_server.py
 ```
 
 These cover message conversion, tool-call render and parse, `tool_choice`
-handling, statelessness, capacity rejection, streaming order, key boundaries and
-backend-failure reporting with a synthetic resident. They need no weights, TPU or
-cloud access.
+handling, statelessness, capacity rejection, streaming order, key boundaries,
+backend-failure reporting and the server's command line with a synthetic
+resident. They need no weights, TPU or cloud access. The server's code is
+`glm_tpu/entrypoints/serve/` and `glm_tpu/entrypoints/openai/`.
 
 On 2026-09-22 four bounded requests ran against the loaded model: a plain answer,
 a real `get_weather` tool call, the tool result, and a streamed answer —

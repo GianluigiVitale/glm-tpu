@@ -1,149 +1,144 @@
-# Operations and recovery constraints
+# Operations and recovery
 
-Targets the existing 8-host/32-chip TPU v4 setup; does not provision infrastructure.
-Never manage TPU/VM/node/queued resources, especially `db-v4-64-od-qr4`.
+The engine runs on one existing TPU v4 slice of eight hosts with four chips each.
+It never creates, resizes, restarts or deletes a TPU, VM or queued resource;
+provisioning is outside this repository. Everything site-specific comes from the
+site file ([INSTALLATION](INSTALLATION.md#the-site-file)).
 
-## Admission
+## Entry points
 
-Validate code/plan pins, topology, complete checkpoint/scale manifests, payload
-integrity, per-chip memory and disk headroom before launch. Existing benchmark
-requires 6 GiB free per host. Historical fit does not admit a changed capacity,
-executable set or deployment. Use original protections, not a second launcher
-that bypasses them. Both workload and sync leases serialize operations.
+| Entry | Role |
+|---|---|
+| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`verify` on local files; `ask` prepares requests and runs the controller |
+| `python -m glm_tpu.executor.multihost_executor` | the rank-0 controller: one request (or a resident session) on the fleet |
+| `python -m glm_tpu.worker.tpu_worker` | the per-host worker; the controller starts it on every host (it refuses to run without the controller's handshake) |
+| `python -m glm_tpu.model_loader.pack_worker` | the per-host checkpoint packer, started by a packing driver outside this repository ([CHECKPOINTS](CHECKPOINTS.md#packing)) |
+| `python -m glm_tpu.entrypoints.serve.server` | the loopback chat UI and `/v1` API attached to a resident session ([UI](../UI.md), [API](../API.md)) |
+| `glm_tpu/executor/remote/*.py` | standard-library helper programs the controller sends to the hosts as `python3 -c <text> <JSON>`; never run by hand |
+| `python -m tools.equivalence` | the CPU graph-equivalence gates ([README](../../tools/equivalence/README.md)); never touches a TPU |
 
-CPU tests require `JAX_PLATFORMS=cpu`. Never launch alongside an active campaign.
-Its source/enforcement remain frozen through execution AND sealing. Release
-preparation runs in an isolated worktree and does not touch its dependencies.
+The command line and the controller are not alternate ways around the controller's
+checks: a request reaches the TPU only through the controller.
 
-## Ordinary greedy deployment
+## Before a launch
 
-The ordinary controller is `glm_tpu.executor.multihost_executor`.
-Run it from a clean published `main` or `release/...` branch on authenticated
-rank0. It stages an exact Git archive into a fresh private run directory on
-each host, verifies its manifest and the pinned topology binding, and leaves
-the canonical research checkout untouched. It holds both workload leases
-through cleanup; both sync locks protect staging. The fixed greedy profile has
-8,192 combined slots. [STATUS](STATUS.md) records its admission separately.
+The controller runs on rank 0 (host 0 of the slice), from a checkout the site's
+`[launch]` policy admits (`glm_tpu/executor/launch_policy.py`): a branch matching
+`allowed_branches` (a detached HEAD is refused), an origin equal to
+`expected_origin` when set, a clean worktree and a HEAD equal to the origin's
+branch head when `require_clean` and `require_pushed` are set. The staged source
+is `git archive` of that commit, so an edit of the checkout during a run changes
+nothing that is sent.
 
-It has no attach, resume or automatic retry option. On failure, preserve its
-controller/worker identities, private logs, partial tokens and runtime records.
-An unresolved cleanup keeps the controller and leases alive. Authenticate the
-original PID/start/boot/argv before cleanup; an elapsed deadline does not permit
-another dispatch. Once terminal, collect the original records and verify all
-eight hosts idle. The legacy upload-recovery commands below do not apply to
-this controller.
+Keep the checkpoint, tokenizer files and topology binding in place
+([CHECKPOINTS](CHECKPOINTS.md)). JAX runs with `JAX_PLATFORMS=cpu` in every
+command except inside the workers, which the controller starts with the TPU
+platform.
 
-## Legacy sampled deployment branch
+## What a run does
 
-The release launcher accepts `--reviewed-branch main` (the default) or an explicit
-`release/...` branch. The controller requires a clean checkout, unchanged model
-source, the owner's private repository origin, and an exact code pin equal to
-the selected remote branch HEAD. The canonical controller may be on that named
-branch or detached at that exact pin; another named branch is refused. Detached
-deployment avoids checking out the same branch in two Git worktrees and leaves
-the research and release branch references intact. A detached checkout is not
-permission to use an unpublished pin or bypass clean/model-source checks.
-Workers independently check the origin and
-fetched HEAD before checking out the pin. A moving branch is a refusal, not
-permission to deploy unreviewed code.
+1. Validates the site file and the prepared request (outside the checkout,
+   owner-only), resolves the launch commit and reads the remote helper texts
+   of that commit (their SHA-256s go to the run's `helpers.json`).
+2. Creates an owner-only run directory under the site's `paths.run_root` and
+   prints `RUN <directory>`.
+3. Takes the site's locks: every `locks.workload` lock without waiting (a live
+   owner is a refusal) and every `locks.sync` lock, waiting (a scheduled backup
+   only delays staging).
+4. Checks over SSH that all eight hosts are idle and that it runs on rank 0.
+5. Stages the source archive, the request and the resolved site configuration
+   (`site.json`, bound by its SHA-256) to every host and runs a CPU-only worker
+   preflight on each; the eight environments must agree. It then releases the
+   sync locks.
+6. Starts the eight workers. Each verifies the staged source, the site, the
+   topology binding and the checkpoint, loads its owner files, compiles the
+   programs, checks the compiled graphs' collectives and the live memory, and
+   serves the request with an all-host vote at every phase and token.
+7. After the workers end (completion, stop or failure), checks all hosts idle
+   again, collects every host's records once (nothing is overwritten; a
+   divergent record is kept under `final/`), writes `controller_terminal.json`
+   and releases the workload locks.
 
-Attach must use the original recorded branch, tag and pin. Historical launch
-records without a branch field mean `rewrite/topology-first-decode`, never main;
-pass that branch explicitly when using this launcher with historical records.
+There is no attach, resume or automatic retry. `--wall-seconds` bounds the run
+(for a resident session: startup plus the first request group, then each later
+group).
 
-DB621 proved the reviewed detached release deployment. This removes the hard-coded research **branch**, not the existing fixed-site
-worktree/path admission. The canonical execution path is still
-`/home/gianl/glm-tpu-topology-rewrite`; the isolated release worktree is not
-launch-admitted. Never switch a live checkout during a request or its sealing.
-Main promotion uses the same reviewed deployment policy; it does not add a
-portable service or a different hardware installation.
+## Resident sessions
 
-### Cutover order (release admission executed for DB621)
+`--keep-loaded` keeps the workers, the loaded model and the workload locks after
+the first answer and serves later prepared requests from the run directory's
+`inbox/` in sequence order ([ordinary inference](OPTIMIZED_INFERENCE.md)). A
+resident session ends only when `inbox/stop.json` holds `{"stop":true}`, after
+outstanding work, or on a failure; either way the controller checks the hosts
+idle and collects the records before it releases the locks. A successful
+resident record says `all_hosts_idle_after=false`: the workers were meant to stay.
+Idle time has no timeout. The chat UI and the `/v1` API use the same inbox through
+one producer lock; run only one producer at a time.
 
-1. Owner cancelled remaining benchmark questions on2026-09-14. Stop only exact
-   authenticated original model workers, retaining supervisors/publication.
-   Establish terminal workers/publication and idle fleet from PID/start/boot and
-   census, not elapsed time. Preserve partial originals and cancellation evidence;
-   do not require a benchmark-success seal or rerun questions to permit cutover.
-   Keep original failed/incomplete verdicts and record any recovery pin separately.
-2. Acquire both canonical leases and verify an authenticated idle eight-host
-   census, source cleanliness, published owner refs and disk/RAM/retained assets.
-   Fix any 6 GiB disk-floor shortfall only with verified expendable local
-   copies; preserve active originals and do not make full-size weight backups.
-3. Preserve the research branch at its published pin. Fetch the reviewed release
-   ref and verify its exact expected commit before switching the **canonical
-   checkout** to that detached commit. Do not move the research ref, force a
-   branch already checked out elsewhere, reset files, or change the canonical
-   path to evade source admission. The release worktree stays on its branch.
-4. End the cutover lease scope, then invoke the default-off user controller with
-   the same reviewed ref/pin. It independently reacquires both leases, repeats
-   clean source/idle-fleet/asset checks and synchronizes the existing workers.
-   A competing owner, changed ref or dirty checkout is a refusal, not a retry.
-5. Run one bounded ordinary user prompt through the actual loader and response
-   path. Preserve first-token output, continuation, terminal stop reason, fresh
-   graph/HBM/trace evidence and authenticated cleanup. A cap-limited response
-   need not contain a final answer; report that honestly. One token alone cannot
-   validate decode. Diagnose new source/HLO mismatches rather than registering
-   hashes blindly. Never repeat the already sealed 128K/256K campaigns here.
-6. Seal the original user result, finish release review, verify regional mirror
-   coverage after the sync lease is free, then merge the eligible release into
-   private main. Record actual execution and release pins separately if later
-   documentation changes differ. Keep research history and branches intact.
+## Failures
 
-This sequence does not authorize source switching while the current campaign
-or its sealing is active. CPU branch tests are preparation, not cutover evidence.
-
-## Weights and storage
-
-Weights are external, not in Git. Current runtime uses four final-layout
-safetensors shards per host in tmpfs plus the dense overlay and canonical
-source/metadata. Tmpfs is volatile; mounted weights alone do not prove cold
-recovery. Release reconstruction instructions must be verified against retained
-sources before claiming reproducibility.
-
-Only `gs://driftbench-dsv4-uc`, US-CENTRAL2; live storage below 2.5 TB (decimal),
-soft delete off. No full-size safety copies. Artifacts over 100 GB need a
-peak/retained/replacement budget.
-Private questions/answers and raw databases stay outside Git; retain compact receipts.
-
-## Observe and recover
-
-Existing watchdog verifies process/libtpu ownership. Manual checks >=10 minutes
-apart unless diagnosing failure. Authenticate PID/start/boot/argv, not just logs.
-Timeout is not restart authority. Recover the SAME original tag/pin rather than
-rerunning successful model work; never fabricate terminal/publication markers.
-
-Seal original request/trace/state/memory evidence to DB and exact regional
-generations, then require authenticated 8/8 zero-work cleanup. Same live-session
-resume is not process-crash KV recovery. Regional mirror verification waits
-for the active sync lease; do not disable backups to make a release check pass.
-
-The user controller must run on worker0, where both canonical leases live.
-It remains default-off; its site-specific deployment passed DB621. It rejects attach-time
-request/deadline overrides and observes ambiguous SSH dispatch without repeating
-it. A prelaunch refusal and an unknown process wait are different: only the
-former can produce an explicit worker_started=false ended record. Collection
-success is transport only; user semantic replay/sealing still remains required.
-See user controller scope (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`) before attempting any invocation.
-
-### User request troubleshooting
+A deadline, a peer or delivery failure, or a worker exit poisons the request: it
+is never retried under a new sequence, and a resident session with a failed
+request ends. On failure the controller keeps the controller and worker
+identities, the per-rank logs, the partial tokens and the runtime records in the
+run directory. If it cannot verify that every host is idle after cleanup, it
+prints `Cleanup unresolved; workload leases retained` and waits, holding the
+workload locks, until an operator has authenticated the cleanup and ends it;
+inspect the run directory before anything else. Authenticate
+a process by its PID, start time, boot and command line (the records hold them)
+before stopping it; an elapsed deadline alone is not permission to stop or
+relaunch anything. Recover by preserving the original run directory, not by
+rerunning the model to regenerate evidence.
 
 | Observation | Action |
 |---|---|
-| Default-off or wrong source/ref refusal | Finish deployment admission; do not bypass the guard or switch live source. |
-| Workload or mirror lease busy | Observe the existing owner; never launch a duplicate or remove a lock. |
-| Disk, memory or archive-cap refusal | Diagnose the exact bounded resource; do not lower the floor or create a full-size safety copy. |
-| SSH observation lost during dispatch | Keep observing the same original owners; do not resend worker dispatch. |
-| Worker succeeded, upload failed | Diagnose storage/authentication/headroom, then use same-pin `--attach --republish-originals` under both leases. |
-| Model failed or no authenticated ended marker | Preserve the prefix and original logs; upload recovery cannot make this a completed request. |
-| Collection/replay/DB/archive interrupted | Attach to the same originals; immutable rows/objects are reused, not regenerated. |
-| Response stops at token cap during reasoning | Report the terminal reason; it is not necessarily a completed final answer or a quality pass. |
+| Launch-policy or source refusal | Publish the intended commit on an allowed branch and launch from a clean checkout of it; do not bypass the policy. |
+| Workload lock busy | Another model owns the fleet: use its inbox or wait for it; never remove a lock. |
+| Hosts not idle, or preflight environments differ | Find and authenticate the owner; do not launch beside it. |
+| Checkpoint or memory refusal | Diagnose the named pin or resource ([CHECKPOINTS](CHECKPOINTS.md)); do not lower a floor or repack an intact checkpoint. |
+| Output stops at the context limit during reasoning | Report the terminal reason; it is not a completed answer. |
+| Collection failed on a host | The other hosts' records are kept (`uncollected_ranks`); fetch that host's run directory by hand after it is idle. |
 
-Upload-only recovery preserves original failed markers in a separate archived
-receipt. It does not change model bytes, extend generation, waive original replay
-or repair missing/corrupted evidence. See the exact recovery scope (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`).
+## Diagnosing a run
 
-The release worktree's explicit backup pair and content comparison are installed.
-Follow mirror cutover (archived at tag `archive/research-20260922`: `docs/release/MIRROR_CUTOVER.md`) under the original leases and cron lock;
-the versioned script is not a way to bypass those locks. Final published-pin and
-checksum/generation evidence is linked from [release status](STATUS.md).
+A different token does not identify its cause: checkpoint corruption, cache
+ownership, rounding, an instrumented executable and an invalid comparison can all
+look alike. Work from one question to the smallest check that can decide it:
+
+1. **Establish identity.** Record the code, site, checkpoint, request, cache
+   history and executable identities (the run directory's records hold them). A
+   file name or a `passed` flag alone is not authority.
+2. **Find the first value that differs**, in causal order: loaded state, residual
+   operands, normalization, cache, query and key inputs, DSA selections, then the
+   output tokens. Stop at an evidence gap.
+3. **State a falsifiable hypothesis**: the boundary, the expected change and what
+   stays invariant. Prefer a recorded value or an existing graph over a new run.
+4. **Check observation effects.** A callback or an extra output can change
+   fusion and scheduling; an instrumented run is evidence about the original only
+   when its executable and outputs match.
+5. **Keep evidence levels apart.** CPU reference arithmetic, lowered StableHLO,
+   optimized TPU HLO, device values and end-to-end answers answer different
+   questions.
+6. **Preserve a useful failure**: its inputs, classification and location.
+
+| Question | Where to look |
+|---|---|
+| Which devices and groups take part? | `glm_tpu/distributed/mesh.py` (the physical mesh), `glm_tpu/distributed/topology.py` (the topology binding), `glm_tpu/runner/admission.py` and `glm_tpu/runner/hlo_utils.py` (the collective check of each compiled graph) |
+| What happened during the run? | the run directory: `controller_identity.json`, `helpers.json`, the per-rank logs and records, the token event files, `resident-measurement.json`, `controller_terminal.json` |
+| Did the tokens change after a code change? | `python -m tools.equivalence compare-run RUN --golden DIR` (token equivalence against earlier run directories, matched by request) |
+| Did a code change alter the device programs? | `python -m tools.equivalence check` on the CPU ([README](../../tools/equivalence/README.md)) |
+
+An incident note should hold: the question and expected outcome, the first failing
+boundary and the UTC run identity; the exact command, environment and identities;
+the relevant values with their schema and digest; observed output, memory and
+timings, each with its scope; failure logs and cleanup evidence; which statements
+are observed, inferred or missing; and one next step that can change the
+diagnosis. Keep weights, private questions and raw answers out of Git.
+
+## Weights and storage
+
+Weights are external and never in Git. The packed checkpoint lives in tmpfs on
+every host, which a host restart loses; mounted weights alone do not prove that a
+cold start will succeed. Keep private questions, answers and raw databases out of
+Git and keep compact receipts instead. Do not make full-size safety copies of the
+weights.
