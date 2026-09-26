@@ -9,16 +9,9 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
-# S5 WU-E2: Ws32RequestSession and its greedy subclass PackedRequestSession -> one RequestSession; the class entry
-# maps the shared methods, the exact step entry the greedy step production runs (BatchedSession stays, DN-22).
-"glm_tpu.engine.request_session:RequestSession" = "glm_tpu.engine.request_session:Ws32RequestSession"
-"glm_tpu.engine.request_session:RequestSession.step" = "glm_tpu.engine.request_session:PackedRequestSession.step"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-"glm_tpu.engine.request_session:PackedRequestSession" = "WU-E: merged into RequestSession"
-"glm_tpu.engine.request_session:PackedRequestSession.__init__" = "WU-E: merged into RequestSession.__init__"
-"glm_tpu.engine.request_session:SampledRequestPolicy" = "WU-E: FU-24, the frozen sampled policy removed"

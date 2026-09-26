@@ -1,6 +1,6 @@
 {
- "count": 602,
- "digest": "d821135d30198f776bda5e7a339421325eb3154d4426e8b3641dd8cf7e9e9952",
+ "count": 599,
+ "digest": "d12418b479f06d9c1375acafa3f1b32a5a88c4ebeaa53a3a9845f0f29dfde33c",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -176,23 +176,20 @@
   "glm_tpu.engine.request_session:BatchedSession.accept",
   "glm_tpu.engine.request_session:BatchedSession.require",
   "glm_tpu.engine.request_session:BatchedSession.run",
-  "glm_tpu.engine.request_session:PackedRequestSession",
-  "glm_tpu.engine.request_session:PackedRequestSession.__init__",
-  "glm_tpu.engine.request_session:PackedRequestSession.step",
   "glm_tpu.engine.request_session:RequestPolicy",
   "glm_tpu.engine.request_session:RequestPolicy.__post_init__",
   "glm_tpu.engine.request_session:RequestPolicy.__post_init__.<locals>.<genexpr>",
-  "glm_tpu.engine.request_session:SampledRequestPolicy",
-  "glm_tpu.engine.request_session:Ws32RequestSession",
-  "glm_tpu.engine.request_session:Ws32RequestSession.__init__",
-  "glm_tpu.engine.request_session:Ws32RequestSession._accept",
-  "glm_tpu.engine.request_session:Ws32RequestSession._begin",
-  "glm_tpu.engine.request_session:Ws32RequestSession._vote",
-  "glm_tpu.engine.request_session:Ws32RequestSession.accept_prefill",
-  "glm_tpu.engine.request_session:Ws32RequestSession.events",
-  "glm_tpu.engine.request_session:Ws32RequestSession.finished",
-  "glm_tpu.engine.request_session:Ws32RequestSession.release",
-  "glm_tpu.engine.request_session:Ws32RequestSession.ttft_seconds",
+  "glm_tpu.engine.request_session:RequestSession",
+  "glm_tpu.engine.request_session:RequestSession.__init__",
+  "glm_tpu.engine.request_session:RequestSession._accept",
+  "glm_tpu.engine.request_session:RequestSession._begin",
+  "glm_tpu.engine.request_session:RequestSession._vote",
+  "glm_tpu.engine.request_session:RequestSession.accept_prefill",
+  "glm_tpu.engine.request_session:RequestSession.events",
+  "glm_tpu.engine.request_session:RequestSession.finished",
+  "glm_tpu.engine.request_session:RequestSession.release",
+  "glm_tpu.engine.request_session:RequestSession.step",
+  "glm_tpu.engine.request_session:RequestSession.ttft_seconds",
   "glm_tpu.engine.resident_client:Resident",
   "glm_tpu.engine.resident_protocol:encode_command",
   "glm_tpu.engine.resident_protocol:inbox_name",
@@ -683,15 +680,15 @@
   "glm_tpu.worker.tpu_worker"
  ],
  "rebaseline": {
-  "closure_map": "98825c6bbeb5eb0b6903b41d461ec3cca054971a68e76d525975a5f6af43114e",
+  "closure_map": "a00d367ce928ef71124b7ac4a4a8704f3c04ad3857dab6dcd75d2407d878f868",
   "kind": "rename-only",
-  "previous_digest": "dfa5821ab67ff698a29c87efeff3aca275f10ed93e9b275d052a0b59f7687059",
-  "reason": "WU-S"
+  "previous_digest": "d821135d30198f776bda5e7a339421325eb3154d4426e8b3641dd8cf7e9e9952",
+  "reason": "WU-E"
  },
- "recorded_unix": 1790403544,
+ "recorded_unix": 1790413011,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "fd3086b0951bd6d47b48d39a968fcb3d7cfb5fcb",
+  "head": "b1271cf493c561975eec0b662c4bc323d21d2557",
   "production_paths_equal_baseline": false
  }
 }
