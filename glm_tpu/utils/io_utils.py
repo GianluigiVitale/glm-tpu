@@ -100,8 +100,8 @@ def read_bounded(path: Path, cap: int) -> bytes:
     Refused with ``ValueError``: a path through a symlink; anything but a regular file of 1 to ``cap`` bytes, such as
     a directory, a device, a FIFO (opened non-blocking, never waited on) or an empty or oversized file, checked on the
     open descriptor before any read ("request input is not a bounded regular file"); a file whose size leaves that
-    range while it is read. ``OSError`` from the open (a missing or unreadable file) propagates. The descriptor is
-    closed on every path."""
+    range while it is read. ``OSError`` from the open or the read (a missing, unreadable or unopenable file such as a
+    socket) propagates. The descriptor is closed on every path."""
     path = plain_path(path)
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:

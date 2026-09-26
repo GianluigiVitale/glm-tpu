@@ -72,12 +72,13 @@ HELP = {
     "": """\
 usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...
 
-Release information, local preparation and protected question submission.
+Release information, environment and checkpoint checks, local request preparation and question
+submission.
 
 positional arguments:
   {info,ask,collect-env,doctor,prepare-request,checkpoint}
     info                show supported scope and release limitations
-    ask                 answer questions on the retained TPU site; optionally batch up to four
+    ask                 answer questions on the configured TPU site; optionally batch up to four
     collect-env (doctor)
                         check installed version metadata without initializing TPU
     prepare-request     tokenize a private chat locally; does NOT launch inference
@@ -343,7 +344,11 @@ def test_every_argument_is_unchanged(monkeypatch):
     assert {name: arguments(p) for name, p in parsers.items()} == ARGUMENTS
     assert commands.choices["doctor"] is commands.choices["collect-env"]
     assert [(p.prog, p.description) for p in parsers.values()] == [
-        ("glm-tpu", "Release information, local preparation and protected question submission."),
+        (
+            "glm-tpu",
+            "Release information, environment and checkpoint checks, local request preparation and question"
+            " submission.",
+        ),
         *((f"glm-tpu {ALIASES.get(name, name)}", None) for name in list(ARGUMENTS)[1:]),
     ]
     defaults = argparse.ArgumentParser()

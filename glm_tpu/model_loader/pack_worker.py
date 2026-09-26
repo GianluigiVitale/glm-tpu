@@ -1,4 +1,4 @@
-"""CPU-only GLM-5.3 owner packing under the protected fleet workflow."""
+"""CPU-only GLM-5.3 owner packing on one host, started by the fleet packing workflow."""
 
 import argparse
 from hashlib import sha256

@@ -8,8 +8,8 @@ names). On the CPU mesh (32 forced devices, the frozen fixture's first dense lay
 owner) the canonical placement must equal those four placements written out one by one and, on CPU, every row in
 one call, for every live count of B128 and B114, with dead rows zero, padding ignored and a live non-finite row
 unhealthy at its own row.
-Ported from the research package's ``runtime/test_ws32_prefill_dense_canonical.py`` and the dense part of its
-``kernels/test_ws32_prefill_linear.py`` (``archive/research-20260922``).
+Ported from the research package's ``runtime/test_ws32_prefill_dense_canonical.py`` and, for the geometry refusals
+only, from its ``kernels/test_ws32_prefill_linear.py`` (``archive/research-20260922``).
 """
 
 from __future__ import annotations

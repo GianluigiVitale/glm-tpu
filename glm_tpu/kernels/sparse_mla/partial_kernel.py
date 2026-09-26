@@ -3,7 +3,7 @@
 This is a numerical boundary, not a bitwise replacement: owner-local
 softmax maxima change BF16 probability rounding and partial outputs round once
 before the FP32 LSE merge. Empty owners contribute zero, including an entirely
-empty selection. Decode retains the frozen selected-KV exchange.
+empty selection. Decode keeps the selected-KV exchange (``glm_tpu.kernels.sparse_mla.kernel``).
 """
 
 import jax

@@ -15,9 +15,9 @@ from typing import Any
 def build_cache_initializer(mesh: Any, config: Any) -> Any:
     """Compile fresh-cache allocation so its full device output is budgeted first.
 
-    Same values/sharding as make_ws32_batched_prefill_state; no model execution,
-    host-sized cache, existing-state donation or prompt-specific compilation.
-    The protected caller inspects its actual memory analysis BEFORE invocation.
+    Same values/sharding as a fresh prefill state (``batched_prefill_state_specs``); no model
+    execution, host-sized cache, existing-state donation or prompt-specific compilation.
+    The caller (the runner's memory admission) inspects its actual memory analysis BEFORE invocation.
     """
     import jax
     import jax.numpy as jnp

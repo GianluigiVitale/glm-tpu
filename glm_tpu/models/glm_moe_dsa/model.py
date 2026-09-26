@@ -1,9 +1,9 @@
 """The production greedy decode step (one token, all layers, one compiled shard_map program).
 
 Every layer runs ``decoder_layer.transformer_layer_bf16``: resident BF16 non-routed tables, the
-two-stage DSA selection, the frozen selected-KV sparse attention and the route-grouped FP8
-routed experts (``ROUTED_PROJECTION`` tiles); the head is the greedy split final sample. The
-release profile is the only one (S2d: the former ``Ws32PerfOptions`` accepted nothing else).
+two-stage DSA selection, the selected-KV sparse attention (``glm_tpu.kernels.sparse_mla``) and the
+route-grouped FP8 routed experts (``ROUTED_PROJECTION`` tiles); the head is the greedy split final
+sample. The release profile is the only one.
 """
 
 from __future__ import annotations
@@ -54,7 +54,8 @@ def decode_step(
     linear_interpret: bool = False,
     active: Any | None = None,
 ) -> DecodeStepResult:
-    """One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``)."""
+    """One greedy decode step over every layer (as the FP8-table ``_ws32_decode_impl`` archived at
+    ``archive/research-20260922``, with the BF16-resident layer bodies)."""
 
     validate_local_state(state, config)
     if active is not None and (active.shape != () or active.dtype != jnp.bool_):
@@ -166,11 +167,11 @@ def build_decoder_program(
     linear_interpret: bool = False,
     mask_finished: bool = False,
 ) -> DecoderProgram:
-    """Jitted shard_map with the frozen decoder's argument order.
+    """Jitted shard_map of the decode step, with the argument order of the archived FP8-table decoder.
 
     Arguments: ``(token, state, weights[, main_rope_table])`` -- the rotary table exactly when
-    ``config.host_main_rope_table``. Same in/out specs as the frozen programs (weights: the
-    resident BF16 tree). ``mask_finished=True`` appends one scalar boolean active argument and
+    ``config.host_main_rope_table``. Same in/out specs as the archived FP8-table programs (weights:
+    the resident BF16 tree). ``mask_finished=True`` appends one scalar boolean active argument and
     retains inactive cache rows at each layer's commit boundary.
     """
 

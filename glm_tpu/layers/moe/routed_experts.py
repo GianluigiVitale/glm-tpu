@@ -201,14 +201,15 @@ def moe_grouped_routes(
     interpret: bool = False,
     shared_bf16: tuple[Any, Any, Any],
 ) -> Any:
-    """Route-grouped challenger for ``ws32_moe_pallas_from_routes_mapped``.
+    """The decode MoE of one row with route-grouped routed experts.
 
     ``shared_bf16 = (gate, up, down)`` supplies the pre-decoded BF16 shared-expert
     tables (``glm_tpu.models.glm_moe_dsa.weights.bf16_resident_weights``); the
     shared projections are plain dots at the same FP32-accumulate boundaries.
 
     Same routed inputs, ownership rule, arithmetic boundaries and output as the
-    frozen body.  Structural differences only: all routed gate/up partials and the
+    per-expert form it replaced (``ws32_moe_pallas_from_routes_mapped``, archived at
+    ``archive/research-20260922``).  Structural differences only: all routed gate/up partials and the
     shared expert's partials cross the feature axis in ONE stacked FP32
     ``psum``; routed down projections run in one grouped kernel; no per-route
     ``lax.cond``.  ``config`` is the routed projections' tile contract; its

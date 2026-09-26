@@ -28,10 +28,11 @@ def prefill_dense(
 ) -> Any:
     """Batched reciprocal-sharded dense MLP, not the StrategyND overlay.
 
-    This is a candidate building block with the same numerical boundaries as
-    ``ws32_dense_pallas_mapped``. It is not automatically interchangeable with
-    the promoted decoder's StrategyND dense association. A future layer path
-    must earn its own bounded comparisons and §21 decoder evidence.
+    It has the numerical boundaries of the FP8-table ``ws32_dense_pallas_mapped``
+    (archived at ``archive/research-20260922``; :func:`dense_bf16` follows it), but it
+    is not interchangeable with the decoder's StrategyND dense association: a layer
+    path that switches between them needs its own bounded comparisons and
+    decoder-level evidence.
     """
 
     require_rows(hidden_local)
@@ -52,7 +53,10 @@ def prefill_dense(
 
 # ----------------------------------------------------------------------------- MLP bodies
 def dense_bf16(normalized: Any, weights: Bf16DenseWeights, *, expert_axis: str, feature_axis: str) -> Any:
-    """Mirror of ``ws32_dense_pallas_mapped`` on BF16 tables."""
+    """The decode dense MLP on BF16 tables.
+
+    Otherwise as the FP8-table ``ws32_dense_pallas_mapped`` archived at ``archive/research-20260922``.
+    """
 
     gate_partial = dot_f32(normalized, weights.gate_local)
     up_partial = dot_f32(normalized, weights.up_local)

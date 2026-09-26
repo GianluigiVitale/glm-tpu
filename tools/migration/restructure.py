@@ -9,7 +9,8 @@ top-level definitions moved to their final modules), ``renames.toml`` (S4.2, pub
 ``helper_names.toml`` (S4.4, the public names of the private helpers other modules import and the
 ``jax.named_scope`` names), ``test_moves.toml`` (S5 A2, tests moved to the test module of their
 subject), ``owed_tests.toml`` (S5 D, the reference cross-validation moved to the test module of its
-subject) and ``work_units.toml`` (the S5 work units' renames and reviewed message rewrites, first WU-R);
+subject) and ``work_units.toml`` (the S5 work units' renames and reviewed message rewrites, and the H-numbered
+host change H11; each version is checked at the commit that applied it);
 the S4 kinds (and S5's) are applied by ``symbols.py`` (its docstring has the rules).
 ``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4 when a moved
 or renamed definition differs from its base-commit original (imports aside), a dissolved module or

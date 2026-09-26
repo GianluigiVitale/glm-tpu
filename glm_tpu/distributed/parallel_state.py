@@ -79,7 +79,12 @@ def initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, An
 
 
 def _batched_fleet_all(value: bool) -> bool:
-    """Declared host-boundary consensus, never per-layer or per-token dispatch."""
+    """The all-host boolean vote at the declared host boundaries: each runtime phase, and each token's
+    validity and delivery.
+
+    Every call is one all-gather of the eight hosts' votes, run on the host between device calls; never
+    inside a layer or a compiled program.
+    """
     from jax.experimental import multihost_utils
 
     values = np.asarray(multihost_utils.process_allgather(np.asarray(int(value), np.int32)))

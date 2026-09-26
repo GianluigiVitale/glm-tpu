@@ -22,10 +22,9 @@ Two kinds of record come from here:
   calls.
 
 The frozen record (``safety_verdicts`` and ``run_safety``) keeps verdicts only (accepted / refused
-and the exception type, fits or not), so message wording and report contents -- which the work
-units change (WU-R renamed the admission functions and reworded the HLO refusals; H11 renames the HLO
-admission profile string) -- stay in the re-baselined characterization record; the frozen G1/G2 files
-keep what must never change.
+and the exception type, fits or not), so message wording and report contents -- which S5 changed
+(WU-R reworded three recorded HLO refusals; H11 renamed the HLO admission profile string) -- stay in the
+re-baselined characterization record; the frozen G1/G2 files keep what must never change.
 """
 
 from __future__ import annotations

@@ -49,7 +49,8 @@ HEAVY = {"G1", "G1-protocol", "G2", "G2-protocol", "G3", "G6", "G7", "G14"}
 FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
 # The load protocol, production defaults and full admission reports the program child also
 # records: host behaviour, option defaults and wording that planned stages change on purpose (S1 HLO
-# root, S2d knob removal, S4 renames, H11 profile string), so they are a characterization record.
+# root, S2d knob removal, S4 renames, WU-R refusal wording, H11 profile string), so they are a
+# characterization record.
 # What must never change -- the verify arguments, the probe and admission verdicts, the admission
 # requests (verdicts.py) -- is the frozen ``safety`` record in the G1/G2 files.
 PROTOCOL_OF = {"G1-protocol": "G1", "G2-protocol": "G2"}

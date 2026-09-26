@@ -111,7 +111,7 @@ def promote_stage_local_prefill_index_wk(
 
 
 def decode_fp8_table(bits: Any, scale: Any, *, block_shape: tuple[int, int] = (128, 128)) -> Any:
-    """Exactly the frozen kernels' per-element decode: ``bf16(f32(bits) * scale_block)``."""
+    """Exactly the FP8 kernels' per-element decode: ``bf16(f32(bits) * scale_block)``."""
 
     if bits.ndim != 2 or scale.ndim != 2 or bits.dtype != jnp.uint8 or scale.dtype != jnp.float32:
         raise ValueError("decode_fp8_table takes uint8 [N,K] bits and float32 [N/bn,K/bk] scales")

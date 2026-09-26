@@ -1,7 +1,7 @@
 """Frozen fixture v1: the small real-schema GLM checkpoint used by every CPU gate.
 
-It reproduces the random-number call order of the historical test fixture
-``tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture(mesh, panel_geometry=...)`` exactly
+It reproduces the random-number call order of the historical test fixture (archived at S2f; at ``eab8993f``:
+``tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture(mesh, panel_geometry=...)``) exactly
 (generator seed 921; per layer q/kv-a, attention, indexer, dense, MoE; then embedding, LM head and
 four trailing WK draws), but returns ``{checkpoint tensor name: numpy array}`` and binds it
 through the production name-based binder, so it does not depend on pytree field names.

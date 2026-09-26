@@ -1,4 +1,4 @@
-"""One private greedy request on the retained 32-chip site; no automatic retries.
+"""One private greedy request on the configured 32-chip site; no automatic retries.
 
 The site's [launch] policy decides which checkout may launch (branch patterns,
 origin, clean, pushed; glm_tpu.executor.launch_policy), and the staged source is

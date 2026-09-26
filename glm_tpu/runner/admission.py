@@ -4,12 +4,13 @@ from collections import Counter
 
 
 def check_hlo_collectives(text: str) -> dict:
-    """Fresh WS32 graph check: physical axis groups and bounded exchanges.
+    """Fresh graph check on the expert-8 x feature-4 mesh: physical axis groups and bounded exchanges.
 
-    This is a deliberately scoped structural check, not the frozen graph's
-    exact opcode/identity proof. CPU/TPU numerical evidence remains separate.
-    Both operands and results are checked, including async collective forms
-    normalized by the retained parser. Full-pod consensus is limited to4KiB.
+    This is a deliberately scoped structural check, not an exact opcode/identity
+    proof of the graph (no HLO seal is inherited). CPU/TPU numerical evidence
+    remains separate. Both operands and results are checked, including async
+    collective forms normalized by the HLO parser (``hlo_utils.parse_hlo_module``).
+    Full-pod consensus is limited to 4 KiB.
     """
     from glm_tpu.runner.hlo_utils import parse_hlo_module
 

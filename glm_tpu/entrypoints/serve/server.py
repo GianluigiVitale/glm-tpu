@@ -1,4 +1,4 @@
-"""Loopback chat UI attached to an existing resident GLM controller.
+"""Loopback chat UI and OpenAI-compatible API attached to an existing resident GLM controller.
 
 This process never initializes devices, starts workers, or sends a stop command.
 Private chat history and requests live outside the checkout.

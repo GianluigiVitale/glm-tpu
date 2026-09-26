@@ -3,10 +3,10 @@ the BF16-resident non-routed tables the decode and prefill bodies use.
 
 Measured on the pod (docs/perf, phase 4): a one-row ``[1,1536] x [2048,1536]``
 projection costs 43-60 us in every FP8-decoding form (Pallas or XLA) but
-10 us from a resident BF16 table.  TPU v4 has no FP8 datapath, so the frozen
-step spends ~40 ms of its 121 ms decoding e4m3 on the vector units.
+10 us from a resident BF16 table.  TPU v4 has no FP8 datapath, so the FP8-table
+decode step spent ~40 ms of its 121 ms decoding e4m3 on the vector units.
 
-The frozen kernels compute, per element, ``bf16(f32(bits) * scale_block)``
+The FP8 kernels compute, per element, ``bf16(f32(bits) * scale_block)``
 and feed that BF16 value to the MXU with FP32 accumulation.  Decoding the
 same expression once at load time and keeping the BF16 table resident gives
 bitwise-identical MXU operands, so this is an exact transformation of the
@@ -14,8 +14,8 @@ non-routed weights (attention q_a/kv_a/q_b/kv_b/o, DSA wq_b/wk, shared
 experts, dense layers).  Routed experts (22 GB/chip) stay FP8 and go through
 the route-grouped kernel.  Cost: about +1.8 GB HBM per chip.
 
-The decode bodies (``glm_tpu.models.glm_moe_dsa.decoder_layer``) mirror the research-era FP8
-bodies (archived at ``archive/research-20260922``) with the FP8 Pallas projection replaced by ``dot_general``
+The decode bodies (``glm_tpu.models.glm_moe_dsa.decoder_layer``) follow the FP8-table bodies
+archived at ``archive/research-20260922``, with the FP8 Pallas projection replaced by ``dot_general``
 at the same FP32-accumulate / BF16-round boundary.  The only numerical
 difference is the MXU accumulation order inside one contraction, which the CPU
 tests bound; the TPU pod run reports token/state agreement.
@@ -529,7 +529,7 @@ class Fp8DenseWeights(NamedTuple):
 
 
 class Fp8StrategyNdDenseWeights(NamedTuple):
-    """Four ordered legacy-rank shards in their final WS32 ownership."""
+    """Four ordered legacy-rank shards in their final expert-8 x feature-4 ownership."""
 
     merged_bits_in_out_local: Any
     merged_scale_in_out_local: Any

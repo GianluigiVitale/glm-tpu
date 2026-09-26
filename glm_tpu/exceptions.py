@@ -4,7 +4,7 @@
 
 
 class ConfigValidationError(ValueError):
-    """Base class for an invalid immutable greenfield configuration."""
+    """Base class for an invalid immutable configuration."""
 
 
 class GeometryValidationError(ConfigValidationError):

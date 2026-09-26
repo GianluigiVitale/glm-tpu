@@ -43,12 +43,12 @@ def two_stage_topk(
     expert_axis: str = "expert",
     positions_in_order: bool = False,
 ):
-    """Return frozen score/position pairs and whether the exact fallback ran.
+    """Return the score/position pairs of the full-K selection and whether the exact fallback ran.
 
     Every owner supplies its best L+1 pairs. The first L enter the merge; the
     extra pair proves no omitted item outranks the global Kth pair, including
     lowest-position ties. Any owner's failed check makes the whole group redo
-    the frozen full-K selection. No score arithmetic is changed.
+    the full-K selection. No score arithmetic is changed.
     """
     if type(candidates_per_owner) is not int or candidates_per_owner <= 0:
         raise ValueError("candidates_per_owner must be a positive integer")
@@ -129,7 +129,7 @@ def two_stage_topk(
 def score_cache_pages(query, cache, head_weights, block_tables, *, layout, owner):
     """Score physical keys in place; gather scalar scores into logical order.
 
-    The projection/FP32 DSA arithmetic is the frozen dsa_scores. Page mapping
+    The projection/FP32 DSA arithmetic is that of ``dsa_scores``. Page mapping
     moves one scalar per key rather than its full 128-component cache vector.
     Return ascending logical positions for the sort-free local top-k path.
     """
@@ -162,11 +162,11 @@ def prefill_dsa_one_pass(
     precision="highest",
     candidates_per_owner=512,
 ):
-    """P2: one score row and one shortlist per prefill tile, with frozen health.
+    """One score row and one shortlist per prefill tile, and the selection's health flag.
 
     Removes the repeated score/top-k/merge chain over 512-key blocks. Temporary
     per-head scores are rows*32*local_context FP32 values (64 MiB at 128K/M32).
-    This is opt-in and keeps causal lengths and finite-score admission intact.
+    Causal lengths and finite-score admission stay intact.
     """
     from glm_tpu.layers.attention.kv_cache import canonicalize_selected_positions
     from glm_tpu.layers.contracts import SelectedPositions
@@ -789,7 +789,10 @@ def dsa_bf16(
     contract: DsaNumericalContract,
     cache_layout: StageLocalKvLayout,
 ) -> DsaResult:
-    """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables and the two-stage selection."""
+    """The decode DSA step (raw path) on BF16 wq_b / wk tables with the two-stage selection.
+
+    Otherwise as the FP8-table ``ws32_dsa_mapped`` archived at ``archive/research-20260922``.
+    """
 
     normalized = prepared.normalized_local
     local_heads = contract.num_heads // cache_layout.local_parallel_size

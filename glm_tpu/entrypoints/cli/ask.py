@@ -1,4 +1,4 @@
-"""Simple private question submission using the existing protected controller."""
+"""Simple private question submission through the controller (``glm_tpu.executor.multihost_executor``)."""
 
 from datetime import UTC, datetime
 import json

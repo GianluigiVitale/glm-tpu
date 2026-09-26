@@ -30,7 +30,7 @@ def _positive_int(value: object, name: str) -> int:
 
 @dataclass(frozen=True, slots=True)
 class MeshContract:
-    """Compile-relevant WS32 logical mesh and ownership geometry."""
+    """Compile-relevant logical mesh (expert-8 x feature-4) and its ownership geometry."""
 
     expert_axis_size: int = 8
     feature_axis_size: int = 4

@@ -2,12 +2,13 @@
 
 The sequential ``RequestSession`` (one greedy token per step) and the concurrent ``BatchedSession``. Until S5 WU-E2
 the first tests below ran the sampled base session and its seeded policy (``Ws32RequestSession``,
-``SampledRequestPolicy``), which production never used; they now run the greedy session with the same fakes. The
-packed-status tests after them came from ``tests/models/glm_moe_dsa/test_decode_program.py`` at S5 WU-E2. Until S2f
-those also ran the frozen sampled session and policy they replaced (same events and timing, one fewer vote per
-decode, identical refusals at seed 0). That oracle is archived at ``archive/research-20260922``; its final green run
-is recorded in the S2f commit message, and the frozen policy's refusals at seed 0 are pinned below as data
-(``POLICY_CASES``).
+``SampledRequestPolicy``): production never instantiated them or ran the sampled step (it ran the base class's shared
+code through ``PackedRequestSession``). They now run the greedy session with this module's fakes, whose decode step
+returns a ``PackedDecodeResult``. The packed-status tests after them came from
+``tests/models/glm_moe_dsa/test_decode_program.py`` at S5 WU-E2. Until S2f those also ran the frozen sampled session
+and policy they replaced (same events and timing, one fewer vote per decode, identical refusals at seed 0). That
+oracle is archived at ``archive/research-20260922``; its final green run is recorded in the S2f commit message, and
+the frozen policy's refusals at seed 0 are pinned below as data (``POLICY_CASES``).
 """
 
 from dataclasses import replace

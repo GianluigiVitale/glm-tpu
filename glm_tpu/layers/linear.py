@@ -111,7 +111,7 @@ def prefill_linear(
 
 # ----------------------------------------------------------------------------- projections
 def dot_f32(x: Any, weight_out_in: Any) -> Any:
-    """``x @ W.T`` with BF16 operands and an FP32 accumulator (the frozen MXU boundary)."""
+    """``x @ W.T`` with BF16 operands and an FP32 accumulator (the MXU boundary of the FP8 kernels)."""
 
     return lax.dot_general(x, weight_out_in, (((x.ndim - 1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
 

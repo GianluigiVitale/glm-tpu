@@ -13,9 +13,9 @@ HELP = """\
 usage: server.py [-h] --run RUN --dispatch DISPATCH --state STATE [--port PORT]
                  [--api-key-file API_KEY_FILE] [--no-api] [--repo REPO] [--site SITE]
 
-Loopback chat UI attached to an existing resident GLM controller. This process never initializes
-devices, starts workers, or sends a stop command. Private chat history and requests live outside
-the checkout.
+Loopback chat UI and OpenAI-compatible API attached to an existing resident GLM controller. This
+process never initializes devices, starts workers, or sends a stop command. Private chat history
+and requests live outside the checkout.
 
 options:
   -h, --help            show this help message and exit

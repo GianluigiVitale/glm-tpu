@@ -30,7 +30,9 @@ checkpoint layout and the tile-local dequantization the per-expert kernel uses:
 per-expert layer's exact arithmetic boundaries (FP32 feature reduction of
 stacked gate/up partials, BF16 activation, BF16 route weighting, BF16 route
 sum, FP32 expert-8 reduction, ``routed * 2.5 + shared``) with two collectives
-per layer instead of ten and four kernel launches instead of up to 27.
+per layer instead of ten and two kernel launches (routed gate/up, routed down)
+instead of up to 27; the shared expert's projections are plain dots on its
+BF16-resident tables.
 """
 
 from __future__ import annotations
@@ -95,7 +97,7 @@ class RoutedProjectionConfig:
 def _scale_entry(scale_slab: Any, block_row: Any, block_column: Any) -> Any:
     """Select one FP32 scale from an aligned ``[8, 128]`` VMEM slab in registers.
 
-    Same masked reduction as the frozen ``_scale_value``: Mosaic on TPU v4 has
+    Same masked reduction as ``_scale_value`` of the archived per-expert kernel: Mosaic on TPU v4 has
     no dynamically indexed scalar VMEM load, so the other entries are zeroed.
     """
 

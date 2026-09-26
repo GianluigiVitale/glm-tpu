@@ -29,9 +29,9 @@ from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 class RequestPolicy:
     """One greedy request's identity and generation limits.
 
-    The checks, their order and their exceptions are those of the frozen sampled
-    ``ws32_request_session.RequestPolicy`` at seed 0 (the release's value): the request id must be a
-    nonempty, UTF-8-encodable string (the frozen policy hashed it for its uniform draws).
+    The checks, their order and their exceptions are those of the sampled policy this one replaced (the
+    ``RequestPolicy`` archived at ``archive/research-20260922``) at seed 0 (the release's value): the request id
+    must be a nonempty, UTF-8-encodable string (that policy hashed it for its uniform draws).
     """
 
     request_id: str
@@ -65,7 +65,8 @@ class RequestSession:
     """Consume one prefill result, then decode/emit one greedy token per step.
 
     All hosts follow the same schedule. ``fleet_all`` must implement the
-    authenticated worker's all-host boolean vote (identity in CPU-only tests).
+    authenticated worker's all-host boolean vote (identity in CPU-only tests);
+    each call performs one real all-host vote.
     ``deliver`` runs at the actual output boundary (e.g. rank0 write+flush);
     it must be bounded. Its completion time is recorded, never prefill-ready
     time mislabeled as delivery. Non-output ranks use a no-op delivery callback
@@ -210,7 +211,7 @@ class RequestSession:
         return event
 
     def accept_prefill(self, result: BatchedPrefillResult) -> TokenEvent:
-        """Deliver the sampled FIRST token now, before any decode call."""
+        """Deliver the prefill's greedy FIRST token now, before any decode call."""
         self._begin()
         try:
             if self._events or self._state is not None:
@@ -232,6 +233,10 @@ class RequestSession:
             self._busy = False
 
     def step(self) -> TokenEvent:
+        """Decode, vote on and deliver the next greedy token.
+
+        One validity vote on the packed status row, then the state is committed, then one delivery vote.
+        """
         self._begin()
         try:
             if not self._events:

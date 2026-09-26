@@ -16,6 +16,8 @@ and a ``jax.named_scope`` name S4.4 renamed as the name it replaced (``helper_na
 A definition an S5 work unit changes is declared in ``S5_DECLARED``: compared under its new name or at its
 new home when renamed or moved, not compared when rewritten, removed or given a new docstring; a reference to a
 definition an S5 unit renamed is compared as renamed where the current module defines or imports it by its new name.
+A definition whose docstrings or raise messages an S5 unit reworded (WU-Docs) is declared in ``S5_TEXT`` and compared
+with that text aside.
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -218,6 +220,20 @@ S5_DECLARATION = re.compile(
     r"(?:rewritten|docstring|removed|renamed -> [A-Za-z_][A-Za-z0-9_]*|moved -> glm_tpu/[A-Za-z0-9_/]+\.py)"
 )
 S5_NOT_COMPARED = ("rewritten", "docstring", "removed")
+# S5 WU-Docs (decision DN-30, extending DN-27): the compared definitions whose docstrings or raise messages an S5 unit
+# reworded, keyed like S5_DECLARED; the value is ``"<work unit>: docstring"``, ``"<work unit>: messages"`` or
+# ``"<work unit>: docstring, messages"``. A declared definition stays compared, under the name and home S5_DECLARED
+# gives it, with every docstring in it removed and the string constants of its raise statements' message arguments
+# blanked on both sides (``_text_aside``); the unit's table proves the text change at the commit that made it
+# (tools/migration/splits.toml for docstrings, work_units.toml [messages] for messages).
+S5_TEXT: dict[tuple[str, str], str] = {
+    ("glm_tpu/distributed/mesh.py", "MeshContract"): "WU-Docs: docstring",
+    ("glm_tpu/distributed/parallel_state.py", "_batched_fleet_all"): "WU-Docs: docstring",
+    ("glm_tpu/exceptions.py", "ConfigValidationError"): "WU-Docs: docstring",
+    ("glm_tpu/models/glm_moe_dsa/weights.py", "Fp8StrategyNdDenseWeights"): "WU-Docs: docstring",
+    ("glm_tpu/runner/kv_cache_manager.py", "build_cache_initializer"): "WU-Docs: docstring",
+}
+S5_TEXT_DECLARATION = re.compile(r"WU-[A-Z][A-Za-z]*: (?:docstring|messages|docstring, messages)")
 COMPARED = 265  # the definitions this test compares (their post-S4 homes: 43 files)
 
 
@@ -338,6 +354,32 @@ def _as_renamed_in(home: str, node: ast.AST, name: str) -> ast.AST:
                 current = public.get(alias.name, alias.name)
                 current = helpers.get(current, current)
                 alias.name = s5.get(current, current)
+    return _text_aside(home, name, node)
+
+
+def _text_aside(home: str, name: str, node: ast.AST) -> ast.AST:
+    """S5 (``S5_TEXT``, DN-30): the definition ``name`` of the S3 file ``home`` without its docstrings and with the
+    string constants of its raise statements' message arguments blanked, when it is declared there; else ``node``."""
+    import copy
+
+    if _s4_home(home, name) not in S5_TEXT:
+        return node
+    node = copy.deepcopy(node)
+    for inner in ast.walk(node):
+        body = getattr(inner, "body", None)
+        if (
+            isinstance(inner, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            inner.body = body[1:]
+        elif isinstance(inner, ast.Raise) and isinstance(inner.exc, ast.Call):
+            for argument in inner.exc.args:
+                for part in argument.values if isinstance(argument, ast.JoinedStr) else [argument]:
+                    if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                        part.value = ""
     return node
 
 
@@ -429,7 +471,7 @@ def _moved_definition(home: str, name: str) -> ast.AST:
     node = _RecordedScopeNames().visit(node)
     if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
         node.name = name
-    return node
+    return _text_aside(home, name, node)
 
 
 def _definition(tree: ast.Module, name: str) -> ast.AST:
@@ -620,3 +662,7 @@ def test_s5_declarations_are_well_formed_and_name_compared_definitions():
     for key, value in S5_DECLARED.items():
         assert key in compared, key
         assert S5_DECLARATION.fullmatch(value), value
+    for key, value in S5_TEXT.items():  # a text row names a compared definition that stays compared
+        assert key in compared, key
+        assert S5_TEXT_DECLARATION.fullmatch(value), value
+        assert S5_DECLARED.get(key, "_: compared").partition(": ")[2] not in S5_NOT_COMPARED, key

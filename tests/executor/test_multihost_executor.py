@@ -688,8 +688,8 @@ HELP = """\
 usage: multihost_executor.py [-h] --request REQUEST [--wall-seconds WALL_SECONDS]
                              [--print-answers] [--keep-loaded] [--site SITE] [--repo REPO]
 
-One private greedy request on the retained 32-chip site; no automatic retries. The site's [launch]
-policy decides which checkout may launch (branch patterns, origin, clean, pushed;
+One private greedy request on the configured 32-chip site; no automatic retries. The site's
+[launch] policy decides which checkout may launch (branch patterns, origin, clean, pushed;
 glm_tpu.executor.launch_policy), and the staged source is `git archive` of the pinned commit of
 that checkout, which must be this controller's own (--repo and the site's paths.repo may only name
 it: the controller's code and the remote helper texts come from it). This controller holds the

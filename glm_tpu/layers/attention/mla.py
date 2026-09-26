@@ -384,7 +384,10 @@ def prepare_attention_bf16(
     feature_axis: str,
     lora_norm_epsilon: float = 1e-5,
 ) -> PreparedAttention:
-    """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
+    """Decode attention preparation (raw path) on BF16 tables.
+
+    Otherwise as the FP8-table ``ws32_prepare_attention_mapped`` archived at ``archive/research-20260922``.
+    """
 
     kv_lora_rank = weights.kv_a_norm_weight.shape[0]
     q_a = feature_linear(normalized, weights.q_a_local, feature_axis)
@@ -418,7 +421,10 @@ def index_share_attention_bf16(
     sparse_attention_config: SparseMlaConfig,
     sparse_attention_interpret: bool,
 ) -> AttentionResult:
-    """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
+    """IndexShare decode attention (host rotary table path) on BF16 tables.
+
+    Otherwise as the FP8-table ``ws32_index_share_attention_mapped`` archived at ``archive/research-20260922``.
+    """
 
     if main_rope_table_row is None:
         raise ValueError("bf16 IndexShare attention mirrors the host main-rotary path only")

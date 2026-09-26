@@ -1,4 +1,4 @@
-"""Private ordinary worker; source staging and fleet leases belong to its controller."""
+"""The per-host ordinary-inference worker; source staging and fleet leases belong to its controller."""
 
 import argparse
 from dataclasses import asdict

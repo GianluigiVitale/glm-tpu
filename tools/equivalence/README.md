@@ -51,7 +51,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs) |
 
 Totals from the same runs: `check` (G1 G1-protocol G3 G4 G6 G7 G9) 1,113 s; `check --tier production`
-381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s (105 tests then; 128 at S5 A1).
+381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s.
 
 Heavy gates -- every gate that builds the real runtime or runs fixture-scale programs on the
 32-device CPU mesh: G1, G1-protocol, G2, G2-protocol, G3, G6 (its `graph` stage builds every fixture
@@ -141,9 +141,9 @@ limit, the alias credit, one fuller chip, five invalid accountings) and of `chec
 on a small synthetic optimized-HLO module (physical expert-8/feature-4 axes with a 4,096-byte
 full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, no collectives:
 refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
-or not); the full reports and messages, whose wording and key names planned stages rename (H11
-renames the HLO profile string, WU-R the admission functions), are in `G1-protocol` /
-`G2-protocol` (`verdicts`). The two functions are found under their 181c013e names, their row in
+or not); the full reports and messages, whose wording S5 changed (WU-R reworded three HLO
+refusals, H11 renamed the HLO profile string), are in `G1-protocol` / `G2-protocol` (`verdicts`).
+The two functions are found under their 181c013e names, their row in
 the permanent table `driver.RECORDED_NAMES` (recorded name -> current name) or a
 `closure_map.toml` `[functions]` entry; a missing or ambiguous one is recorded (`<absent>`,
 `<ambiguous: n definitions>`), so a rename the table does not follow fails G1/G2.
@@ -358,9 +358,9 @@ that admits its bucket; the harness never spells it.
 G6 runs each stage in a fresh interpreter and records **every** module whose file lies in the
 source tree, whatever its top-level package (`glm_tpu`, `scripts`, but also `bench`, `tools`,
 `tests`, ...; only this harness is excluded), the third-party top-level packages and whether JAX
-was imported. Stages: controller (26 modules, no JAX), worker preflight (43) and worker main (139)
-import their entry modules and the lazy imports those processes perform, and the controller stage
-also runs the real launcher `main` (G9's `controller.launcher_record`), so a lazy import anywhere
+was imported. Stages: controller (no JAX), worker preflight and worker main (the record lists each
+stage's modules) import their entry modules and the lazy imports those processes perform, and the
+controller stage also runs the real launcher `main` (G9's `controller.launcher_record`), so a lazy import anywhere
 on the launch path -- staging, preflight, dispatch, supervision, collection, cleanup -- is recorded
 and must keep the controller JAX-free; `graph` drives the real
 `TPUModelRunner.__init__`/`_load` (and the real compile path) for every fixture run and traces
@@ -516,8 +516,9 @@ to 4 CPUs also reproduced every G3 group.
   `batched_runtime.batch` until S4.1; G3's relaxed fixture-request validation; a
   bypass makes production validation refuse the 1,536-slot requests); the runner and engine classes
   `driver.RUNTIME_CLASS` (`TPUModelRunner`, `OrdinaryRuntime` until S5 WU-E1) and `driver.ENGINE_CLASS`
-  (`LLMEngine` in `driver.ENGINE_MODULE`; G1-G3 and G7 build them, G9's worker exercise patches the runner
-  class where `main` imports it; a rename not followed fails on the missing attribute); the program-set module's
+  (`LLMEngine` in `driver.ENGINE_MODULE`; G1 and G2 build the runner, G3 and G7 build both, G9's worker
+  exercise patches the runner class where `main` imports it; a rename not followed fails on the missing
+  attribute); the program-set module's
   (S2c; the runtime module's before) `build_prefill_program` (S2d c3; before,
   `build_ws32_prefill_challenger_program`) and `build_packed_decoder_program` (G3's Pallas interpret
   flags; a bypass runs TPU kernels on CPU and

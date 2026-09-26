@@ -1,4 +1,4 @@
-"""Release information, local preparation and protected question submission."""
+"""Release information, environment and checkpoint checks, local request preparation and question submission."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ class InfoSubcommand(CLISubcommand):
 
 
 class AskSubcommand(CLISubcommand):
-    """``glm-tpu ask``: answer questions on the retained TPU site (``glm_tpu.entrypoints.cli.ask``).
+    """``glm-tpu ask``: answer questions on the configured TPU site (``glm_tpu.entrypoints.cli.ask``).
 
     Its parser is defined here and ``cmd`` imports ``ask`` only when it runs: ``ask`` imports the request module at
     load time, and registering the parser must not load it for the other subcommands.
@@ -84,7 +84,7 @@ class AskSubcommand(CLISubcommand):
 
     def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
         ask = subparsers.add_parser(
-            "ask", help="answer questions on the retained TPU site; optionally batch up to four"
+            "ask", help="answer questions on the configured TPU site; optionally batch up to four"
         )
         inputs = ask.add_mutually_exclusive_group(required=True)
         inputs.add_argument("question", nargs="?")
