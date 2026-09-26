@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import argparse
 from collections.abc import Callable
 from importlib import metadata, resources
 import json
 import sys
+
+from glm_tpu.entrypoints.cli.types import CLISubcommand
 
 
 def environment_manifest() -> dict:
@@ -58,3 +61,24 @@ def environment_report(
             "launch authorization"
         ),
     )
+
+
+class CollectEnvSubcommand(CLISubcommand):
+    """``glm-tpu doctor``: the environment report of one profile; exit 0 only when it passed."""
+
+    name = "doctor"
+
+    @staticmethod
+    def cmd(args: argparse.Namespace) -> int:
+        report = environment_report(args.profile)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["passed"] else 1
+
+    def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        doctor = subparsers.add_parser("doctor", help="check installed version metadata without initializing TPU")
+        doctor.add_argument(
+            "--profile",
+            choices=("core", "runtime", "tpu", "benchmark", "dev"),
+            default="core",
+        )
+        return doctor

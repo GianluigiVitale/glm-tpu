@@ -27,14 +27,15 @@ this checker compares them:
   every ``[added]`` row (from S5 WU-S1/S2).
 * ``[docstrings]``: ``"path" = "<token>: reason"``, a module docstring the unit rewrote (not compared).
 * ``[imports."path"]``: ``added`` / ``removed``, the top-level import bindings the file gains and loses
-  (``module:name``, ``module`` for ``import module``, `` as alias`` appended); the other top-level
+  (``module:name``, ``module`` for ``import module``, `` as alias`` appended); the bindings it keeps must
+  keep their order (from S5 WU-C1; where a gained binding goes is not checked), and the other top-level
   statements must be unchanged, in order.
 
 Definitions are top-level functions and classes and the functions and classes directly in a top-level
 class; nested functions, lambdas and comprehensions are part of the definition that contains them. A class
 is compared as its shell (name, bases, keywords, decorators, docstring and the statements that are not
-definitions). Comments and formatting are not compared (``ast.unparse``), nor is the order of the top-level
-imports (bindings are compared as sets). Standard library only; exit 1 with every problem listed. S7 deletes
+definitions). Comments and formatting are not compared (``ast.unparse``), nor is the place of the imports
+among the other top-level statements. Standard library only; exit 1 with every problem listed. S7 deletes
 ``tools/migration/``.
 """
 
@@ -90,18 +91,18 @@ def shell(node: ast.AST, name: str) -> str:
     return ast.unparse(node)
 
 
-def module_parts(tree: ast.Module) -> tuple[str | None, set[str], list[str]]:
-    """The module docstring, its top-level import bindings and its other top-level statements."""
+def module_parts(tree: ast.Module) -> tuple[str | None, list[str], list[str]]:
+    """The module docstring, its top-level import bindings (in order) and its other top-level statements."""
     docstring = ast.get_docstring(tree, clean=False)
     body = tree.body[1:] if docstring is not None else tree.body
-    imports: set[str] = set()
+    imports: list[str] = []
     other: list[str] = []
     for node in body:
         if isinstance(node, ast.Import):
-            imports |= {a.name + (f" as {a.asname}" if a.asname else "") for a in node.names}
+            imports += [a.name + (f" as {a.asname}" if a.asname else "") for a in node.names]
         elif isinstance(node, ast.ImportFrom):
             module = "." * node.level + (node.module or "")
-            imports |= {f"{module}:{a.name}" + (f" as {a.asname}" if a.asname else "") for a in node.names}
+            imports += [f"{module}:{a.name}" + (f" as {a.asname}" if a.asname else "") for a in node.names]
         elif not isinstance(node, DEFINITION):
             other.append(ast.unparse(node))
     return docstring, imports, other
@@ -229,8 +230,9 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
 
     # Module shells: docstring, import bindings, other statements.
     for path in files:
-        old_doc, old_imports, old_other = module_parts(old_trees[path])
-        new_doc, new_imports, new_other = module_parts(new_trees[path])
+        old_doc, old_order, old_other = module_parts(old_trees[path])
+        new_doc, new_order, new_other = module_parts(new_trees[path])
+        old_imports, new_imports = set(old_order), set(new_order)
         if path in docstrings:
             report.append(f"{path}: module docstring rewritten ({docstrings[path]})")
         elif old_doc != new_doc:
@@ -241,6 +243,11 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
             problems.append(f"{path}: import bindings +{gained} -{lost} differ from the declared ones")
         elif gained or lost:
             report.append(f"{path}: imports +{gained} -{lost}")
+        kept_old = [binding for binding in old_order if binding in new_imports]
+        kept_new = [binding for binding in new_order if binding in old_imports]
+        if kept_old != kept_new:
+            problems.append(f"{path}: the import bindings it keeps changed order")
+            problems += [f"    {line}" for line in changed_lines("\n".join(kept_old), "\n".join(kept_new))]
         if old_other != new_other:
             problems.append(f"{path}: top-level statements other than definitions and imports differ")
             problems += [f"    {line}" for line in changed_lines("\n".join(old_other), "\n".join(new_other))]

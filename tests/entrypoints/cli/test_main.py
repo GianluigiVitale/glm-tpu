@@ -1,5 +1,6 @@
 """Release CLI must remain safe on a controller with active TPU work."""
 
+import argparse
 from contextlib import redirect_stdout
 from importlib import metadata
 import io
@@ -194,6 +195,131 @@ def test_info_output_is_unchanged(monkeypatch, capsys):
 
     monkeypatch.setattr(metadata, "version", uninstalled)
     assert run_cli(monkeypatch, capsys, ["info"]) == INFO
+
+
+def built_parser(monkeypatch) -> argparse.ArgumentParser:
+    """The parser ``main`` builds, taken where it would parse (whichever module defines the subcommands)."""
+
+    class Built(Exception):
+        pass
+
+    def capture(self, args=None, namespace=None):
+        raise Built(self)
+
+    monkeypatch.setattr(sys, "argv", ["glm-tpu"])
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", capture)
+    with pytest.raises(Built) as built:
+        main([])
+    return built.value.args[0]
+
+
+def arguments(parser: argparse.ArgumentParser) -> list[str]:
+    """Every action in order: its kind, flags (or dest) and each attribute that is set (help: the HELP snapshot)."""
+    rows = []
+    for action in parser._actions:
+        row = [type(action).__name__, "/".join(action.option_strings) or action.dest, f"dest={action.dest}"]
+        for field in ("nargs", "const", "default", "type", "choices", "metavar"):
+            value = getattr(action, field)
+            if field == "type" and value is not None:
+                value = value.__name__
+            elif field == "choices" and value is not None:
+                value = list(value)
+            if value is not None:
+                row.append(f"{field}={value!r}")
+        rows.append(" ".join(row + ["required"] * action.required))
+    rows += [
+        f"exclusive required={group.required}: " + " ".join(a.dest for a in group._group_actions)
+        for group in parser._mutually_exclusive_groups
+    ]
+    return rows
+
+
+# Each parser's actions (arguments(): flags, dest, nargs, const, default, type, choices, metavar, required) and its
+# mutually exclusive groups, in order. The HELP snapshot above pins the help texts and the layout, not these.
+ARGUMENTS = {
+    "": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_SubParsersAction command dest=command nargs='A...' "
+        "choices=['info', 'ask', 'doctor', 'prepare-request'] required",
+    ],
+    "info": ["_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='"],
+    "ask": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction question dest=question nargs='?'",
+        "_StoreAction --questions dest=questions type='Path'",
+        "_StoreAction --context dest=context default='32k' choices=['8k', '32k', '128k', '256k']",
+        "_StoreTrueAction --keep-loaded dest=keep_loaded nargs=0 const=True default=False",
+        "_StoreTrueAction --concurrent dest=concurrent nargs=0 const=True default=False",
+        "_StoreAction --max-new-tokens dest=max_new_tokens type='int'",
+        "_StoreAction --wall-seconds dest=wall_seconds default=86400 type='int'",
+        "_StoreTrueAction --prepare-only dest=prepare_only nargs=0 const=True default=False",
+        "_StoreAction --site dest=site type='Path'",
+        "exclusive required=True: question questions",
+    ],
+    "doctor": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'benchmark', 'dev']",
+    ],
+    "prepare-request": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --messages dest=messages type='Path' required",
+        "_StoreAction --output dest=output type='Path' required",
+        "_StoreAction --repo dest=repo type='Path' required",
+        "_StoreAction --tokenizer-root dest=tokenizer_root type='Path' required",
+        "_StoreAction --request-id dest=request_id required",
+        "_StoreAction --profile dest=profile default='ordinary-greedy-8k' "
+        "choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']",
+        "_StoreAction --max-new-tokens dest=max_new_tokens type='int' required",
+    ],
+}
+
+
+def test_every_argument_is_unchanged(monkeypatch):
+    parser = built_parser(monkeypatch)
+    (commands,) = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
+    parsers = {"": parser, **commands.choices}
+    assert {name: arguments(p) for name, p in parsers.items()} == ARGUMENTS
+    assert [(p.prog, p.description) for p in parsers.values()] == [
+        ("glm-tpu", "Release information, local preparation and protected question submission."),
+        *((f"glm-tpu {name}", None) for name in list(ARGUMENTS)[1:]),
+    ]
+    defaults = argparse.ArgumentParser()
+    settings = (
+        "usage",
+        "epilog",
+        "formatter_class",
+        "prefix_chars",
+        "fromfile_prefix_chars",
+        "argument_default",
+        "conflict_handler",
+        "add_help",
+        "allow_abbrev",
+        "exit_on_error",
+        "_defaults",
+    )
+    for p in parsers.values():
+        assert [getattr(p, name) for name in settings] == [getattr(defaults, name) for name in settings], p.prog
+
+
+@pytest.mark.parametrize("profile", ["core", "runtime", "tpu", "benchmark", "dev", "missing jax"])
+def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, profile):
+    """`doctor` prints the profile's report and exits 0 exactly when it passed (every pin installed, Python 3.12)."""
+    pins = {name: value for group in environment_manifest()["profiles"].values() for name, value in group.items()}
+
+    def installed(name):
+        if profile == "missing jax" and name == "jax":
+            raise metadata.PackageNotFoundError(name)
+        return pins[name]
+
+    # environment_report's keyword defaults: the same function object wherever the command looks it up.
+    monkeypatch.setitem(environment_report.__kwdefaults__, "version", installed)
+    monkeypatch.setitem(environment_report.__kwdefaults__, "python_version", (3, 12))
+    name = "core" if profile == "missing jax" else profile
+    report = environment_report(name)
+    assert report["passed"] is (profile != "missing jax")
+    capsys.readouterr()
+    assert main(["doctor", "--profile", name]) == (0 if report["passed"] else 1)
+    assert capsys.readouterr() == (json.dumps(report, indent=2, sort_keys=True) + "\n", "")
 
 
 if __name__ == "__main__":
