@@ -70,9 +70,11 @@ RENAMES = Path(__file__).with_name("renames.toml")  # S4.2
 MERGES = Path(__file__).with_name("test_merges.toml")  # S4.3
 TEST_MOVES = Path(__file__).with_name("test_moves.toml")  # S5 A2
 # S3 destinations a later S5 work unit removed without a table of this module: their tests moved by hand, proved by
-# split_check.py (its splits.toml, whose next version belongs to the next split, so the removal is recorded here).
+# split_check.py (its splits.toml, whose next version belongs to the next split, so the removal is recorded here), or
+# a package-data file (which also leaves the [pyproject] package-data list the check expects).
 DISSOLVED_BY_HAND = {
     "tests/models/glm_moe_dsa/test_decode_program.py": "S5 WU-E2: moved into tests/engine/test_request_session.py",
+    "glm_tpu/environment.json": "S5 WU-C3: removed; collect-env reads the declared requirements",
 }
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
@@ -379,7 +381,9 @@ def rewrite_pyproject(moves: MoveMap, text: str) -> str:
         return "[" + ", ".join(f'"{v}"' for v in values) + "]"
 
     if "package_data" in moves.pyproject:
-        text = replace(r"^(glm_tpu = )\[.*\]$", toml_list(moves.pyproject["package_data"]), text)
+        # a package-data file a later unit removed leaves the list (S5 WU-C3: environment.json)
+        data = [glob for glob in moves.pyproject["package_data"] if f"glm_tpu/{glob}" not in dissolved_later()]
+        text = replace(r"^(glm_tpu = )\[.*\]$", toml_list(data), text)
     if "license_files" in moves.pyproject:
         text = replace(r"^(license-files = )\[.*\]$", toml_list(moves.pyproject["license_files"]), text)
     if "black_include" in moves.pyproject and re.search(r"^\[tool\.black\]$", text, flags=re.M):

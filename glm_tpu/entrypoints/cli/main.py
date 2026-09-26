@@ -29,12 +29,12 @@ class InfoSubcommand(CLISubcommand):
                 dict(
                     project="glm-tpu",
                     version=version,
-                    release_status="private project; see docs/release/STATUS.md for trained admission and promotion",
-                    engine="native JAX WS32_2D",
+                    release_status="private project",
+                    engine="native JAX",
                     hardware="8 hosts / 32 TPU v4 chips",
                     ordinary_profile=(
-                        "greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; "
-                        "see STATUS for measured scope"
+                        "greedy; 8K combined, concurrent 32K per conversation, 128K prompt / 166912 combined slots, "
+                        "or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)"
                     ),
                     concurrent_requests=4,
                     model="zai-org/GLM-5.3",
@@ -43,12 +43,13 @@ class InfoSubcommand(CLISubcommand):
                         "short inputs only"
                     ),
                     concurrent_context_capacity=32768,
-                    concurrent_scope=(
-                        "fixed submitted group; see STATUS for hardware evidence; no online request admission"
-                    ),
+                    concurrent_scope="fixed submitted group; no online request admission",
                     queued_questions=10,
                     resume="resident ordinary inbox reuses the live model; no process-restart or durable KV recovery",
-                    serving="site-specific protected request harness; no supported HTTP endpoint",
+                    serving=(
+                        "site-specific protected request harness; loopback chat UI and OpenAI-compatible /v1 API "
+                        "attached to a resident controller (python -m glm_tpu.entrypoints.serve.server)"
+                    ),
                     installation=(
                         "wheel contains Python components only; full deployment requires source checkout and external "
                         "assets"
@@ -117,12 +118,11 @@ class AskSubcommand(CLISubcommand):
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    # The help lists the subcommands in this order.
-    commands = {
-        command.name: command
-        for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand())
-    }
-    for command in commands.values():
-        command.subparser_init(sub)
+    # The help lists the subcommands in this order. argparse stores the name the command was called by (an alias
+    # such as ``doctor`` included), so each subcommand is keyed under every name its parser answers to.
+    commands: dict[str, CLISubcommand] = {}
+    for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand()):
+        subparser = command.subparser_init(sub)
+        commands.update({name: command for name, choice in sub.choices.items() if choice is subparser})
     args = parser.parse_args(argv)
     return commands[args.command].cmd(args)

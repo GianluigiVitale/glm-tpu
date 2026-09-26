@@ -5,24 +5,25 @@ from contextlib import redirect_stdout
 from importlib import metadata
 import io
 import json
-from pathlib import Path
 import subprocess
 import sys
-import tomllib
 import unittest
 
 import pytest
 
-from glm_tpu.entrypoints.cli.collect_env import environment_manifest, environment_report
+from glm_tpu.entrypoints.cli.collect_env import declared_requirements, environment_report
 from glm_tpu.entrypoints.cli.main import main
 
 
 class CliTests(unittest.TestCase):
     def test_complete_metadata(self):
-        pins = {name: value for group in environment_manifest()["profiles"].values() for name, value in group.items()}
-        result = environment_report("benchmark", version=pins.__getitem__, python_version=(3, 12))
+        pins = {name: value for group in declared_requirements()["groups"].values() for name, value in group.items()}
+        installed = {**pins, "torch": pins["torch"] + "+cpu"}
+        result = environment_report("tpu", version=installed.__getitem__, python_version=(3, 12))
         self.assertTrue(result["passed"])
-        self.assertTrue(any(row["expected"] == "2.10.0+cpu" for row in result["packages"]))
+        self.assertIn(
+            dict(package="torch", expected="2.10.0", installed="2.10.0+cpu", status="match"), result["packages"]
+        )
 
     def test_missing_and_wrong_versions_refuse(self):
         def lookup(name):
@@ -35,7 +36,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual({row["status"] for row in result["packages"]}, {"missing", "mismatch"})
 
     def test_wrong_python_refuses(self):
-        pins = environment_manifest()["profiles"]["core"]
+        pins = declared_requirements()["groups"]["core"]
         self.assertFalse(environment_report("core", version=pins.__getitem__, python_version=(3, 13))["passed"])
 
     def test_unknown_profile_refuses(self):
@@ -63,30 +64,22 @@ for name in ("jax", "jaxlib", "libtpu", "torch", "transformers"):
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_manifest_matches_declared_dependencies(self):
-        repo = Path(__file__).resolve().parents[3]
-        project = tomllib.loads((repo / "pyproject.toml").read_text())["project"]
-        profiles = environment_manifest()["profiles"]
-        for group, pins in profiles.items():
-            declared = project["dependencies"] if group == "core" else project["optional-dependencies"][group]
-            expected = {f"{name}=={pin.split('+')[0] if name == 'torch' else pin}" for name, pin in pins.items()}
-            self.assertEqual(set(declared), expected)
-
 
 # The command-line surface, byte for byte (S5 A2): the help of every subcommand and the `info` output of an
 # uninstalled checkout. argparse wraps to the terminal width (pinned: COLUMNS=100) and its layout differs
 # between Python versions (the literals are Python 3.12's).
 HELP = {
     "": """\
-usage: glm-tpu [-h] {info,ask,doctor,prepare-request} ...
+usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request} ...
 
 Release information, local preparation and protected question submission.
 
 positional arguments:
-  {info,ask,doctor,prepare-request}
+  {info,ask,collect-env,doctor,prepare-request}
     info                show supported scope and release limitations
     ask                 answer questions on the retained TPU site; optionally batch up to four
-    doctor              check installed version metadata without initializing TPU
+    collect-env (doctor)
+                        check installed version metadata without initializing TPU
     prepare-request     tokenize a private chat locally; does NOT launch inference
 
 options:
@@ -123,12 +116,12 @@ options:
   --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else
                         $GLM_TPU_CONFIG_ROOT/site.toml)
 """,
-    "doctor": """\
-usage: glm-tpu doctor [-h] [--profile {core,runtime,tpu,benchmark,dev}]
+    "collect-env": """\
+usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]
 
 options:
   -h, --help            show this help message and exit
-  --profile {core,runtime,tpu,benchmark,dev}
+  --profile {core,runtime,tpu,dev}
 """,
     "prepare-request": """\
 usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO
@@ -147,24 +140,25 @@ options:
   --max-new-tokens MAX_NEW_TOKENS
 """,
 }
+HELP["doctor"] = HELP["collect-env"]  # the alias's parser is collect-env's
 
 INFO = """\
 {
   "concurrent_context_capacity": 32768,
   "concurrent_requests": 4,
-  "concurrent_scope": "fixed submitted group; see STATUS for hardware evidence; no online request admission",
+  "concurrent_scope": "fixed submitted group; no online request admission",
   "concurrent_validation": "GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only",
-  "engine": "native JAX WS32_2D",
+  "engine": "native JAX",
   "hardware": "8 hosts / 32 TPU v4 chips",
   "installation": "wheel contains Python components only; full deployment requires source checkout and external assets",
   "model": "zai-org/GLM-5.3",
-  "ordinary_profile": "greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope",
+  "ordinary_profile": "greedy; 8K combined, concurrent 32K per conversation, 128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)",
   "project": "glm-tpu",
   "quality": "full benchmark/model-card parity not established",
   "queued_questions": 10,
-  "release_status": "private project; see docs/release/STATUS.md for trained admission and promotion",
+  "release_status": "private project",
   "resume": "resident ordinary inbox reuses the live model; no process-restart or durable KV recovery",
-  "serving": "site-specific protected request harness; no supported HTTP endpoint",
+  "serving": "site-specific protected request harness; loopback chat UI and OpenAI-compatible /v1 API attached to a resident controller (python -m glm_tpu.entrypoints.serve.server)",
   "version": "source checkout (not installed)"
 }
 """  # noqa: E501 (the info output, byte for byte)
@@ -240,7 +234,7 @@ ARGUMENTS = {
     "": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
         "_SubParsersAction command dest=command nargs='A...' "
-        "choices=['info', 'ask', 'doctor', 'prepare-request'] required",
+        "choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request'] required",
     ],
     "info": ["_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='"],
     "ask": [
@@ -256,9 +250,13 @@ ARGUMENTS = {
         "_StoreAction --site dest=site type='Path'",
         "exclusive required=True: question questions",
     ],
-    "doctor": [
+    "collect-env": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
-        "_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'benchmark', 'dev']",
+        "_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']",
+    ],
+    "doctor": [  # the alias: collect-env's parser
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']",
     ],
     "prepare-request": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
@@ -274,14 +272,18 @@ ARGUMENTS = {
 }
 
 
+ALIASES = {"doctor": "collect-env"}  # alias -> the subcommand whose parser answers to it
+
+
 def test_every_argument_is_unchanged(monkeypatch):
     parser = built_parser(monkeypatch)
     (commands,) = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
     parsers = {"": parser, **commands.choices}
     assert {name: arguments(p) for name, p in parsers.items()} == ARGUMENTS
+    assert commands.choices["doctor"] is commands.choices["collect-env"]
     assert [(p.prog, p.description) for p in parsers.values()] == [
         ("glm-tpu", "Release information, local preparation and protected question submission."),
-        *((f"glm-tpu {name}", None) for name in list(ARGUMENTS)[1:]),
+        *((f"glm-tpu {ALIASES.get(name, name)}", None) for name in list(ARGUMENTS)[1:]),
     ]
     defaults = argparse.ArgumentParser()
     settings = (
@@ -301,10 +303,12 @@ def test_every_argument_is_unchanged(monkeypatch):
         assert [getattr(p, name) for name in settings] == [getattr(defaults, name) for name in settings], p.prog
 
 
-@pytest.mark.parametrize("profile", ["core", "runtime", "tpu", "benchmark", "dev", "missing jax"])
-def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, profile):
-    """`doctor` prints the profile's report and exits 0 exactly when it passed (every pin installed, Python 3.12)."""
-    pins = {name: value for group in environment_manifest()["profiles"].values() for name, value in group.items()}
+@pytest.mark.parametrize("command", ["collect-env", "doctor"])
+@pytest.mark.parametrize("profile", ["core", "runtime", "tpu", "dev", "missing jax"])
+def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, profile, command):
+    """`collect-env` and its alias `doctor` print the profile's report and exit 0 exactly when it passed (every pin
+    installed, Python 3.12)."""
+    pins = {name: value for group in declared_requirements()["groups"].values() for name, value in group.items()}
 
     def installed(name):
         if profile == "missing jax" and name == "jax":
@@ -318,8 +322,30 @@ def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, 
     report = environment_report(name)
     assert report["passed"] is (profile != "missing jax")
     capsys.readouterr()
-    assert main(["doctor", "--profile", name]) == (0 if report["passed"] else 1)
+    assert main([command, "--profile", name]) == (0 if report["passed"] else 1)
     assert capsys.readouterr() == (json.dumps(report, indent=2, sort_keys=True) + "\n", "")
+
+
+@pytest.mark.parametrize(
+    "argv", [["info"], ["collect-env"], ["doctor"], ["--help"], ["collect-env", "--help"]], ids=" ".join
+)
+def test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded(argv):
+    """The subcommands that need neither load neither the ask module nor the request module (imported by `ask` and
+    `prepare-request` when they run), nor a model library."""
+    code = f"""
+import contextlib, io, sys
+from glm_tpu.entrypoints.cli.main import main
+with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+    try:
+        main({argv!r})
+    except SystemExit:
+        pass
+unloaded = ("glm_tpu.entrypoints.cli.ask", "glm_tpu.engine.request", "jax", "jaxlib", "libtpu", "torch", "transformers")
+loaded = [name for name in unloaded if name in sys.modules]
+assert not loaded, loaded
+"""
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
 
 
 if __name__ == "__main__":

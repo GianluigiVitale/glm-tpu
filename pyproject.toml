@@ -36,7 +36,6 @@ runtime = [
   "requests==2.34.2",
 ]
 tpu = ["libtpu==0.0.41"]
-benchmark = ["pyarrow==24.0.0", "python-dotenv==1.2.2"]
 dev = ["pytest==9.0.3"]
 
 [project.scripts]
@@ -47,7 +46,7 @@ include = ["glm_tpu", "glm_tpu.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-glm_tpu = ["environment.json", "models/glm_moe_dsa/hf_config/*", "entrypoints/ui/static/*"]
+glm_tpu = ["models/glm_moe_dsa/hf_config/*", "entrypoints/ui/static/*"]
 
 # CPU PyTorch is used only for checkpoint tensor reading. Do not resolve CUDA
 # wheels or let the PyTorch index shadow unrelated PyPI package versions.
