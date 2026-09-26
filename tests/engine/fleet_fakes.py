@@ -293,7 +293,7 @@ def install(monkeypatch: Any, fleet: Fleet) -> None:
 
     monkeypatch.setattr(tpu_runner.TPUModelRunner, "_load", _load)
     monkeypatch.setattr(shutil, "disk_usage", lambda path: SimpleNamespace(total=1 << 40, used=0, free=1 << 40))
-    monkeypatch.setattr(llm_engine, "PackedRequestSession", _recorded(llm_engine.PackedRequestSession, fleet))
+    monkeypatch.setattr(llm_engine, "RequestSession", _recorded(llm_engine.RequestSession, fleet))
     monkeypatch.setattr(llm_engine, "BatchedSession", _recorded(llm_engine.BatchedSession, fleet))
 
 

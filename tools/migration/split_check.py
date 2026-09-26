@@ -6,10 +6,12 @@ A work unit that splits a class by method, folds a function into a method or cha
 split (S5 WU-E1 first) cannot be applied by the S4 engine (``symbols.py`` moves and renames whole top-level
 definitions); nor can a move whose old home keeps importing the moved name for its importers (S5 WU-S3), which
 the engine would rewrite, and whose ``--check`` compares no whole file and ignores every import, function-local
-ones included. Its table (``[stage] kind = "splits"``; ``base``, the commit it was written against; ``files``,
-the production files the unit touches; ``created``, those of them that do not exist at ``base``, compared as
-empty modules there) declares how every definition of those files at ``base`` relates to the current tree, and
-this checker compares them:
+ones included; nor a test move whose tests change with the names they call (S5 WU-E2). Its table (``[stage] kind
+= "splits"``; ``base``, the commit it was written against; ``files``, the files the unit touches: production
+modules and, from S5 WU-E2, the test modules whose tests it moves or ports; ``created``, those of them that do
+not exist at ``base``, compared as empty modules there; ``deleted``, those that exist at ``base`` and not now,
+compared as empty modules now) declares how every definition of those files at ``base`` relates to the current
+tree, and this checker compares them:
 
 * ``[definitions]``: ``"path:qualname" = {from = "path:qualname", rewrite = {...}, diff = [...]}``, a
   definition now at the key that came from ``from`` (default: the key itself, an edit in place). ``rewrite``
@@ -212,8 +214,15 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     if unknown:
         problems.append(f"unknown tables {unknown}")
     base, files, created = stage["base"], list(stage["files"]), list(stage.get("created", []))
+    deleted = list(stage.get("deleted", []))
     problems += [f"[stage] created {p}: not a listed file" for p in created if p not in files]
     problems += [f"[stage] created {p}: exists at {base}" for p in created if exists_at(base, p)]
+    problems += [f"[stage] deleted {p}: not a listed file" for p in deleted if p not in files]
+    problems += [f"[stage] deleted {p}: also created" for p in deleted if p in created]
+    problems += [f"[stage] deleted {p}: does not exist at {base}" for p in deleted if not exists_at(base, p)]
+    problems += [f"[stage] deleted {p}: still exists" for p in deleted if (REPO / p).exists()]
+    missing = [p for p in files if p not in deleted and not (REPO / p).is_file()]
+    problems += [f"{p}: listed but missing now (declare it in [stage] deleted)" for p in missing]
     rows: dict[str, dict[str, Any]] = table.get("definitions", {})
     added: dict[str, str] = table.get("added", {})
     added_source: dict[str, list[str]] = table.get("added_source", {})
@@ -236,7 +245,8 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     problems += [f"[added] {k}: no [added_source] entry" for k in sorted(set(added) - set(added_source))]
     problems += [f"[added_source] {k}: not an [added] row" for k in sorted(set(added_source) - set(added))]
     old_trees = {path: ast.parse("" if path in created else source_at(base, path)) for path in files}
-    new_trees = {path: ast.parse((REPO / path).read_text()) for path in files}
+    absent = set(deleted) | set(missing)
+    new_trees = {path: ast.parse("" if path in absent else (REPO / path).read_text()) for path in files}
     old_defs = {k: v for path, tree in old_trees.items() for k, v in definitions(path, tree).items()}
     new_defs = {k: v for path, tree in new_trees.items() for k, v in definitions(path, tree).items()}
 

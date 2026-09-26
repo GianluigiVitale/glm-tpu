@@ -13,7 +13,7 @@ import jax
 import numpy as np
 
 from glm_tpu.engine.request import batch, validate
-from glm_tpu.engine.request_session import BatchedSession, PackedRequestSession, RequestPolicy
+from glm_tpu.engine.request_session import BatchedSession, RequestPolicy, RequestSession
 from glm_tpu.models.glm_moe_dsa import state as pre
 
 
@@ -78,7 +78,7 @@ class LLMEngine:
                 "optimized prefill failed",
             )
         prefill_seconds = clock() - started
-        session = PackedRequestSession(
+        session = RequestSession(
             policy,
             decode_step=lambda t, s: self.runner.decode(t, s, self.runner.weights, self.runner.rope),
             fleet_all=lambda valid: self.runner.vote(valid and clock() < deadline),

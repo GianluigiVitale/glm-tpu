@@ -203,6 +203,11 @@ S5_DECLARED: dict[tuple[str, str], str] = {
     ("glm_tpu/layers/contracts.py", "StageLocalKvLayout"): "WU-S: rewritten",
     ("glm_tpu/layers/contracts.py", "DsaNumericalContract"): "WU-S: moved -> glm_tpu/config/cache.py",
     ("glm_tpu/layers/contracts.py", "GlmMoeNumericalContract"): "WU-S: moved -> glm_tpu/config/cache.py",
+    # WU-E2 (DN-22): the sampled base session merged with the greedy one into RequestSession (renamed and edited);
+    # its seeded policy and uniform draw, which production never used, removed (FOLLOWUPS 24).
+    ("glm_tpu/engine/request_session.py", "SampledRequestPolicy"): "WU-E: removed",
+    ("glm_tpu/engine/request_session.py", "Ws32RequestSession"): "WU-E: rewritten",
+    ("glm_tpu/engine/request_session.py", "request_uniform"): "WU-E: removed",
 }
 S5_DECLARATION = re.compile(
     r"(?:WU-[A-Z][A-Za-z]*|H[1-9][0-9]?): "

@@ -69,6 +69,11 @@ SYMBOLS = Path(__file__).with_name("symbol_moves.toml")  # S4.1
 RENAMES = Path(__file__).with_name("renames.toml")  # S4.2
 MERGES = Path(__file__).with_name("test_merges.toml")  # S4.3
 TEST_MOVES = Path(__file__).with_name("test_moves.toml")  # S5 A2
+# S3 destinations a later S5 work unit removed without a table of this module: their tests moved by hand, proved by
+# split_check.py (its splits.toml, whose next version belongs to the next split, so the removal is recorded here).
+DISSOLVED_BY_HAND = {
+    "tests/models/glm_moe_dsa/test_decode_program.py": "S5 WU-E2: moved into tests/engine/test_request_session.py",
+}
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -408,8 +413,9 @@ def tracked() -> list[str]:
 
 def dissolved_later() -> set[str]:
     """Modules a later table dissolved (the S4.1 interim modules, the S4.3 merged tests, the S5 A2 split
-    test modules): S3 destinations that no longer exist."""
-    out: set[str] = set()
+    test modules) or a later work unit removed by hand (``DISSOLVED_BY_HAND``): S3 destinations that no longer
+    exist."""
+    out: set[str] = set(DISSOLVED_BY_HAND)
     for table in (SYMBOLS, RENAMES, MERGES, TEST_MOVES):
         if table.is_file():
             out |= set(tomllib.loads(table.read_text()).get("dissolve", {}).get("modules", []))

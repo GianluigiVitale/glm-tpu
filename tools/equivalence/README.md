@@ -289,7 +289,8 @@ checkpoint; WK decode/promote; resident BF16 weights; RoPE tables (1,536 / 8,192
 166,912); `cache_init(157)`; prompt A (157 = B128 + B114 tail) state, token and health after
 each block; prompt B (114, one block); prompt C (refused prefill on a finished state: caches and
 frontier unchanged, health false, token -1); three packed decode steps;
-an 8-token `PackedRequestSession` loop with identity votes (tokens and TokenEvent JSONL digest);
+an 8-token `RequestSession` loop (`PackedRequestSession` until S5 WU-E2) with identity votes (tokens and
+TokenEvent JSONL digest);
 `batch_cache_init` and `batch_insert` through the real `compile_batch`; `batch_generate`: the real
 `LLMEngine.generate_concurrent` (`generate_batch` until S5 WU-E1) over the concurrent runtime, four lanes (prompts A, B
 and two short ones) with that runtime's **own** `cache_init`, prefill and `batch_insert` programs

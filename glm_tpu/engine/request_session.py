@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from hashlib import sha256
 import math
 from time import perf_counter
 from typing import Any
@@ -21,34 +20,21 @@ import time
 import jax
 import numpy as np
 
-from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, finish_batched_prefill, DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, finish_batched_prefill
 from glm_tpu.engine.outputs import TokenEvent
 from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 
 
-def request_uniform(*, seed: int, request_id: str, token_index: int) -> float:
-    """Stateless replayable SHA256/24-bit uniform in [0,1), exactly FP32.
-
-    Persist this algorithm identity, seed, request id and next token index with
-    the whole request state. Resume must not reset the counter. One draw per
-    delivered/generated token, including the first token after prefill. This
-    protocol is explicit and does not claim the model card's unspecified RNG.
-    """
-    if any(type(x) is not int or not 0 <= x < 2**64 for x in (seed, token_index)):
-        raise ValueError("seed and token index must be uint64 integers")
-    if type(request_id) is not str or not request_id:
-        raise ValueError("a nonempty request id is required")
-    identity = sha256(request_id.encode("utf-8")).digest()
-    digest = sha256(
-        b"glm-ws32-request-uniform-v1\0" + seed.to_bytes(8, "big") + identity + token_index.to_bytes(8, "big")
-    ).digest()
-    return int.from_bytes(digest[:3], "big") / 2**24
-
-
 @dataclass(frozen=True, slots=True)
-class SampledRequestPolicy:
+class RequestPolicy:
+    """One greedy request's identity and generation limits.
+
+    The checks, their order and their exceptions are those of the frozen sampled
+    ``ws32_request_session.RequestPolicy`` at seed 0 (the release's value): the request id must be a
+    nonempty, UTF-8-encodable string (the frozen policy hashed it for its uniform draws).
+    """
+
     request_id: str
-    seed: int
     prompt_tokens: int
     max_new_tokens: int
     context_capacity: int
@@ -56,7 +42,9 @@ class SampledRequestPolicy:
     eos_ids: tuple[int, ...]
 
     def __post_init__(self) -> None:
-        request_uniform(seed=self.seed, request_id=self.request_id, token_index=0)
+        if type(self.request_id) is not str or not self.request_id:
+            raise ValueError("a nonempty request id is required")
+        self.request_id.encode("utf-8")
         if any(
             type(x) is not int or x <= 0
             for x in (self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size)
@@ -73,8 +61,8 @@ class SampledRequestPolicy:
             raise ValueError("unique in-vocabulary EOS ids required")
 
 
-class Ws32RequestSession:
-    """Consume one prefill result, then decode/emit with a resumable RNG index.
+class RequestSession:
+    """Consume one prefill result, then decode/emit one greedy token per step.
 
     All hosts follow the same schedule. ``fleet_all`` must implement the
     authenticated worker's all-host boolean vote (identity in CPU-only tests).
@@ -83,25 +71,28 @@ class Ws32RequestSession:
     time mislabeled as delivery. Non-output ranks use a no-op delivery callback
     and their timestamps MUST NOT be published as client delivery latency.
 
-    ``decode_step`` is the already-compiled sampled decoder with weights/RoPE
-    bound; ``replicate_uniform`` supplies its one replicated FP32 scalar. No
-    per-token compile, transformer dispatch or RNG reset lives in this class.
+    ``decode_step(token, state)`` is the already-compiled greedy decoder with
+    weights and rotary data bound; it returns the ``PackedDecodeResult`` of
+    ``glm_tpu.models.glm_moe_dsa.model``, whose compact status row each step
+    reads once and votes on with the fleet. No per-token compile or transformer
+    dispatch lives in this class.
     An exception poisons the session: no retry with possibly consumed buffers,
     and no duplicate token emission after an ambiguous delivery failure.
     """
 
     def __init__(
         self,
-        policy: SampledRequestPolicy,
+        policy: RequestPolicy,
         *,
-        decode_step: Callable[[Any, Any, Any], DecodeStepResult],
-        replicate_uniform: Callable[[np.ndarray], Any],
+        decode_step: Callable[[Any, Any], PackedDecodeResult],
         fleet_all: Callable[[bool], bool],
         deliver: Callable[[TokenEvent], None],
         delivery_boundary: str,
         request_started: float,
         clock: Callable[[], float] = perf_counter,
     ) -> None:
+        if not isinstance(policy, RequestPolicy):
+            raise ValueError("an explicit greedy RequestPolicy is required")
         now = clock()
         if (
             not math.isfinite(request_started)
@@ -112,7 +103,6 @@ class Ws32RequestSession:
             raise ValueError("request clock and named delivery boundary required")
         self.policy = policy
         self._decode = decode_step
-        self._replicate = replicate_uniform
         self._fleet_all = fleet_all
         self._deliver = deliver
         self._clock = clock
@@ -150,13 +140,6 @@ class Ws32RequestSession:
     @property
     def delivered_request_seconds(self) -> float | None:
         return None if not self._delivered_at else self._delivered_at[-1] - self.request_started
-
-    def next_uniform(self) -> Any:
-        """Same draw for every nonfinal prompt block; first generated index=0."""
-        if self._failed or self.finished:
-            raise RuntimeError("terminal request cannot sample")
-        value = request_uniform(seed=self.policy.seed, request_id=self.policy.request_id, token_index=len(self._events))
-        return self._replicate(np.asarray(value, np.float32))
 
     def release(self) -> None:
         """Drop terminal cache roots, retaining the compact output/timing log.
@@ -249,19 +232,61 @@ class Ws32RequestSession:
             self._busy = False
 
     def step(self) -> TokenEvent:
-        """Resume this live cache; one sampled decode, no hidden extra token."""
         self._begin()
         try:
             if not self._events:
                 raise RuntimeError("complete prefill before decoding")
-            draw = self.next_uniform()
             started = self._clock()
-            result = self._decode(self._pending_token, self._state, draw)
-            jax.block_until_ready(result)
+            packed = self._decode(self._pending_token, self._state)
+            jax.block_until_ready(packed)
             elapsed = self._clock() - started
-            self._vote(math.isfinite(elapsed) and elapsed >= 0)
+            error = None
+            try:
+                status = np.asarray(packed.metadata)  # One device-to-host read.
+                expected = self.policy.prompt_tokens + len(self._events)
+                valid = (
+                    math.isfinite(elapsed)
+                    and elapsed >= 0
+                    and status.shape == (4,)
+                    and status.dtype == np.int32
+                    and 0 <= int(status[0]) < self.policy.vocab_size
+                    and int(status[1]) == 1
+                    and int(status[2]) == expected
+                    and int(status[3]) == expected + 1
+                )
+            except Exception as exc:
+                valid, error = False, exc
+            self._vote(valid, error)
+            if error is not None:
+                raise RuntimeError("invalid packed request metadata") from error
             self._decode_seconds.append(elapsed)
-            return self._accept(result.state, result.next_token)
+            token_id = int(status[0])
+            reason = (
+                "eos"
+                if token_id in self.policy.eos_ids
+                else "length"
+                if len(self._events) + 1 == self.policy.max_new_tokens
+                else None
+            )
+            event = TokenEvent(self.policy.request_id, len(self._events), token_id, reason)
+            result = packed.decoded
+            # Commit before invoking the sink: an ambiguous failure cannot retry.
+            self._state, self._pending_token = result.state, result.next_token
+            self._events.append(event)
+            delivered = None
+            try:
+                self._deliver(event)
+                delivered = self._clock()
+                floor = self._delivered_at[-1] if self._delivered_at else self.request_started
+                if not math.isfinite(delivered) or delivered < floor:
+                    raise ValueError("delivery clock moved backwards")
+            except Exception as exc:
+                error = exc
+            self._vote(error is None, error)
+            if error is not None:
+                raise RuntimeError("delivery failed; request cannot be retried") from error
+            self._delivered_at.append(delivered)
+            return event
         except Exception:
             self._failed = True
             raise
@@ -347,138 +372,3 @@ class BatchedSession:
         finally:
             # No live cache survives the completed or failed batch.
             del state, tokens
-
-
-@dataclass(frozen=True, slots=True)
-class RequestPolicy:
-    """One greedy request's identity and generation limits.
-
-    The checks, their order and their exceptions are those of the frozen sampled
-    ``ws32_request_session.RequestPolicy`` at seed 0 (the release's value): the request id must be a
-    nonempty, UTF-8-encodable string (the frozen policy hashed it for its uniform draws).
-    """
-
-    request_id: str
-    prompt_tokens: int
-    max_new_tokens: int
-    context_capacity: int
-    vocab_size: int
-    eos_ids: tuple[int, ...]
-
-    def __post_init__(self) -> None:
-        if type(self.request_id) is not str or not self.request_id:
-            raise ValueError("a nonempty request id is required")
-        self.request_id.encode("utf-8")
-        if any(
-            type(x) is not int or x <= 0
-            for x in (self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size)
-        ):
-            raise ValueError("positive integer request dimensions required")
-        if self.prompt_tokens + self.max_new_tokens > self.context_capacity:
-            raise ValueError("full registered generation cap must fit; no silent truncation")
-        if (
-            type(self.eos_ids) is not tuple
-            or not self.eos_ids
-            or len(set(self.eos_ids)) != len(self.eos_ids)
-            or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)
-        ):
-            raise ValueError("unique in-vocabulary EOS ids required")
-
-
-class PackedRequestSession(Ws32RequestSession):
-    """Frozen prefill/delivery policy, compact host admission for greedy decode.
-
-    ``decode_step(token,state)`` must return the PackedDecodeResult produced by
-    the builder above, with weights and rotary data bound. The fleet callback
-    still performs one real all-host vote per invocation.
-    """
-
-    def __init__(
-        self,
-        policy: RequestPolicy,
-        *,
-        decode_step: Callable[[Any, Any], PackedDecodeResult],
-        fleet_all: Callable[[bool], bool],
-        deliver: Callable[[TokenEvent], None],
-        delivery_boundary: str,
-        request_started: float,
-        clock: Callable[[], float] = perf_counter,
-    ) -> None:
-        if not isinstance(policy, RequestPolicy):
-            raise ValueError("an explicit greedy RequestPolicy is required")
-        # Greedy decoding draws no uniforms: nothing to replicate (next_uniform refuses).
-        super().__init__(
-            policy,
-            decode_step=decode_step,
-            replicate_uniform=None,
-            fleet_all=fleet_all,
-            deliver=deliver,
-            delivery_boundary=delivery_boundary,
-            request_started=request_started,
-            clock=clock,
-        )
-
-    def next_uniform(self) -> Any:
-        raise RuntimeError("greedy decoding draws no uniforms")
-
-    def step(self) -> TokenEvent:
-        self._begin()
-        try:
-            if not self._events:
-                raise RuntimeError("complete prefill before decoding")
-            started = self._clock()
-            packed = self._decode(self._pending_token, self._state)
-            jax.block_until_ready(packed)
-            elapsed = self._clock() - started
-            error = None
-            try:
-                status = np.asarray(packed.metadata)  # One device-to-host read.
-                expected = self.policy.prompt_tokens + len(self._events)
-                valid = (
-                    math.isfinite(elapsed)
-                    and elapsed >= 0
-                    and status.shape == (4,)
-                    and status.dtype == np.int32
-                    and 0 <= int(status[0]) < self.policy.vocab_size
-                    and int(status[1]) == 1
-                    and int(status[2]) == expected
-                    and int(status[3]) == expected + 1
-                )
-            except Exception as exc:
-                valid, error = False, exc
-            self._vote(valid, error)
-            if error is not None:
-                raise RuntimeError("invalid packed request metadata") from error
-            self._decode_seconds.append(elapsed)
-            token_id = int(status[0])
-            reason = (
-                "eos"
-                if token_id in self.policy.eos_ids
-                else "length"
-                if len(self._events) + 1 == self.policy.max_new_tokens
-                else None
-            )
-            event = TokenEvent(self.policy.request_id, len(self._events), token_id, reason)
-            result = packed.decoded
-            # Commit before invoking the sink: an ambiguous failure cannot retry.
-            self._state, self._pending_token = result.state, result.next_token
-            self._events.append(event)
-            delivered = None
-            try:
-                self._deliver(event)
-                delivered = self._clock()
-                floor = self._delivered_at[-1] if self._delivered_at else self.request_started
-                if not math.isfinite(delivered) or delivered < floor:
-                    raise ValueError("delivery clock moved backwards")
-            except Exception as exc:
-                error = exc
-            self._vote(error is None, error)
-            if error is not None:
-                raise RuntimeError("delivery failed; request cannot be retried") from error
-            self._delivered_at.append(delivered)
-            return event
-        except Exception:
-            self._failed = True
-            raise
-        finally:
-            self._busy = False
