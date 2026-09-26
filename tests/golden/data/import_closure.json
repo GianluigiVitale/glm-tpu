@@ -43,15 +43,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "5b8c323593a069adbead785fc7fa1a2ffc468924a4934547a1aa46e29e8e751f",
+  "closure_map": "4b584639af378cf17375c929e998769369e85c172f63e60f5d30a8b721b192e0",
   "kind": "rename-only",
-  "previous_digest": "2354f15501600bab61f7eea999cd657ffb4a8d7ed9f012c5a9f25d639d3cbdac",
-  "reason": "WU-E"
+  "previous_digest": "3934a048a4598a63f50aac8ce2fe041484134b27a95c65086bafd5a7d0b0be7d",
+  "reason": "WU-S"
  },
- "recorded_unix": 1790328994,
+ "recorded_unix": 1790390537,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "43fa28cbe4aadae6feb0032eb508b0db57536468",
+  "head": "4f225279089d409fdeded32e719ce7a3319fe59e",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -166,7 +166,7 @@
    ]
   },
   "serving": {
-   "count": 79,
+   "count": 81,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -191,6 +191,7 @@
     "glm_tpu.entrypoints.openai.chat_utils",
     "glm_tpu.entrypoints.openai.protocol",
     "glm_tpu.entrypoints.openai.serving_chat",
+    "glm_tpu.entrypoints.openai.serving_models",
     "glm_tpu.entrypoints.openai.tool_parser",
     "glm_tpu.entrypoints.serve",
     "glm_tpu.entrypoints.serve.http_handler",
@@ -198,6 +199,7 @@
     "glm_tpu.entrypoints.serve.security",
     "glm_tpu.entrypoints.serve.server",
     "glm_tpu.entrypoints.ui",
+    "glm_tpu.entrypoints.ui.conversations",
     "glm_tpu.envs",
     "glm_tpu.exceptions",
     "glm_tpu.executor",
