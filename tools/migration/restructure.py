@@ -38,7 +38,8 @@ S3, ``move_map.toml``:
      repository-root anchors ``Path(__file__).resolve().parents[N]`` of a file whose depth changed;
    * other text (Markdown, TOML, ...): dotted names and paths, the same maps;
    * ``pyproject.toml``: additionally the package-data globs and license files of ``[pyproject]``
-     (and the legacy black boundary while ``[tool.black]`` exists: S4.3 replaced it by ruff);
+     (after the license files a later stage added, ``LICENSE_FILES_ADDED_LATER``; and the legacy black
+     boundary while ``[tool.black]`` exists: S4.3 replaced it by ruff);
    names listed in ``[baseline_references]`` for a file stay as spelled there;
 3. add a ``closure_map.toml`` ``[modules]`` entry (new name = recorded name) for every module this
    run moved (G6/G7 pass through the table until the rename-only re-record clears it).
@@ -77,6 +78,9 @@ DISSOLVED_BY_HAND = {
     "tests/models/glm_moe_dsa/test_decode_program.py": "S5 WU-E2: moved into tests/engine/test_request_session.py",
     "glm_tpu/environment.json": "S5 WU-C3: removed; collect-env reads the declared requirements",
 }
+# License files a later stage added to the [pyproject] license-files list the check expects, listed before the S3
+# table's own entries.
+LICENSE_FILES_ADDED_LATER = {"LICENSE": "S6: the root LICENSE, the Apache License 2.0"}
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -386,7 +390,8 @@ def rewrite_pyproject(moves: MoveMap, text: str) -> str:
         data = [glob for glob in moves.pyproject["package_data"] if f"glm_tpu/{glob}" not in dissolved_later()]
         text = replace(r"^(glm_tpu = )\[.*\]$", toml_list(data), text)
     if "license_files" in moves.pyproject:
-        text = replace(r"^(license-files = )\[.*\]$", toml_list(moves.pyproject["license_files"]), text)
+        files = [*LICENSE_FILES_ADDED_LATER, *moves.pyproject["license_files"]]
+        text = replace(r"^(license-files = )\[.*\]$", toml_list(files), text)
     if "black_include" in moves.pyproject and re.search(r"^\[tool\.black\]$", text, flags=re.M):
         include = moves.pyproject["black_include"]
         for path in sorted(dissolved_later()):  # a file S4.1 dissolved leaves the boundary

@@ -1,89 +1,81 @@
-# Third-party material and distribution scope
+# License and third-party notices
 
-This private repository does not currently grant a blanket open-source license
-for the owner's original work. Third-party material retains its own licenses.
-Do not infer a repository license from the model card or from these notices.
-Public distribution still requires completion of the provenance/privacy audit.
+## This repository
 
-## Hugging Face Transformers reference extracts
+Copyright 2026 Gianluigi Vitale.
 
-This tree no longer contains these extracts: they were archived with the research
-layer at tag `archive/research-20260922`, where the following files retain their
-original copyright and Apache-2.0 headers:
+The project's own work in this repository (the `glm_tpu` package, its tests, the
+equivalence harness and migration tools, the documentation and the compact result
+receipts) is licensed under the [Apache License, Version 2.0](LICENSE). The
+material listed below keeps its own license; the Apache License does not relicense
+it. The package metadata states the combination as the SPDX expression
+`Apache-2.0 AND LicenseRef-GLM-5.3` (`pyproject.toml`).
 
-- `reference/configuration_glm_moe_dsa.py`
-- `reference/modeling_glm_moe_dsa.py`
-- `reference/modular_glm_moe_dsa.py`
+## Material in this tree with its own license
 
-Copyright 2026 the HuggingFace Team. All rights reserved.
-License text: [Apache License 2.0](licenses/Apache-2.0.txt).
+### GLM-5.3 model configuration
 
-On 2026-09-14 each extract was byte-identical to its corresponding file in the
-installed Transformers 5.12.0 distribution under
-`transformers/models/glm_moe_dsa/`. The included license text was copied from that
-distribution's own LICENSE file, unchanged. This is a local distribution
-comparison, not a claim to have established the original upstream commit or
-revalidated downloaded wheel bytes. Hashes and limitations are in
-`docs/release/third-party-reference-check-20260914.json` (at the archive tag).
+`glm_tpu/models/glm_moe_dsa/hf_config/` contains the unchanged GLM-5.3
+configuration, generation configuration, tokenizer metadata and chat template from
+`zai-org/GLM-5.3` at revision `aca966e4e02791568aa6a4ced368624b3d897f42`.
+Copyright (c) 2026 Z.AI. Its [GLM-5.3 license](glm_tpu/models/glm_moe_dsa/hf_config/LICENSE)
+is retained verbatim next to the files and ships with them in the wheel. This
+license is distinct from GLM-5.2's MIT license. The tokenizer vocabulary and the
+model weights are external: they are never part of Git or of the wheel, and their
+use is governed by the model publisher's license.
 
-These extracts are reference material, not the native engine's execution path.
-The current private wheel excludes `reference/`; source checkouts include
-`glm_tpu/models/glm_moe_dsa/hf_config/` only.
+### Chat UI styling
 
-## Model repository snapshot and weights
+The palette, sidebar, message layout, composer and responsive styling of
+`glm_tpu/entrypoints/ui/static/style.css` are adapted from the owner's own `as-pt`
+project, file `aspt_rag/web/index.html` at commit
+`4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256 in
+[docs/UI.md](docs/UI.md)). The owner contributes this adaptation under this
+repository's license. This notice licenses nothing else of the `as-pt` project.
 
-`glm_tpu/models/glm_moe_dsa/hf_config/` contains the unchanged GLM-5.3 configuration, generation
-configuration, tokenizer metadata and chat template from `zai-org/GLM-5.3` at
-revision `aca966e4e02791568aa6a4ced368624b3d897f42`. Copyright (c) 2026 Z.AI.
-Its [GLM-5.3 license](glm_tpu/models/glm_moe_dsa/hf_config/LICENSE) is retained verbatim. This license is
-distinct from GLM-5.2's MIT license. Tokenizer vocabulary and weights remain
-external; the ordinary request profile pins their model/template identities.
-The historical snapshot below is preserved, unchanged, at the archive tag.
+## Material in the repository history only
 
-`reference/hf-repo/` (archived at tag `archive/research-20260922`, not in this
-tree) preserves GLM-5.2-FP8 configuration, tokenizer metadata, chat template and
-historical model-card text. The publisher's
-[MIT license](https://huggingface.co/zai-org/GLM-5.2-FP8/blob/f33c6dc501ee5a2c7e35155653b1b1abbc320951/LICENSE)
-is retained in [GLM-5.2-MIT.txt](licenses/GLM-5.2-MIT.txt):
-Copyright (c) 2026 Zhipu AI.
+These files are not in this tree. They are preserved, with their original headers,
+at the tag `archive/research-20260922` (the research tree this release was cut
+from) and in the Git history, which a clone of this repository carries. Their
+license texts stay in `licenses/` for that reason.
 
-On 2026-09-14 the four configuration/template files matched upstream revision
-`f33c6dc501ee5a2c7e35155653b1b1abbc320951` byte-for-byte. The local README is an
-earlier historical copy, not the benchmark protocol's pinned card; it was not
-overwritten. Use the protocol's original card revision/hash for comparisons.
-The copied license was obtained from that exact revision, not a different GLM
-repository. Details: `docs/release/hf-source-notice-check-20260914.json` (at the
-archive tag).
-Model weights are external and must never be bundled into Git or the wheel.
+- **Hugging Face Transformers reference extracts**:
+  `reference/configuration_glm_moe_dsa.py`, `reference/modeling_glm_moe_dsa.py`,
+  `reference/modular_glm_moe_dsa.py`. Copyright 2026 the HuggingFace Team.
+  License: [Apache License 2.0](licenses/Apache-2.0.txt), the LICENSE file of the
+  Transformers 5.12.0 distribution copied unchanged (hence its Hugging Face
+  copyright line). On 2026-09-14 each extract was byte-identical to its file in the
+  installed Transformers 5.12.0 distribution (`transformers/models/glm_moe_dsa/`);
+  this is a local distribution comparison, not a claim about the upstream commit.
+  The receipt is `docs/release/third-party-reference-check-20260914.json` at the
+  tag. The extracts were reference material, never the engine's execution path.
+- **GLM-5.2-FP8 repository snapshot** (`reference/hf-repo/`): configuration,
+  tokenizer metadata, chat template and a historical model-card copy from
+  `zai-org/GLM-5.2-FP8` at revision `f33c6dc501ee5a2c7e35155653b1b1abbc320951`.
+  Copyright (c) 2026 Zhipu AI. License: [MIT](licenses/GLM-5.2-MIT.txt), obtained
+  from that exact revision. On 2026-09-14 the four configuration/template files
+  matched that revision byte for byte; the local model-card copy is an earlier
+  historical copy, not the benchmark protocol's pinned card. Details:
+  `docs/release/hf-source-notice-check-20260914.json` at the tag.
+- **A historical vLLM patch** (`patches/vllm-fused-indexer-wk-clone.patch`) is in
+  neither this tree nor the wheel. It is recoverable at research commit
+  `83f0c2728d0d418255a917343cc89d24b815bd0c` (Git blob
+  `c1b64f0d88b768f4367e2fa1c1b4d07e7013a8fd`). No code of this tree uses it. Any
+  reuse or redistribution of it needs its own upstream license reconciliation.
 
-## Legacy patch and external dependencies
+## Evaluation data
 
-The chat UI styling in `glm_tpu/entrypoints/ui/static/style.css` is adapted, at the owner's
-request, from Gianluigi Vitale's private `as-pt` project at commit
-`4ed7937910538eef2754b31d0af316c6888ad9ba`, `aspt_rag/web/index.html`.
-The palette/layout contribution belongs to that project; GLM's resident bridge
-and conversation frontend are new integration code. [Design provenance](docs/UI.md)
-records the exact source hash and matching bucket generations. This private
-reuse does not imply a new public redistribution license for that UI.
+The GSM8K evaluation used the `openai/gsm8k` dataset, `main` configuration, test
+split at revision `740312add88f781978c0658806c59bc2815b9866`. Dataset questions,
+reference solutions and generated answer transcripts are not redistributed; the
+aggregate receipt identifies the source and the scoring method. The questions and
+solutions belong to the GSM8K dataset authors.
 
-The GSM8K evaluation uses the cached `openai/gsm8k` dataset, `main` configuration,
-test split at revision `740312add88f781978c0658806c59bc2815b9866`. Dataset questions,
-reference solutions and generated answer transcripts are not redistributed in
-the source archive. The aggregate receipt identifies the source and scoring
-method; attribution for this evaluation belongs to the GSM8K/OpenAI dataset
-authors. The project does not claim authorship of those questions.
+## Dependencies
 
-The historical `patches/vllm-fused-indexer-wk-clone.patch` is excluded from this
-release tree and wheel. It remains recoverable at research commit
-`83f0c2728d0d418255a917343cc89d24b815bd0c` (Git blob
-`c1b64f0d88b768f4367e2fa1c1b4d07e7013a8fd`). No supported runtime code consumes
-it. Any future reuse or public distribution of that historical patch needs its
-own upstream revision/license-notice reconciliation; removal from this tree does
-not remove it from history or complete public-distribution clearance.
-
-JAX, jaxlib, libtpu, PyTorch, Transformers and other installed dependencies are
-separately distributed packages, not relicensed by this project. The versions
-observed for the research release are in `requirements/runtime-observed.txt` (at
-the archive tag `archive/research-20260922`); dependency installation does
-not mean all binary redistribution terms have been audited. Do not publish a
-bundled runtime image as though this source notice covered all of its contents.
+JAX, jaxlib, libtpu, PyTorch, Transformers, tokenizers and the other packages
+declared in `pyproject.toml` are distributed separately under their own licenses;
+this project does not relicense them. Installing them does not mean their binary
+redistribution terms were audited: do not publish a bundled runtime image as
+though this notice covered its contents.

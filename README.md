@@ -143,5 +143,6 @@ preserve failures, recovery, original evidence, research branches and DB616–62
 Legacy sampling/long-context evidence is documented separately (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`).
 
 Maintained by **Gianluigi Vitale**. The repository and reviewer archive remain
-private. Original code has no blanket open-source license; upstream attribution
-and licenses are retained. Review is assistant self-review, not independent review.
+private. The project's own work is licensed under the [Apache License 2.0](LICENSE);
+third-party material keeps its own license ([notices](THIRD_PARTY_NOTICES.md)).
+Review is assistant self-review, not independent review.
