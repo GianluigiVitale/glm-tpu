@@ -91,12 +91,6 @@ class RoutedProjectionConfig:
     def blocks_per_contraction_tile(self) -> int:
         return self.contraction_tile // self.block_shape[1]
 
-    @classmethod
-    def frozen_tiles(cls, block_shape: tuple[int, int]) -> RoutedProjectionConfig:
-        """The frozen kernel's geometry: one scale block per grid step."""
-
-        return cls(block_shape=block_shape, output_tile=block_shape[0], contraction_tile=block_shape[1])
-
 
 def _scale_entry(scale_slab: Any, block_row: Any, block_column: Any) -> Any:
     """Select one FP32 scale from an aligned ``[8, 128]`` VMEM slab in registers.

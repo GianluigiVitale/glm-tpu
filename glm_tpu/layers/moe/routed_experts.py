@@ -193,33 +193,26 @@ def moe_grouped_routes(
     expert_up_scale_local: Any,
     expert_down_bits_local: Any,
     expert_down_scale_local: Any,
-    shared_gate_bits_local: Any,
-    shared_gate_scale_local: Any,
-    shared_up_bits_local: Any,
-    shared_up_scale_local: Any,
-    shared_down_bits_local: Any,
-    shared_down_scale_local: Any,
     *,
     contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
-    config: RoutedProjectionConfig | None = None,
+    config: RoutedProjectionConfig,
     expert_axis: str = "expert",
     feature_axis: str = "feature",
     interpret: bool = False,
-    shared_bf16: tuple[Any, Any, Any] | None = None,
+    shared_bf16: tuple[Any, Any, Any],
 ) -> Any:
     """Route-grouped challenger for ``ws32_moe_pallas_from_routes_mapped``.
 
-    ``shared_bf16 = (gate, up, down)`` supplies pre-decoded BF16 shared-expert
-    tables (``glm_tpu.perf.bf16_resident``); the shared FP8 operands are then
-    ignored (pass None) and the shared projections are plain dots at the same
-    FP32-accumulate boundaries.
+    ``shared_bf16 = (gate, up, down)`` supplies the pre-decoded BF16 shared-expert
+    tables (``glm_tpu.models.glm_moe_dsa.weights.bf16_resident_weights``); the
+    shared projections are plain dots at the same FP32-accumulate boundaries.
 
-    Same inputs, ownership rule, arithmetic boundaries and output as the frozen
-    body.  Structural differences only: all routed gate/up partials and the
+    Same routed inputs, ownership rule, arithmetic boundaries and output as the
+    frozen body.  Structural differences only: all routed gate/up partials and the
     shared expert's partials cross the feature axis in ONE stacked FP32
     ``psum``; routed down projections run in one grouped kernel; no per-route
-    ``lax.cond``.  ``config`` defaults to 512x512 tiles when the checkpoint
-    block is 128x128 and to the frozen one-block tiles otherwise.
+    ``lax.cond``.  ``config`` is the routed projections' tile contract; its
+    block must be the checkpoint's scale block (``contract.fp8_block_shape``).
     """
 
     if contract.stage_size != 8:
@@ -242,27 +235,14 @@ def moe_grouped_routes(
         raise ValueError("WS32 grouped MoE routed gate/up shapes drifted")
     if expert_down_bits_local.shape != expected_down:
         raise ValueError("WS32 grouped MoE routed down shape drifted")
-    if shared_bf16 is None:
-        if shared_gate_bits_local.shape != expected_gate[1:] or (
-            shared_up_bits_local.shape != expected_gate[1:] or shared_down_bits_local.shape != expected_down[1:]
-        ):
-            raise ValueError("WS32 grouped MoE shared expert shapes drifted")
-    else:
-        if (
-            len(shared_bf16) != 3
-            or any(t.dtype != jnp.bfloat16 for t in shared_bf16)
-            or shared_bf16[0].shape != expected_gate[1:]
-            or (shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:])
-        ):
-            raise ValueError("WS32 grouped MoE BF16 shared tables drifted")
-    if config is None:
-        block = tuple(contract.fp8_block_shape)
-        config = (
-            RoutedProjectionConfig(block_shape=block)
-            if block == (128, 128)
-            else RoutedProjectionConfig.frozen_tiles(block)
-        )
-    elif tuple(config.block_shape) != tuple(contract.fp8_block_shape):
+    if (
+        len(shared_bf16) != 3
+        or any(t.dtype != jnp.bfloat16 for t in shared_bf16)
+        or shared_bf16[0].shape != expected_gate[1:]
+        or (shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:])
+    ):
+        raise ValueError("WS32 grouped MoE BF16 shared tables drifted")
+    if tuple(config.block_shape) != tuple(contract.fp8_block_shape):
         raise ValueError("WS32 grouped MoE tile config block differs from the contract")
 
     top_k = contract.top_k
@@ -270,8 +250,6 @@ def moe_grouped_routes(
     routes = route_indices[0]
     owned = (routes >= expert_start) & (routes < expert_start + local_experts)
     local_ids = jnp.clip(routes - expert_start, jnp.int32(0), jnp.int32(local_experts - 1))
-    always = jnp.ones((1,), jnp.bool_)
-    zero_id = jnp.zeros((1,), jnp.int32)
 
     with jax.named_scope("moe_grouped/routed_gate_up"):
         routed_gate_up = fp8_routed_projection(
@@ -287,28 +265,14 @@ def moe_grouped_routes(
             interpret=interpret,
         )
     with jax.named_scope("moe_grouped/shared_gate_up"):
-        if shared_bf16 is None:
-            shared_gate_up = fp8_routed_projection(
-                hidden_local,
-                (
-                    (shared_gate_bits_local[None], shared_gate_scale_local[None]),
-                    (shared_up_bits_local[None], shared_up_scale_local[None]),
-                ),
-                zero_id,
-                always,
-                config=config,
-                result_dtype=jnp.float32,
-                interpret=interpret,
-            )
-        else:
-            dims = (((1,), (1,)), ((), ()))
-            shared_gate_up = jnp.stack(
-                (
-                    lax.dot_general(hidden_local, shared_bf16[0], dims, preferred_element_type=jnp.float32),
-                    lax.dot_general(hidden_local, shared_bf16[1], dims, preferred_element_type=jnp.float32),
-                ),
-                axis=1,
-            )
+        dims = (((1,), (1,)), ((), ()))
+        shared_gate_up = jnp.stack(
+            (
+                lax.dot_general(hidden_local, shared_bf16[0], dims, preferred_element_type=jnp.float32),
+                lax.dot_general(hidden_local, shared_bf16[1], dims, preferred_element_type=jnp.float32),
+            ),
+            axis=1,
+        )
     stacked = jnp.concatenate((routed_gate_up, shared_gate_up), axis=0)
     with jax.named_scope("moe_grouped/gate_up_feature_reduce"):
         gate_up = lax.psum(stacked, axis_name=feature_axis).astype(jnp.bfloat16)
@@ -329,22 +293,11 @@ def moe_grouped_routes(
     with jax.named_scope("moe_grouped/routed_expert_reduce"):
         routed = lax.psum(local_routed.astype(jnp.float32), axis_name=expert_axis).astype(jnp.bfloat16)
     with jax.named_scope("moe_grouped/shared_down"):
-        if shared_bf16 is None:
-            shared = fp8_routed_projection(
-                activated[top_k:],
-                ((shared_down_bits_local[None], shared_down_scale_local[None]),),
-                zero_id,
-                always,
-                config=config,
-                result_dtype=jnp.bfloat16,
-                interpret=interpret,
-            )[:, 0]
-        else:
-            shared = lax.dot_general(
-                activated[top_k:],
-                shared_bf16[2],
-                (((1,), (1,)), ((), ())),
-                preferred_element_type=jnp.float32,
-            ).astype(jnp.bfloat16)
+        shared = lax.dot_general(
+            activated[top_k:],
+            shared_bf16[2],
+            (((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ).astype(jnp.bfloat16)
     routed_scale = jnp.asarray(contract.routed_scaling_factor, dtype=jnp.bfloat16)
     return (routed * routed_scale + shared).astype(jnp.bfloat16)

@@ -3,148 +3,92 @@
 # definition now, compared by AST text after the declared rewrite with exactly the declared remaining lines, or is
 # removed; every definition now has an origin or is added, with its source. A later split rewrites this table
 # against its own base; each version is checked at the commit that applies it (history keeps them: S5 WU-E1 at
-# 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99). S7 deletes tools/migration/.
+# 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99, S5 WU-S3 at fd3086b0). S7 deletes tools/migration/.
 #
-# S5 WU-S3 (S = serving and structure; owner decisions DN-21 and DN-23(b)): the DN-12 layering moves, which close
-# three residuals of DESIGN 8.7. Definitions move down to the layer that uses them, verbatim; their old homes keep
-# importing them, so every other importer is unchanged and each name is the same object everywhere:
-# * layers -> models: the four BF16 weight groups the layer bodies take (Bf16QkvAWeights, Bf16AttentionWeights,
-#   Bf16DsaWeights, Bf16DenseWeights) move from models/glm_moe_dsa/weights.py to layers/contracts.py; the layer
-#   modules and decoder_layer.py import them from there, weights.py imports the ones it builds;
-# * engine -> entrypoints: ApiError moves from entrypoints/openai/protocol.py to glm_tpu/exceptions.py and
-#   final_channel from entrypoints/openai/tool_parser.py to engine/outputs.py (both re-exported from their old
-#   homes); the resident client imports them from there;
-# * config.cache -> layers.contracts (JAX): the four numerical contracts move to config/cache.py, which imports no
-#   JAX; layers/contracts.py re-exports them. The one non-verbatim line: StageLocalKvLayout.owner imports
-#   jax.numpy when it runs (its jax.Array annotations take jax from an `if TYPE_CHECKING:` import).
-# No message, value or signature changes.
+# S5 IMP-23 (owner decision DN-23(c)): the dead FP8 shared-expert path of the decode MoE, left "for a later unit"
+# by 040f7368. The only caller of moe_grouped_routes (decoder_layer.mlp_bf16) passes six None FP8 shared operands,
+# the BF16 shared tables and the release tile config, so these never run and are removed: the six operands, the
+# FP8 shared shape check and the two FP8 shared projections (the BF16 arms stay, unchanged, in the same named
+# scopes), the two constants only those projections read, and the `config=None` default with the one call of
+# RoutedProjectionConfig.frozen_tiles, which goes too. config and shared_bf16 are required; the two
+# routed_projection annotations drop `| None`. write_empty_slot and RoutedProjectionConfig's fields stay (the
+# kernel reads write_empty_slot; G1-/G2-protocol record the defaults). No message, value or program changes.
 
 [stage]
-name = "S5 WU-S3"
+name = "S5 IMP-23"
 kind = "splits"
-base = "71f79523"   # the tree this table was written against
+base = "496088b0"   # the tree this table was written against
 files = [
-  "glm_tpu/layers/contracts.py",
-  "glm_tpu/models/glm_moe_dsa/weights.py",
-  "glm_tpu/layers/linear.py",
-  "glm_tpu/layers/mlp.py",
-  "glm_tpu/layers/attention/mla.py",
-  "glm_tpu/layers/attention/dsa_indexer.py",
+  "glm_tpu/layers/moe/routed_experts.py",
+  "glm_tpu/kernels/fp8_grouped_matmul/kernel.py",
   "glm_tpu/models/glm_moe_dsa/decoder_layer.py",
-  "glm_tpu/exceptions.py",
-  "glm_tpu/entrypoints/openai/protocol.py",
-  "glm_tpu/entrypoints/openai/tool_parser.py",
-  "glm_tpu/engine/outputs.py",
-  "glm_tpu/engine/resident_client.py",
-  "glm_tpu/config/cache.py",
-  "glm_tpu/config/__init__.py",
 ]
 
-[docstrings]
-"glm_tpu/layers/contracts.py" = "WU-S: names where the contracts are defined and the BF16 weight groups it now holds"
-"glm_tpu/exceptions.py" = "WU-S: names ApiError, now defined here"
-"glm_tpu/entrypoints/openai/protocol.py" = "WU-S: names where ApiError is defined"
-"glm_tpu/entrypoints/openai/tool_parser.py" = "WU-S: names where final_channel is defined"
-"glm_tpu/engine/outputs.py" = "WU-S: names final_channel, now defined here"
-"glm_tpu/config/cache.py" = "WU-S: the contracts are defined here; the module imports no JAX"
-"glm_tpu/config/__init__.py" = "WU-S: no config module imports JAX any more"
-
-[imports."glm_tpu/layers/contracts.py"]
-added = [
-  "glm_tpu.config.cache:DsaNumericalContract as DsaNumericalContract",
-  "glm_tpu.config.cache:GlmMoeNumericalContract as GlmMoeNumericalContract",
-  "glm_tpu.config.cache:MlaNumericalContract as MlaNumericalContract",
-  "glm_tpu.config.cache:StageLocalKvLayout as StageLocalKvLayout",
-]
-removed = ["dataclasses:dataclass"]
-
-[imports."glm_tpu/models/glm_moe_dsa/weights.py"]
-added = [
-  "glm_tpu.layers.contracts:Bf16AttentionWeights",
-  "glm_tpu.layers.contracts:Bf16DenseWeights",
-  "glm_tpu.layers.contracts:Bf16DsaWeights",
-  "glm_tpu.layers.contracts:Bf16QkvAWeights",
-]
-removed = []
-
-[imports."glm_tpu/layers/linear.py"]
-added = ["glm_tpu.layers.contracts:Bf16DsaWeights"]
-removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights"]
-
-[imports."glm_tpu/layers/mlp.py"]
-added = ["glm_tpu.layers.contracts:Bf16DenseWeights"]
-removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DenseWeights"]
-
-[imports."glm_tpu/layers/attention/mla.py"]
-added = ["glm_tpu.layers.contracts:Bf16AttentionWeights", "glm_tpu.layers.contracts:Bf16QkvAWeights"]
-removed = [
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16AttentionWeights",
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16QkvAWeights",
-]
-
-[imports."glm_tpu/layers/attention/dsa_indexer.py"]
-added = ["glm_tpu.layers.contracts:Bf16DsaWeights"]
-removed = ["glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights"]
-
-[imports."glm_tpu/models/glm_moe_dsa/decoder_layer.py"]
-added = [
-  "glm_tpu.layers.contracts:Bf16AttentionWeights",
-  "glm_tpu.layers.contracts:Bf16DenseWeights",
-  "glm_tpu.layers.contracts:Bf16DsaWeights",
-  "glm_tpu.layers.contracts:Bf16QkvAWeights",
-]
-removed = [
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16AttentionWeights",
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16DenseWeights",
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16DsaWeights",
-  "glm_tpu.models.glm_moe_dsa.weights:Bf16QkvAWeights",
+# the six FP8 shared operands leave the signature; config and shared_bf16 are required; the docstring's three
+# sentences about them and the BF16 tables' module pointer are rewritten; the FP8 shared shape check, the config=None
+# default, the two constants only the FP8 shared projections read and those two projections are removed (the BF16
+# arms stay, dedented, in the same named scopes; ast.unparse prints the old `else: if` as `elif`)
+[definitions."glm_tpu/layers/moe/routed_experts.py:moe_grouped_routes"]
+diff = [
+  "-def moe_grouped_routes(hidden_local: Any, route_indices: Any, route_weights: Any, expert_gate_bits_local: Any, expert_gate_scale_local: Any, expert_up_bits_local: Any, expert_up_scale_local: Any, expert_down_bits_local: Any, expert_down_scale_local: Any, shared_gate_bits_local: Any, shared_gate_scale_local: Any, shared_up_bits_local: Any, shared_up_scale_local: Any, shared_down_bits_local: Any, shared_down_scale_local: Any, *, contract: GlmMoeNumericalContract=GlmMoeNumericalContract(stage_size=8), config: RoutedProjectionConfig | None=None, expert_axis: str='expert', feature_axis: str='feature', interpret: bool=False, shared_bf16: tuple[Any, Any, Any] | None=None) -> Any:",
+  "+def moe_grouped_routes(hidden_local: Any, route_indices: Any, route_weights: Any, expert_gate_bits_local: Any, expert_gate_scale_local: Any, expert_up_bits_local: Any, expert_up_scale_local: Any, expert_down_bits_local: Any, expert_down_scale_local: Any, *, contract: GlmMoeNumericalContract=GlmMoeNumericalContract(stage_size=8), config: RoutedProjectionConfig, expert_axis: str='expert', feature_axis: str='feature', interpret: bool=False, shared_bf16: tuple[Any, Any, Any]) -> Any:",
+  "-    ``shared_bf16 = (gate, up, down)`` supplies pre-decoded BF16 shared-expert",
+  "-    tables (``glm_tpu.perf.bf16_resident``); the shared FP8 operands are then",
+  "-    ignored (pass None) and the shared projections are plain dots at the same",
+  "-    FP32-accumulate boundaries.",
+  "+    ``shared_bf16 = (gate, up, down)`` supplies the pre-decoded BF16 shared-expert",
+  "+    tables (``glm_tpu.models.glm_moe_dsa.weights.bf16_resident_weights``); the",
+  "+    shared projections are plain dots at the same FP32-accumulate boundaries.",
+  "-    Same inputs, ownership rule, arithmetic boundaries and output as the frozen",
+  "-    body.  Structural differences only: all routed gate/up partials and the",
+  "+    Same routed inputs, ownership rule, arithmetic boundaries and output as the",
+  "+    frozen body.  Structural differences only: all routed gate/up partials and the",
+  "-    ``lax.cond``.  ``config`` defaults to 512x512 tiles when the checkpoint",
+  "-    block is 128x128 and to the frozen one-block tiles otherwise.",
+  "+    ``lax.cond``.  ``config`` is the routed projections' tile contract; its",
+  "+    block must be the checkpoint's scale block (``contract.fp8_block_shape``).",
+  "-    if shared_bf16 is None:",
+  "-        if shared_gate_bits_local.shape != expected_gate[1:] or (shared_up_bits_local.shape != expected_gate[1:] or shared_down_bits_local.shape != expected_down[1:]):",
+  "-            raise ValueError('WS32 grouped MoE shared expert shapes drifted')",
+  "-    elif len(shared_bf16) != 3 or any((t.dtype != jnp.bfloat16 for t in shared_bf16)) or shared_bf16[0].shape != expected_gate[1:] or (shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:]):",
+  "+    if len(shared_bf16) != 3 or any((t.dtype != jnp.bfloat16 for t in shared_bf16)) or shared_bf16[0].shape != expected_gate[1:] or (shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:]):",
+  "-    if config is None:",
+  "-        block = tuple(contract.fp8_block_shape)",
+  "-        config = RoutedProjectionConfig(block_shape=block) if block == (128, 128) else RoutedProjectionConfig.frozen_tiles(block)",
+  "-    elif tuple(config.block_shape) != tuple(contract.fp8_block_shape):",
+  "+    if tuple(config.block_shape) != tuple(contract.fp8_block_shape):",
+  "-    always = jnp.ones((1,), jnp.bool_)",
+  "-    zero_id = jnp.zeros((1,), jnp.int32)",
+  "-        if shared_bf16 is None:",
+  "-            shared_gate_up = fp8_routed_projection(hidden_local, ((shared_gate_bits_local[None], shared_gate_scale_local[None]), (shared_up_bits_local[None], shared_up_scale_local[None])), zero_id, always, config=config, result_dtype=jnp.float32, interpret=interpret)",
+  "-        else:",
+  "-            dims = (((1,), (1,)), ((), ()))",
+  "-            shared_gate_up = jnp.stack((lax.dot_general(hidden_local, shared_bf16[0], dims, preferred_element_type=jnp.float32), lax.dot_general(hidden_local, shared_bf16[1], dims, preferred_element_type=jnp.float32)), axis=1)",
+  "+        dims = (((1,), (1,)), ((), ()))",
+  "+        shared_gate_up = jnp.stack((lax.dot_general(hidden_local, shared_bf16[0], dims, preferred_element_type=jnp.float32), lax.dot_general(hidden_local, shared_bf16[1], dims, preferred_element_type=jnp.float32)), axis=1)",
+  "-        if shared_bf16 is None:",
+  "-            shared = fp8_routed_projection(activated[top_k:], ((shared_down_bits_local[None], shared_down_scale_local[None]),), zero_id, always, config=config, result_dtype=jnp.bfloat16, interpret=interpret)[:, 0]",
+  "-        else:",
+  "-            shared = lax.dot_general(activated[top_k:], shared_bf16[2], (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32).astype(jnp.bfloat16)",
+  "+        shared = lax.dot_general(activated[top_k:], shared_bf16[2], (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32).astype(jnp.bfloat16)",
 ]
 
-[imports."glm_tpu/entrypoints/openai/protocol.py"]
-added = ["glm_tpu.exceptions:ApiError as ApiError"]
-removed = []
-
-[imports."glm_tpu/entrypoints/openai/tool_parser.py"]
-added = ["glm_tpu.engine.outputs:final_channel as final_channel"]
-removed = []
-
-[imports."glm_tpu/engine/outputs.py"]
-added = ["re"]
-removed = []
-
-[imports."glm_tpu/engine/resident_client.py"]
-added = ["glm_tpu.engine.outputs:final_channel", "glm_tpu.exceptions:ApiError"]
-removed = ["glm_tpu.entrypoints.openai.tool_parser:final_channel", "glm_tpu.entrypoints.openai:protocol"]
-
-[imports."glm_tpu/config/cache.py"]
-added = ["typing:Any", "typing:TYPE_CHECKING"]
-removed = [
-  "glm_tpu.layers.contracts:DsaNumericalContract",
-  "glm_tpu.layers.contracts:GlmMoeNumericalContract",
-  "glm_tpu.layers.contracts:MlaNumericalContract",
-  "glm_tpu.layers.contracts:StageLocalKvLayout",
+# the one caller: the six None arguments leave; the annotation no longer offers None
+[definitions."glm_tpu/models/glm_moe_dsa/decoder_layer.py:mlp_bf16"]
+diff = [
+  "-def mlp_bf16(post_attention_residual_local: Any, normalized: Any, dense: Bf16DenseWeights | None, moe: Bf16MoeWeights | None, *, mlp_kind: str, contract: GlmMoeNumericalContract, routed_projection: RoutedProjectionConfig | None, interpret: bool, expert_axis: str='expert', feature_axis: str='feature') -> MlpResult:",
+  "+def mlp_bf16(post_attention_residual_local: Any, normalized: Any, dense: Bf16DenseWeights | None, moe: Bf16MoeWeights | None, *, mlp_kind: str, contract: GlmMoeNumericalContract, routed_projection: RoutedProjectionConfig, interpret: bool, expert_axis: str='expert', feature_axis: str='feature') -> MlpResult:",
+  "-    update = moe_grouped_routes(normalized, route_indices, route_weights, *moe[2:8], None, None, None, None, None, None, contract=contract, config=routed_projection, interpret=interpret, shared_bf16=(moe.shared_gate_local, moe.shared_up_local, moe.shared_down_local))",
+  "+    update = moe_grouped_routes(normalized, route_indices, route_weights, *moe[2:8], contract=contract, config=routed_projection, interpret=interpret, shared_bf16=(moe.shared_gate_local, moe.shared_up_local, moe.shared_down_local))",
 ]
 
-[statements."glm_tpu/config/cache.py"]
-# the jax.Array annotations of StageLocalKvLayout.owner (string annotations; nothing is imported at run time)
-diff = ["+if TYPE_CHECKING:", "+    import jax"]
+# passes routed_projection on to mlp_bf16: the annotation no longer offers None
+[definitions."glm_tpu/models/glm_moe_dsa/decoder_layer.py:transformer_layer_bf16"]
+diff = [
+  "-def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any, cache_local: Any, index_cache_local: Any, selected_positions: Any, selected_valid_counts: Any, selected_scores: Any, position: Any, block_tables: Any, context_lengths: Any, layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str, mlp_kind: str, config: cache.CacheConfig, routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool, linear_interpret: bool, main_rope_table_row: Any) -> TransformerLayerResult:",
+  "+def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any, cache_local: Any, index_cache_local: Any, selected_positions: Any, selected_valid_counts: Any, selected_scores: Any, position: Any, block_tables: Any, context_lengths: Any, layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str, mlp_kind: str, config: cache.CacheConfig, routed_projection: RoutedProjectionConfig, sparse_attention_interpret: bool, linear_interpret: bool, main_rope_table_row: Any) -> TransformerLayerResult:",
+]
 
-[definitions]
-# the BF16 weight groups the layer bodies take: models -> layers (verbatim)
-"glm_tpu/layers/contracts.py:Bf16QkvAWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16QkvAWeights" }
-"glm_tpu/layers/contracts.py:Bf16AttentionWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16AttentionWeights" }
-"glm_tpu/layers/contracts.py:Bf16DsaWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16DsaWeights" }
-"glm_tpu/layers/contracts.py:Bf16DenseWeights" = { from = "glm_tpu/models/glm_moe_dsa/weights.py:Bf16DenseWeights" }
-# the numerical contracts: layers -> config (verbatim; their methods follow their classes, implicit rows)
-"glm_tpu/config/cache.py:MlaNumericalContract" = { from = "glm_tpu/layers/contracts.py:MlaNumericalContract" }
-"glm_tpu/config/cache.py:StageLocalKvLayout" = { from = "glm_tpu/layers/contracts.py:StageLocalKvLayout" }
-"glm_tpu/config/cache.py:StageLocalKvLayout.owner" = { from = "glm_tpu/layers/contracts.py:StageLocalKvLayout.owner", diff = [
-  "+    import jax.numpy as jnp",
-] }
-"glm_tpu/config/cache.py:DsaNumericalContract" = { from = "glm_tpu/layers/contracts.py:DsaNumericalContract" }
-"glm_tpu/config/cache.py:GlmMoeNumericalContract" = { from = "glm_tpu/layers/contracts.py:GlmMoeNumericalContract" }
-# the API error and the answer split: entrypoints -> the leaf exceptions module and engine/outputs.py (verbatim)
-"glm_tpu/exceptions.py:ApiError" = { from = "glm_tpu/entrypoints/openai/protocol.py:ApiError" }
-"glm_tpu/engine/outputs.py:final_channel" = { from = "glm_tpu/entrypoints/openai/tool_parser.py:final_channel" }
-# the resident client raises the class it now imports by name (was protocol.ApiError, the same class)
-"glm_tpu/engine/resident_client.py:Resident.prepare_api" = { rewrite = { "protocol.ApiError" = "ApiError" } }
+# never called in production (its only caller was the config=None default above)
+[removed]
+"glm_tpu/kernels/fp8_grouped_matmul/kernel.py:RoutedProjectionConfig.frozen_tiles" = "WU-E: IMP-23, only the config=None default of moe_grouped_routes called it (never run)"
