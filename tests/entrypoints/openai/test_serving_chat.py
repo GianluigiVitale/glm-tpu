@@ -8,13 +8,15 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from glm_tpu.entrypoints.openai.serving_chat import Api
+from glm_tpu.entrypoints.openai.serving_chat import OpenAIServingChat
+from glm_tpu.entrypoints.openai.serving_models import OpenAIServingModels
 from glm_tpu.entrypoints.openai.protocol import ApiError
 from glm_tpu.entrypoints.openai.chat_utils import convert, check_tools, instruct
 from glm_tpu.entrypoints.openai.tool_parser import parse
-from glm_tpu.entrypoints.serve.job_queue import Chats
+from glm_tpu.entrypoints.serve.job_queue import JobQueue
 from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
 from glm_tpu.entrypoints.serve.http_handler import handler
+from glm_tpu.entrypoints.ui.conversations import ConversationStore
 
 
 TOOLS = [
@@ -73,17 +75,22 @@ class FakeResident:
 
 def service(tmp_path, backend=None):
     backend = backend or FakeResident()
-    store = Chats(tmp_path, backend)
-    return Api(store, backend, capacity=32768), store, backend
+    queue = JobQueue(tmp_path, backend)
+    return OpenAIServingChat(queue, backend, capacity=32768), queue, backend
 
 
-def pump(store):
+def listing(api):
+    """The ``/v1/models`` listing the server builds beside ``api``: the same window and deadline."""
+    return OpenAIServingModels(capacity=api.capacity, wait_seconds=api.wait_seconds)
+
+
+def pump(queue):
     """Run the shared sequential worker for the duration of one test."""
     stop = threading.Event()
 
     def loop():
         while not stop.is_set():
-            store.step()
+            queue.step()
             time.sleep(0.01)
 
     thread = threading.Thread(target=loop, daemon=True)
@@ -170,15 +177,15 @@ def test_tool_choice_is_expressed_in_band():
 
 
 def test_completion_is_stateless_and_reports_usage(tmp_path):
-    api, store, backend = service(tmp_path)
-    stop = pump(store)
+    api, queue, backend = service(tmp_path)
+    stop = pump(queue)
     try:
         first = api.completion(chat(messages=[dict(role="user", content="one")]))
         second = api.completion(chat(messages=[dict(role="user", content="two")]))
     finally:
         stop.set()
     # No conversation is created and no history leaks between requests.
-    assert store.db["chats"] == []
+    assert queue.db["chats"] == []
     assert [m[-1]["content"] for m in (p["messages"] for p in backend.prepared)] == ["one", "two"]
     assert all(len(p["messages"]) == 1 for p in backend.prepared)
     assert first["object"] == "chat.completion" and first["model"] == "glm-5.3"
@@ -193,8 +200,8 @@ def test_completion_is_stateless_and_reports_usage(tmp_path):
 
 def test_tool_call_answer_sets_tool_calls_finish_reason(tmp_path):
     backend = FakeResident("<tool_call>read_file<arg_key>path</arg_key><arg_value>a.txt</arg_value></tool_call>")
-    api, store, _ = service(tmp_path, backend)
-    stop = pump(store)
+    api, queue, _ = service(tmp_path, backend)
+    stop = pump(queue)
     try:
         result = api.completion(chat(tools=TOOLS, tool_choice="auto"))
     finally:
@@ -210,8 +217,8 @@ def test_tool_call_answer_sets_tool_calls_finish_reason(tmp_path):
 
 def test_stream_separates_reasoning_content_and_tool_calls(tmp_path):
     backend = FakeResident("done<tool_call>read_file<arg_key>path</arg_key><arg_value>a.txt</arg_value></tool_call>")
-    api, store, _ = service(tmp_path, backend)
-    stop = pump(store)
+    api, queue, _ = service(tmp_path, backend)
+    stop = pump(queue)
     try:
         raw = b"".join(api.stream(chat(tools=TOOLS, stream=True)))
     finally:
@@ -234,7 +241,7 @@ def test_stream_separates_reasoning_content_and_tool_calls(tmp_path):
 
 
 def test_capacity_and_request_validation(tmp_path):
-    api, _store, backend = service(tmp_path)
+    api, _queue, backend = service(tmp_path)
     with pytest.raises(ApiError, match="fills the context"):
         api.prepare(chat(messages=[dict(role="user", content="x" * 400000)]))
     with pytest.raises(ApiError, match="reasoning_effort"):
@@ -252,24 +259,25 @@ def test_capacity_and_request_validation(tmp_path):
 
 
 def test_api_traffic_stays_out_of_the_browser_workspace(tmp_path):
-    api, store, _ = service(tmp_path)
-    stop = pump(store)
+    api, queue, _ = service(tmp_path)
+    store = ConversationStore(queue)
+    stop = pump(queue)
     try:
         api.completion(chat(messages=[dict(role="user", content="private")]))
     finally:
         stop.set()
     snapshot = store.snapshot()
     assert snapshot["chats"] == [] and snapshot["jobs"] == []
-    assert len(store.db["jobs"]) == 1 and store.db["jobs"][0]["api"]
+    assert len(queue.db["jobs"]) == 1 and queue.db["jobs"][0]["api"]
 
 
 def test_http_key_boundary_and_model_list(tmp_path):
-    api, store, _ = service(tmp_path)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(store, api, "secret-key"))
+    api, queue, _ = service(tmp_path)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(ConversationStore(queue), api, listing(api), "secret-key"))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
-    stop = pump(store)
+    stop = pump(queue)
     try:
         for headers in ({}, {"Authorization": "Bearer wrong"}, {"Authorization": "secret-key"}):
             with pytest.raises(HTTPError) as error:
@@ -306,9 +314,9 @@ def test_http_key_boundary_and_model_list(tmp_path):
 
 def test_backend_failure_reaches_the_waiting_client(tmp_path):
     backend = FakeResident()
-    api, store, _ = service(tmp_path, backend)
+    api, queue, _ = service(tmp_path, backend)
     backend.observe = lambda _: (_ for _ in ()).throw(OSError("receipt unreadable"))
-    stop = pump(store)
+    stop = pump(queue)
     try:
         with pytest.raises(ApiError, match="receipt unreadable") as error:
             api.completion(chat())
@@ -323,8 +331,8 @@ def test_backend_failure_reaches_the_waiting_client(tmp_path):
 
 def test_effort_alias_forces_cheap_side_calls(tmp_path):
     """A client that cannot send reasoning_effort selects it by model id."""
-    api, store, backend = service(tmp_path)
-    listed = {row["id"]: row for row in api.models()["data"]}
+    api, queue, backend = service(tmp_path)
+    listed = {row["id"]: row for row in listing(api).models()["data"]}
     assert set(listed) == {"glm-5.3", "glm-5.3-low", "glm-5.3-high"}
     assert listed["glm-5.3-low"]["reasoning_effort"] == "low"
     api.prepare(chat(model="glm-5.3-low"))
@@ -334,7 +342,7 @@ def test_effort_alias_forces_cheap_side_calls(tmp_path):
     assert backend.prepared[-1]["effort"] == "low"
     api.prepare(chat(model="glm-5.3", reasoning_effort="high"))
     assert backend.prepared[-1]["effort"] == "high"
-    stop = pump(store)
+    stop = pump(queue)
     try:
         assert api.completion(chat(model="glm-5.3-low"))["model"] == "glm-5.3-low"
     finally:

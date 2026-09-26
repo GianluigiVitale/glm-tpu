@@ -12,7 +12,10 @@ from glm_tpu.entrypoints.openai import protocol
 UI_PACKAGE = "glm_tpu.entrypoints.ui"  # the page, script and style sheet: its package data static/*
 
 
-def handler(chats, service=None, token=None):
+def handler(store, chat=None, models=None, token=None):
+    """The handler class: the browser workspace over ``store`` (a ``ConversationStore``) and ``/v1`` over ``chat``
+    (``OpenAIServingChat``) and ``models`` (``OpenAIServingModels``) for bearer ``token`` (``None``: no API)."""
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass  # Do not put private questions in access logs.
@@ -84,9 +87,9 @@ def handler(chats, service=None, token=None):
                     )
                 if path != "/v1/models":
                     return self.respond(404, dict(error=dict(message="Not found.", type="invalid_request_error")))
-                return self.respond(200, service.models())
+                return self.respond(200, models.models())
             if path == "/api/state":
-                return self.respond(200, chats.snapshot())
+                return self.respond(200, store.snapshot())
             assets = {
                 "/": ("index.html", "text/html"),
                 "/app.js": ("app.js", "text/javascript"),
@@ -113,7 +116,7 @@ def handler(chats, service=None, token=None):
                 data = json.loads(self.rfile.read(size))
                 if type(data) is not dict:
                     raise ValueError("Expected an object.")
-                result = chats.change(data)
+                result = store.change(data)
             except (ValueError, OSError) as exc:
                 return self.respond(400, dict(error=str(exc)))
             self.respond(200, result)
@@ -141,9 +144,9 @@ def handler(chats, service=None, token=None):
                 return self.respond(400, dict(error=dict(message=str(exc), type="invalid_request_error")))
             self.connection.settimeout(None)
             if type(data) is dict and data.get("stream"):
-                return self.stream(service.stream(data))
+                return self.stream(chat.stream(data))
             try:
-                return self.respond(200, service.completion(data))
+                return self.respond(200, chat.completion(data))
             except protocol.ApiError as exc:
                 return self.respond(exc.status, exc.body())
             except (ValueError, OSError) as exc:

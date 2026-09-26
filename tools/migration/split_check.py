@@ -5,8 +5,9 @@
 A work unit that splits a class by method, folds a function into a method or changes the callers of the
 split (S5 WU-E1 first) cannot be applied by the S4 engine (``symbols.py`` moves and renames whole top-level
 definitions). Its table (``[stage] kind = "splits"``; ``base``, the commit it was written against; ``files``,
-the production files the unit touches) declares how every definition of those files at ``base`` relates to
-the current tree, and this checker compares them:
+the production files the unit touches; ``created``, those of them that do not exist at ``base``, compared as
+empty modules there) declares how every definition of those files at ``base`` relates to the current tree, and
+this checker compares them:
 
 * ``[definitions]``: ``"path:qualname" = {from = "path:qualname", rewrite = {...}, diff = [...]}``, a
   definition now at the key that came from ``from`` (default: the key itself, an edit in place). ``rewrite``
@@ -21,6 +22,9 @@ the current tree, and this checker compares them:
 * ``[added]`` / ``[removed]``: ``"path:qualname" = "<token>: reason"``, a definition with no origin, and a
   ``base`` definition that is nobody's origin. Every ``base`` definition of the files must be an origin
   (declared or implicit) or removed; every current definition must have an origin or be added.
+* ``[added_source]``: ``"path:qualname" = [lines]``, the exact ``ast.unparse`` lines of each ``[added]``
+  definition (a class as its shell, like every comparison here), so added code is compared too; required for
+  every ``[added]`` row (from S5 WU-S1/S2).
 * ``[docstrings]``: ``"path" = "<token>: reason"``, a module docstring the unit rewrote (not compared).
 * ``[imports."path"]``: ``added`` / ``removed``, the top-level import bindings the file gains and loses
   (``module:name``, ``module`` for ``import module``, `` as alias`` appended); the other top-level
@@ -29,8 +33,9 @@ the current tree, and this checker compares them:
 Definitions are top-level functions and classes and the functions and classes directly in a top-level
 class; nested functions, lambdas and comprehensions are part of the definition that contains them. A class
 is compared as its shell (name, bases, keywords, decorators, docstring and the statements that are not
-definitions). Comments and formatting are not compared (``ast.unparse``). Standard library only; exit 1 with
-every problem listed. S7 deletes ``tools/migration/``.
+definitions). Comments and formatting are not compared (``ast.unparse``), nor is the order of the top-level
+imports (bindings are compared as sets). Standard library only; exit 1 with every problem listed. S7 deletes
+``tools/migration/``.
 """
 
 from __future__ import annotations
@@ -57,6 +62,10 @@ def source_at(base: str, path: str) -> str:
     return subprocess.run(
         ["git", "show", f"{base}:{path}"], cwd=REPO, check=True, capture_output=True, text=True
     ).stdout
+
+
+def exists_at(base: str, path: str) -> bool:
+    return subprocess.run(["git", "cat-file", "-e", f"{base}:{path}"], cwd=REPO, capture_output=True).returncode == 0
 
 
 def definitions(path: str, tree: ast.Module) -> dict[str, ast.AST]:
@@ -191,12 +200,15 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     report: list[str] = []
     if stage.get("kind") != "splits":
         return [f"{table_path.name}: [stage] kind must be 'splits'"], report
-    unknown = sorted(set(table) - {"stage", "definitions", "added", "removed", "docstrings", "imports"})
+    unknown = sorted(set(table) - {"stage", "definitions", "added", "added_source", "removed", "docstrings", "imports"})
     if unknown:
         problems.append(f"unknown tables {unknown}")
-    base, files = stage["base"], list(stage["files"])
+    base, files, created = stage["base"], list(stage["files"]), list(stage.get("created", []))
+    problems += [f"[stage] created {p}: not a listed file" for p in created if p not in files]
+    problems += [f"[stage] created {p}: exists at {base}" for p in created if exists_at(base, p)]
     rows: dict[str, dict[str, Any]] = table.get("definitions", {})
     added: dict[str, str] = table.get("added", {})
+    added_source: dict[str, list[str]] = table.get("added_source", {})
     removed: dict[str, str] = table.get("removed", {})
     docstrings: dict[str, str] = table.get("docstrings", {})
     imports: dict[str, dict[str, list[str]]] = table.get("imports", {})
@@ -208,7 +220,9 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
     problems += [f"[imports] {p}: only added and removed" for p, v in imports.items() if set(v) - {"added", "removed"}]
     problems += [f"[definitions] {k}: only from, rewrite and diff" for k, v in rows.items() if set(v) - ROW_KEYS]
 
-    old_trees = {path: ast.parse(source_at(base, path)) for path in files}
+    problems += [f"[added] {k}: no [added_source] entry" for k in sorted(set(added) - set(added_source))]
+    problems += [f"[added_source] {k}: not an [added] row" for k in sorted(set(added_source) - set(added))]
+    old_trees = {path: ast.parse("" if path in created else source_at(base, path)) for path in files}
     new_trees = {path: ast.parse((REPO / path).read_text()) for path in files}
     old_defs = {k: v for path, tree in old_trees.items() for k, v in definitions(path, tree).items()}
     new_defs = {k: v for path, tree in new_trees.items() for k, v in definitions(path, tree).items()}
@@ -257,6 +271,12 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
             problems.append(f"[added] {key}: no such definition now")
         elif key in rows:
             problems.append(f"[added] {key}: also a [definitions] row")
+        elif key in added_source:
+            name = key.rpartition(":")[2].rpartition(".")[2]
+            actual = shell(new_defs[key], name).splitlines()
+            if actual != list(added_source[key]):
+                problems.append(f"[added_source] {key}: differs from the definition now")
+                problems += [f"    {line}" for line in changed_lines("\n".join(added_source[key]), "\n".join(actual))]
     used: dict[str, str] = {}
     for key, origin in sorted(origins.items()):
         if origin not in old_defs:
@@ -291,7 +311,7 @@ def check(table_path: Path) -> tuple[list[str], list[str]]:
         for k in removed
         if k in used or k not in old_defs
     ]
-    report += [f"{key}: added ({reason})" for key, reason in sorted(added.items())]
+    report += [f"{key}: added, source compared ({reason})" for key, reason in sorted(added.items())]
     return problems, report
 
 

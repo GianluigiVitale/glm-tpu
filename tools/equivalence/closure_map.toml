@@ -9,9 +9,24 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
+# S5 WU-S1/S2: Api -> OpenAIServingChat (chat completions) + OpenAIServingModels (the listing); Chats -> JobQueue
+# (document, lock, jobs) + ConversationStore (conversations). A class entry maps its methods and nested functions.
+"glm_tpu.entrypoints.openai.serving_chat:OpenAIServingChat" = "glm_tpu.entrypoints.openai.serving_chat:Api"
+"glm_tpu.entrypoints.openai.serving_models:OpenAIServingModels.models" = "glm_tpu.entrypoints.openai.serving_chat:Api.models"
+"glm_tpu.entrypoints.serve.job_queue:JobQueue" = "glm_tpu.entrypoints.serve.job_queue:Chats"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore.change" = "glm_tpu.entrypoints.serve.job_queue:Chats.change"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore.snapshot" = "glm_tpu.entrypoints.serve.job_queue:Chats.snapshot"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+"glm_tpu.entrypoints.openai.serving_models" = "WU-S: the /v1/models listing split out of Api (G6 serving stage)"
+"glm_tpu.entrypoints.ui.conversations" = "WU-S: the conversation store split out of Chats (G6 serving stage)"
+"glm_tpu.entrypoints.openai.serving_models:OpenAIServingModels" = "WU-S: the listing class"
+"glm_tpu.entrypoints.openai.serving_models:OpenAIServingModels.__init__" = "WU-S: holds capacity and wait_seconds (as Api did)"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore" = "WU-S: the conversation store class"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore.__init__" = "WU-S: holds the queue and registers itself on it"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore.update_message" = "WU-S: the chat-message write moved out of Chats.step"
+"glm_tpu.entrypoints.ui.conversations:ConversationStore.update_message.<locals>.<genexpr>" = "WU-S: its two lookups (were Chats.step's)"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

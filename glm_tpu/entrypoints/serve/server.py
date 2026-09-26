@@ -10,11 +10,13 @@ import os
 from pathlib import Path
 import threading
 
-from glm_tpu.entrypoints.openai import serving_chat as api
+from glm_tpu.entrypoints.openai.serving_chat import OpenAIServingChat
+from glm_tpu.entrypoints.openai.serving_models import OpenAIServingModels
 from glm_tpu.engine.resident_client import Resident
 from glm_tpu.entrypoints.serve.http_handler import handler
-from glm_tpu.entrypoints.serve.job_queue import Chats
+from glm_tpu.entrypoints.serve.job_queue import JobQueue
 from glm_tpu.entrypoints.serve.security import api_token
+from glm_tpu.entrypoints.ui.conversations import ConversationStore
 
 
 def main(argv=None):
@@ -40,24 +42,26 @@ def main(argv=None):
 
     site = SiteConfig.load(args.site)
     backend = Resident(args.run.resolve(), args.dispatch.resolve(), args.repo.resolve(), site.paths.model_path)
-    chats = Chats(args.state, backend)
-    service = token = key_path = None
+    queue = JobQueue(args.state, backend)
+    store = ConversationStore(queue)
+    chat = models = token = key_path = None
     if not args.no_api:
         key_path = args.api_key_file or (args.state / "api-key")
         token = api_token(key_path)
-        service = api.Api(chats, backend, capacity=backend.capacity)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(chats, service, token))
-    thread = threading.Thread(target=chats.work, daemon=True)
+        chat = OpenAIServingChat(queue, backend, capacity=backend.capacity)
+        models = OpenAIServingModels(capacity=backend.capacity, wait_seconds=chat.wait_seconds)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(store, chat, models, token))
+    thread = threading.Thread(target=queue.work, daemon=True)
     thread.start()
     print(f"GLM-5.3 chat: http://127.0.0.1:{args.port} (existing model retained)", flush=True)
-    if service is not None:
+    if chat is not None:
         print(f"OpenAI-compatible API: http://127.0.0.1:{args.port}/v1 (key in {key_path})", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        chats.stopping.set()
+        queue.stopping.set()
         thread.join(timeout=5)
         server.server_close()
         # Closing this UI does not stop the resident controller or its workers.

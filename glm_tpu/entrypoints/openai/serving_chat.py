@@ -10,7 +10,6 @@ import json
 import time
 import uuid
 
-from glm_tpu.engine.request import PROMPT_LIMITS, MAX_NEW
 from glm_tpu.entrypoints.openai.chat_utils import check_tools, convert, instruct
 from glm_tpu.entrypoints.openai.protocol import ALIASES, ApiError, EFFORTS, MODEL_ID
 from glm_tpu.entrypoints.openai.tool_parser import parse
@@ -32,46 +31,14 @@ def usage(job):
     )
 
 
-class Api:
+class OpenAIServingChat:
     """Stateless request shaping in front of the shared sequential resident queue."""
 
-    def __init__(self, chats, backend, *, capacity, wait_seconds=1800):
-        self.chats = chats
+    def __init__(self, queue, backend, *, capacity, wait_seconds=1800):
+        self.queue = queue
         self.backend = backend
         self.capacity = capacity
         self.wait_seconds = wait_seconds
-
-    def models(self):
-        # Report the loaded session's real window so a client sizes its own
-        # compaction correctly instead of assuming a default.
-        # max_input_tokens is what a client must compact against: this profile's
-        # prompt ceiling can be lower than its total capacity.
-        return dict(
-            object="list",
-            data=[
-                dict(
-                    id=name,
-                    object="model",
-                    owned_by="local",
-                    created=0,
-                    context_window=self.capacity,
-                    max_input_tokens=min(PROMPT_LIMITS[self.capacity], self.capacity - 1),
-                    max_output_tokens=min(MAX_NEW, self.capacity - 1),
-                    # A request is also bounded by this server deadline; a client should
-                    # size its own output expectation against observed throughput.
-                    request_deadline_seconds=self.wait_seconds,
-                    reasoning_effort=forced or "max",
-                    supports=dict(
-                        tools=True,
-                        streaming=True,
-                        reasoning_effort=list(EFFORTS),
-                        parallel_requests=False,
-                        sampling=False,
-                    ),
-                )
-                for name, forced in ALIASES.items()
-            ],
-        )
 
     def prepare(self, data):
         if type(data) is not dict:
@@ -99,7 +66,7 @@ class Api:
 
     def wait(self, key, *, deadline):
         while True:
-            job = self.chats.job(key)
+            job = self.queue.job(key)
             if job is None:
                 raise ApiError("request was not retained", status=500, kind="server_error")
             if job["status"] in ("complete", "incomplete"):
@@ -116,7 +83,7 @@ class Api:
 
     def completion(self, data):
         payload, key, name = self.prepare(data)
-        self.chats.submit(payload, key, label="api")
+        self.queue.submit(payload, key, label="api")
         job = self.wait(key, deadline=time.time() + self.wait_seconds)
         content, calls = parse(job["answer"])
         message = dict(role="assistant", content=content or None)
@@ -136,14 +103,14 @@ class Api:
     def stream(self, data):
         """Yield SSE chunks. Tool calls are emitted once the final channel is known."""
         payload, key, name = self.prepare(data)
-        self.chats.submit(payload, key, label="api")
+        self.queue.submit(payload, key, label="api")
         identity = dict(id="chatcmpl-" + key, object="chat.completion.chunk", model=name)
         created = int(time.time())
         yield self.chunk(dict(identity, created=created), dict(role="assistant", content=""), None)
         deadline = time.time() + self.wait_seconds
         sent_thinking = sent_answer = 0
         while True:
-            job = self.chats.job(key)
+            job = self.queue.job(key)
             if job is None:
                 raise ApiError("request was not retained", status=500, kind="server_error")
             if job.get("error"):

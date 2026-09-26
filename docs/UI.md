@@ -91,7 +91,7 @@ project; this notice does not assign a new license to the reference UI.
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/serve/test_http_handler.py
+JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/serve/test_http_handler.py tests/entrypoints/ui/test_conversations.py
 node --check glm_tpu/entrypoints/ui/static/app.js
 ```
 

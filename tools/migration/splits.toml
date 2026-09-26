@@ -1,76 +1,152 @@
 # S5 class splits (DESIGN 11.3 S5; the S5 plan's P9), checked by `tools/migration/split_check.py` (its docstring
 # has the rules): every definition of the listed files at `base` is the declared or implicit origin of a
 # definition now, compared by AST text after the declared rewrite with exactly the declared remaining lines, or is
-# removed; every definition now has an origin or is added. A later split rewrites this table against its own base;
-# each version is checked at the commit that applies it (history keeps it). S7 deletes tools/migration/.
+# removed; every definition now has an origin or is added, with its source. A later split rewrites this table
+# against its own base; each version is checked at the commit that applies it (history keeps it: S5 WU-E1 at
+# 43fa28cb). S7 deletes tools/migration/.
 #
-# S5 WU-E1 (E = the request path; owner decision DN-21): OrdinaryRuntime -> TPUModelRunner + LLMEngine
-# (tools/migration/symbol_moves.toml, "the design splits by method"; move_map.toml [split] runner/tpu_runner.py ->
-# engine/llm_engine.py). The runner keeps loading, compiling and admitting; the engine takes `generate` and the
-# body of `generate_batch` as `generate_concurrent`, and owns the poison flag `active`. The worker builds the
-# runner with the same keywords, then the engine, hands the engine to its entry points, and those run their
-# fleet-voted phases through `engine.runner.phase`. No message, vote, phase, record key or program changes.
+# S5 WU-S1/S2 (S = serving and structure; owner decision DN-21; DN-12 default): the two serving classes split by
+# method (tools/migration/symbol_moves.toml, "Chats -> JobQueue + ConversationStore", "Api ... by method";
+# move_map.toml [split] rows serving_chat.py -> openai/serving_models.py, server.py -> ui/conversations.py).
+# Api -> OpenAIServingChat (chat completions, over the job queue) + OpenAIServingModels (the /v1/models listing).
+# Chats -> JobQueue (chats.json, its lock, the jobs, the worker loop) + ConversationStore (create, rename, send,
+# delete, the browser's snapshot, and the chat-message write that Chats.step did inline): one document, one lock,
+# the same write order. The handler takes the store, the chat service and the listing; the server composes them.
+# No message, header, status, file or JSON key changes.
 
 [stage]
-name = "S5 WU-E1"
+name = "S5 WU-S1/S2"
 kind = "splits"
-base = "01935fe6"   # the tree this table was written against
+base = "9a645aa2"   # the tree this table was written against
 files = [
-  "glm_tpu/runner/tpu_runner.py",
-  "glm_tpu/engine/llm_engine.py",
-  "glm_tpu/worker/tpu_worker.py",
-  "glm_tpu/runner/programs.py",   # its module docstring names the runner class
+  "glm_tpu/entrypoints/openai/serving_chat.py",
+  "glm_tpu/entrypoints/openai/serving_models.py",
+  "glm_tpu/entrypoints/serve/job_queue.py",
+  "glm_tpu/entrypoints/ui/conversations.py",
+  "glm_tpu/entrypoints/serve/http_handler.py",
+  "glm_tpu/entrypoints/serve/server.py",
+]
+created = [
+  "glm_tpu/entrypoints/openai/serving_models.py",
+  "glm_tpu/entrypoints/ui/conversations.py",
 ]
 
 [docstrings]
-"glm_tpu/runner/tpu_runner.py" = "WU-E: the runner loads, compiles and admits; generation is the engine's"
-"glm_tpu/engine/llm_engine.py" = "WU-E: the engine module now holds the LLMEngine class"
-"glm_tpu/runner/programs.py" = "WU-E: OrdinaryRuntime._load -> TPUModelRunner._load (one class name)"
+"glm_tpu/entrypoints/openai/serving_models.py" = "WU-S: the new module of the /v1/models listing"
+"glm_tpu/entrypoints/ui/conversations.py" = "WU-S: the new module of the conversation store"
 
-[imports."glm_tpu/runner/tpu_runner.py"]
+[imports."glm_tpu/entrypoints/openai/serving_chat.py"]
 added = []
-removed = [
-  "hashlib:sha256",
-  "glm_tpu.engine.request:validate",
-  "glm_tpu.engine.request_session:PackedRequestSession",
-  "glm_tpu.engine.request_session:RequestPolicy",
-]
+removed = ["glm_tpu.engine.request:PROMPT_LIMITS", "glm_tpu.engine.request:MAX_NEW"]
 
-[imports."glm_tpu/engine/llm_engine.py"]
+[imports."glm_tpu/entrypoints/openai/serving_models.py"]
 added = [
-  "glm_tpu.engine.request:validate",
-  "glm_tpu.engine.request_session:PackedRequestSession",
-  "glm_tpu.engine.request_session:RequestPolicy",
+  "glm_tpu.engine.request:PROMPT_LIMITS",
+  "glm_tpu.engine.request:MAX_NEW",
+  "glm_tpu.entrypoints.openai.protocol:ALIASES",
+  "glm_tpu.entrypoints.openai.protocol:EFFORTS",
 ]
 removed = []
 
+[imports."glm_tpu/entrypoints/serve/job_queue.py"]
+added = []
+removed = ["re", "uuid"]
+
+[imports."glm_tpu/entrypoints/ui/conversations.py"]
+added = ["json", "re", "time", "uuid", "glm_tpu.entrypoints.serve.job_queue:PENDING"]
+removed = []
+
+[imports."glm_tpu/entrypoints/serve/server.py"]
+added = [
+  "glm_tpu.entrypoints.openai.serving_chat:OpenAIServingChat",
+  "glm_tpu.entrypoints.openai.serving_models:OpenAIServingModels",
+  "glm_tpu.entrypoints.serve.job_queue:JobQueue",
+  "glm_tpu.entrypoints.ui.conversations:ConversationStore",
+]
+removed = ["glm_tpu.entrypoints.openai:serving_chat as api", "glm_tpu.entrypoints.serve.job_queue:Chats"]
+
 [definitions]
-# The runner: the class renamed; its seven kept methods compared implicitly, verbatim, except that the poison
-# flag leaves __init__ (the engine owns it); generate and the generate_concurrent wrapper leave the class.
-"glm_tpu/runner/tpu_runner.py:TPUModelRunner" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime" }
-"glm_tpu/runner/tpu_runner.py:TPUModelRunner.__init__" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.__init__", diff = [
-  "-    self.active = False",
-] }
+# S1: the chat service keeps Api's docstring and every method but the listing; its queue is named for what it is.
+"glm_tpu/entrypoints/openai/serving_chat.py:OpenAIServingChat" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api" }
+"glm_tpu/entrypoints/openai/serving_chat.py:OpenAIServingChat.__init__" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api.__init__", rewrite = { "chats" = "queue", "self.chats" = "self.queue" } }
+"glm_tpu/entrypoints/openai/serving_chat.py:OpenAIServingChat.wait" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api.wait", rewrite = { "self.chats" = "self.queue" } }
+"glm_tpu/entrypoints/openai/serving_chat.py:OpenAIServingChat.completion" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api.completion", rewrite = { "self.chats" = "self.queue" } }
+"glm_tpu/entrypoints/openai/serving_chat.py:OpenAIServingChat.stream" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api.stream", rewrite = { "self.chats" = "self.queue" } }
+"glm_tpu/entrypoints/openai/serving_models.py:OpenAIServingModels.models" = { from = "glm_tpu/entrypoints/openai/serving_chat.py:Api.models" }
 
-# The engine: what the runtime did on itself it now does on its runner, except the poison flag.
-"glm_tpu/engine/llm_engine.py:LLMEngine.generate" = { from = "glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.generate", rewrite = { "self.*" = "self.runner.*", "self.active" = "self.active" } }
-"glm_tpu/engine/llm_engine.py:LLMEngine.generate_concurrent" = { from = "glm_tpu/engine/llm_engine.py:generate_batch", rewrite = { "r" = "self", "r.*" = "self.runner.*", "r.active" = "self.active", "values" = "requests" } }
-
-# The worker: its entry points receive the engine and reach the runner's fleet phases (and the loaded
-# capacity) through it; main builds the runner, then the engine.
-"glm_tpu/worker/tpu_worker.py:main" = { rewrite = { "OrdinaryRuntime" = "TPUModelRunner", "runtime" = "engine", "runtime.record" = "runner.record" }, diff = [
-  "+        from glm_tpu.engine.llm_engine import LLMEngine",
-  "-        engine = TPUModelRunner(args=args, repo=REPO, root=native, mesh=mesh, physical=physical, topology=topology, fleet_sha=fleet_sha, vote=parallel_state._batched_fleet_all, save=lambda v: persist(native / 'runtime.json', v), context_capacity=value['context_capacity'], **dict(concurrent_size=len(pending)) if concurrent else {})",
-  "+        runner = TPUModelRunner(args=args, repo=REPO, root=native, mesh=mesh, physical=physical, topology=topology, fleet_sha=fleet_sha, vote=parallel_state._batched_fleet_all, save=lambda v: persist(native / 'runtime.json', v), context_capacity=value['context_capacity'], **dict(concurrent_size=len(pending)) if concurrent else {})",
-  "+        engine = LLMEngine(runner)",
+# S2: the queue keeps the document, the lock and the jobs; the conversations' writes go to the store.
+# The class gains a docstring (who owns the document and the lock), __init__ the store's slot.
+"glm_tpu/entrypoints/serve/job_queue.py:JobQueue" = { from = "glm_tpu/entrypoints/serve/job_queue.py:Chats", diff = [
+  "-    pass",
+  "+    \"\"\"The jobs of the browser workspace and the ``/v1`` API, run one at a time against the resident controller.",
+  "+",
+  "+    It owns the private state directory: ``chats.json`` (saved conversations and jobs, one document) and the lock",
+  "+    that guards it. The conversation store (``glm_tpu.entrypoints.ui.conversations``) edits the conversations in",
+  "+    the same document under the same lock, and ``step`` hands it each conversation job's progress.",
+  "+    \"\"\"",
 ] }
-"glm_tpu/worker/tpu_worker.py:resident_loop" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase", "runtime.capacity" = "engine.runner.capacity" } }
-"glm_tpu/worker/tpu_worker.py:run_queued" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase" } }
-"glm_tpu/worker/tpu_worker.py:run_concurrent" = { rewrite = { "runtime" = "engine", "runtime.phase" = "engine.runner.phase" } }
+"glm_tpu/entrypoints/serve/job_queue.py:JobQueue.__init__" = { from = "glm_tpu/entrypoints/serve/job_queue.py:Chats.__init__", diff = [
+  "+    self.conversations = None",
+] }
+# step: the chat-message write (ConversationStore.update_message, [added_source] below) is called in the same
+# place: after job.update(update), before self.save(), under the lock, inside the try.
+"glm_tpu/entrypoints/serve/job_queue.py:JobQueue.step" = { from = "glm_tpu/entrypoints/serve/job_queue.py:Chats.step", diff = [
+  "-                chat = next((c for c in self.db['chats'] if c['id'] == job['chat']))",
+  "-                message = next((m for m in chat['messages'] if m.get('job') == job['id']))",
+  "-                message.update(content=job['answer'], status=job['status'])",
+  "+                self.conversations.update_message(job)",
+] }
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.change" = { from = "glm_tpu/entrypoints/serve/job_queue.py:Chats.change", rewrite = { "self.*" = "self.queue.*" } }
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.snapshot" = { from = "glm_tpu/entrypoints/serve/job_queue.py:Chats.snapshot", rewrite = { "self.*" = "self.queue.*" } }
+
+# The composition: the handler serves the store, the chat service and the listing; the server builds all four.
+"glm_tpu/entrypoints/serve/http_handler.py:handler" = { rewrite = { "chats" = "store", "service" = "chat", "service.models" = "models.models" }, diff = [
+  "-def handler(store, chat=None, token=None):",
+  "+def handler(store, chat=None, models=None, token=None):",
+  "+    \"\"\"The handler class: the browser workspace over ``store`` (a ``ConversationStore``) and ``/v1`` over ``chat``",
+  "+    (``OpenAIServingChat``) and ``models`` (``OpenAIServingModels``) for bearer ``token`` (``None``: no API).\"\"\"",
+] }
+"glm_tpu/entrypoints/serve/server.py:main" = { rewrite = { "chats" = "queue", "Chats" = "JobQueue", "service" = "chat", "api.Api" = "OpenAIServingChat" }, diff = [
+  "-    chat = token = key_path = None",
+  "+    store = ConversationStore(queue)",
+  "+    chat = models = token = key_path = None",
+  "-    server = ThreadingHTTPServer(('127.0.0.1', args.port), handler(queue, chat, token))",
+  "+        models = OpenAIServingModels(capacity=backend.capacity, wait_seconds=chat.wait_seconds)",
+  "+    server = ThreadingHTTPServer(('127.0.0.1', args.port), handler(store, chat, models, token))",
+] }
 
 [added]
-"glm_tpu/engine/llm_engine.py:LLMEngine" = "WU-E: the engine: generation over one loaded TPUModelRunner"
-"glm_tpu/engine/llm_engine.py:LLMEngine.__init__" = "WU-E: holds the runner and the poison flag (active = False, as OrdinaryRuntime.__init__ set it)"
+"glm_tpu/entrypoints/openai/serving_models.py:OpenAIServingModels" = "WU-S: the /v1/models listing class"
+"glm_tpu/entrypoints/openai/serving_models.py:OpenAIServingModels.__init__" = "WU-S: holds capacity and wait_seconds, as Api.__init__ did"
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore" = "WU-S: the conversation store class"
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.__init__" = "WU-S: holds the queue and registers itself as its conversation store"
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.update_message" = "WU-S: the three chat-message lines of Chats.step, self.db -> self.queue.db"
 
-[removed]
-"glm_tpu/runner/tpu_runner.py:OrdinaryRuntime.generate_concurrent" = "WU-E: the wrapper folded into LLMEngine.generate_concurrent (the body of generate_batch)"
+[added_source]
+"glm_tpu/entrypoints/openai/serving_models.py:OpenAIServingModels" = [
+  "class OpenAIServingModels:",
+  "    \"\"\"The model list of one loaded resident session (``capacity``) served with ``wait_seconds`` per request.\"\"\"",
+]
+"glm_tpu/entrypoints/openai/serving_models.py:OpenAIServingModels.__init__" = [
+  "def __init__(self, *, capacity, wait_seconds):",
+  "    self.capacity = capacity",
+  "    self.wait_seconds = wait_seconds",
+]
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore" = [
+  "class ConversationStore:",
+  "    \"\"\"Create, rename, send to and delete conversations, and the browser's view of them, over ``queue``.\"\"\"",
+]
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.__init__" = [
+  "def __init__(self, queue):",
+  "    self.queue = queue",
+  "    queue.conversations = self",
+]
+# The three lines JobQueue.step no longer has (its diff above), with self.db -> self.queue.db.
+"glm_tpu/entrypoints/ui/conversations.py:ConversationStore.update_message" = [
+  "def update_message(self, job):",
+  "    \"\"\"Copy a conversation job's answer and status into its assistant message (``JobQueue.step`` calls this",
+  "        under the queue's lock and saves the document afterwards).\"\"\"",
+  "    chat = next((c for c in self.queue.db['chats'] if c['id'] == job['chat']))",
+  "    message = next((m for m in chat['messages'] if m.get('job') == job['id']))",
+  "    message.update(content=job['answer'], status=job['status'])",
+]

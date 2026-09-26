@@ -7,11 +7,12 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from glm_tpu.entrypoints.serve.job_queue import Chats
+from glm_tpu.entrypoints.serve.job_queue import JobQueue
 from glm_tpu.engine.resident_client import Resident
 from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
 from glm_tpu.entrypoints.openai.tool_parser import final_channel
 from glm_tpu.entrypoints.serve.http_handler import handler
+from glm_tpu.entrypoints.ui.conversations import ConversationStore
 
 
 class FakeResident:
@@ -49,6 +50,11 @@ class FakeResident:
         )
 
 
+def open_store(root, backend):
+    """The browser workspace as the server composes it: a conversation store over the job queue."""
+    return ConversationStore(JobQueue(root, backend))
+
+
 def chat(store):
     return store.change(dict(action="create"))["id"]
 
@@ -57,42 +63,19 @@ def send(store, c, text="question", key="a" * 32):
     return store.change(dict(action="send", chat=c, text=text, id=key))
 
 
-def test_history_isolation_and_full_allowance(tmp_path):
-    backend = FakeResident()
-    store = Chats(tmp_path, backend)
-    a, b = chat(store), chat(store)
-    send(store, a)
-    store.step()
-    assert store.snapshot()["jobs"][0]["status"] == "generating"
-    with pytest.raises(ValueError, match="completed answer"):
-        send(store, a, key="b" * 32)
-    backend.complete = True
-    store.step()
-    send(store, a, "follow up", "b" * 32)
-    assert backend.messages[-1] == [
-        dict(role="user", content="question"),
-        dict(role="assistant", content="42"),
-        dict(role="user", content="follow up"),
-    ]
-    send(store, b, "separate", "c" * 32)
-    assert backend.messages[-1] == [dict(role="user", content="separate")]
-    assert all(j["payload"]["max_new_tokens"] == 32766 for j in store.db["jobs"])
-    assert all("payload" not in j for j in store.snapshot()["jobs"])
-
-
 def test_idempotence_and_restart_preserve_admitted_identity(tmp_path):
     backend = FakeResident()
-    store = Chats(tmp_path, backend)
+    store = open_store(tmp_path, backend)
     c = chat(store)
     send(store, c)
     send(store, c)
-    assert len(store.db["jobs"]) == 1
+    assert len(store.queue.db["jobs"]) == 1
     with pytest.raises(ValueError, match="already used"):
         send(store, c, "different")
-    store.step()
-    restarted = Chats(tmp_path, backend)
+    store.queue.step()
+    restarted = open_store(tmp_path, backend)
     backend.complete = True
-    restarted.step()
+    restarted.queue.step()
     assert len(backend.published) == 1
     assert restarted.snapshot()["jobs"][0]["status"] == "complete"
     assert restarted.snapshot()["jobs"][0]["sequence"] == 771
@@ -100,46 +83,33 @@ def test_idempotence_and_restart_preserve_admitted_identity(tmp_path):
 
 def test_crash_after_publish_reconciles_same_sequence(tmp_path):
     backend = FakeResident()
-    store = Chats(tmp_path, backend)
+    store = open_store(tmp_path, backend)
     c = chat(store)
     send(store, c)
     original = backend.observe
     backend.observe = lambda _: (_ for _ in ()).throw(OSError("receipt unreadable"))
-    store.step()
-    assert store.error and len(backend.published) == 1
+    store.queue.step()
+    assert store.queue.error and len(backend.published) == 1
     assert json.loads((tmp_path / "chats.json").read_text())["jobs"][0]["sequence"] == 771
     backend.observe = original
     backend.complete = True
-    restarted = Chats(tmp_path, backend)
-    restarted.step()
+    restarted = open_store(tmp_path, backend)
+    restarted.queue.step()
     assert len(backend.published) == 1
-
-
-def test_overflow_and_delete_cannot_corrupt_active_chat(tmp_path):
-    store = Chats(tmp_path, FakeResident())
-    c = chat(store)
-    with pytest.raises(ValueError, match="capacity"):
-        send(store, c, "x" * 101)
-    assert store.db["chats"][0]["messages"] == []
-    send(store, c)
-    with pytest.raises(ValueError, match="finish"):
-        store.change(dict(action="delete", chat=c))
-    store.change(dict(action="rename", chat=c, title="Renamed"))
-    assert store.db["chats"][0]["title"] == "Renamed"
 
 
 def test_queue_runs_one_at_a_time(tmp_path):
     backend = FakeResident()
-    store = Chats(tmp_path, backend)
+    store = open_store(tmp_path, backend)
     a, b = chat(store), chat(store)
     send(store, a)
     send(store, b, key="b" * 32)
-    store.step()
-    store.step()
+    store.queue.step()
+    store.queue.step()
     assert list(backend.published) == [771]
     backend.complete = True
-    store.step()
-    store.step()
+    store.queue.step()
+    store.queue.step()
     assert list(backend.published) == [771, 772]
 
 
@@ -151,7 +121,7 @@ def test_reasoning_is_not_final_answer():
 
 
 def test_http_csrf_rebinding_static_and_private_payload(tmp_path):
-    store = Chats(tmp_path, FakeResident())
+    store = open_store(tmp_path, FakeResident())
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler(store))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

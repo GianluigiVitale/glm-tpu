@@ -120,7 +120,7 @@ repeatedly refilling a small one.
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/openai/test_serving_chat.py tests/entrypoints/serve/test_http_handler.py
+JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/openai/test_serving_chat.py tests/entrypoints/openai/test_serving_models.py tests/entrypoints/serve/test_http_handler.py
 ```
 
 These cover message conversion, tool-call render and parse, `tool_choice`

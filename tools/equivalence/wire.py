@@ -1208,23 +1208,27 @@ class FakeResident:
 
 
 def http_record() -> dict[str, Any]:
-    from glm_tpu.entrypoints.openai.serving_chat import Api
-    from glm_tpu.entrypoints.serve.job_queue import Chats
+    from glm_tpu.entrypoints.openai.serving_chat import OpenAIServingChat
+    from glm_tpu.entrypoints.openai.serving_models import OpenAIServingModels
+    from glm_tpu.entrypoints.serve.job_queue import JobQueue
     from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
     from glm_tpu.entrypoints.serve.http_handler import handler
+    from glm_tpu.entrypoints.ui.conversations import ConversationStore
 
     token = "golden-local-key"
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-http-") as scratch:
         backend = FakeResident()
-        store = Chats(Path(scratch) / "state", backend)
-        service = Api(store, backend, capacity=32768, wait_seconds=60)
-        server = ThreadingHTTPServer(("127.0.0.1", 0), handler(store, service, token))
+        queue = JobQueue(Path(scratch) / "state", backend)
+        store = ConversationStore(queue)
+        chat = OpenAIServingChat(queue, backend, capacity=32768, wait_seconds=60)
+        models = OpenAIServingModels(capacity=32768, wait_seconds=chat.wait_seconds)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler(store, chat, models, token))
         port = server.server_port
         stop = threading.Event()
 
         def pump() -> None:
             while not stop.is_set():
-                store.step()
+                queue.step()
                 time.sleep(0.01)
 
         threads = [
