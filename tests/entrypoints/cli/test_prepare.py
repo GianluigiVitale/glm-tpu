@@ -67,6 +67,17 @@ def test_a_refusal_prints_only_the_error_type(monkeypatch, capsys, error):
     assert capsys.readouterr() == ("", refusal)
 
 
+def test_a_directory_is_refused_as_a_value_error(tmp_path, capsys):
+    """The messages are read first: a directory is refused like every input that is not a bounded regular file."""
+    assert not any(p.is_symlink() for p in (tmp_path, *tmp_path.parents))  # a symlink is a ValueError too
+    argv = list(ARGV)
+    argv[argv.index("--messages") + 1] = str(tmp_path)
+    capsys.readouterr()
+    assert main(argv) == 1
+    refusal = json.dumps(dict(error="ValueError", status="request preparation refused")) + "\n"
+    assert capsys.readouterr() == ("", refusal)
+
+
 def test_other_errors_propagate(monkeypatch):
     def fail(**kwargs):
         raise RuntimeError("not a refusal")

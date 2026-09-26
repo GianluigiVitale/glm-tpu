@@ -95,13 +95,23 @@ def plain_path(path: Path) -> Path:
 
 
 def read_bounded(path: Path, cap: int) -> bytes:
+    """The bytes of the regular file ``path``, 1 to ``cap`` of them, opened without following a symlink.
+
+    Refused with ``ValueError``: a path through a symlink; anything but a regular file of 1 to ``cap`` bytes, such as
+    a directory, a device, a FIFO (opened non-blocking, never waited on) or an empty or oversized file, checked on the
+    open descriptor before any read ("request input is not a bounded regular file"); a file whose size leaves that
+    range while it is read. ``OSError`` from the open (a missing or unreadable file) propagates. The descriptor is
+    closed on every path."""
     path = plain_path(path)
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    with os.fdopen(fd, "rb") as stream:
-        facts = os.fstat(stream.fileno())
+    try:
+        facts = os.fstat(fd)
         if not stat.S_ISREG(facts.st_mode) or not 0 < facts.st_size <= cap:
             raise ValueError("request input is not a bounded regular file")
-        raw = stream.read(cap + 1)
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            raw = stream.read(cap + 1)
+    finally:
+        os.close(fd)
     if not 0 < len(raw) <= cap:
         raise ValueError("request input changed beyond its byte cap")
     return raw

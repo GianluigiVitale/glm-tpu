@@ -137,12 +137,30 @@ def test_read_bounded_refuses_symlinks_oversize_and_non_regular_files(tmp_path):
     (tmp_path / "empty").write_bytes(b"")
     with pytest.raises(ValueError, match="bounded regular file"):
         read_bounded(tmp_path / "empty", PAYLOAD_CAP)
-    with pytest.raises(IsADirectoryError):  # refused, but at fdopen, before the ValueError check
+    with pytest.raises(ValueError, match="bounded regular file"):
         read_bounded(tmp_path, PAYLOAD_CAP)
     fifo = tmp_path / "fifo"
     os.mkfifo(fifo)  # opened non-blocking: refused, never waited on
     with pytest.raises(ValueError, match="bounded regular file"):
         read_bounded(fifo, PAYLOAD_CAP)
+
+
+@pytest.mark.skipif(not os.path.isdir("/proc/self/fd"), reason="counts this process's open descriptors")
+def test_read_bounded_closes_its_descriptor_on_every_path(tmp_path):
+    """A read and every refusal, a directory's included, leave no descriptor open."""
+    path = tmp_path / "request.json"
+    path.write_bytes(b'{"a":1}')
+    (tmp_path / "empty").write_bytes(b"")
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo)
+    refused = [(tmp_path, PAYLOAD_CAP), (fifo, PAYLOAD_CAP), (tmp_path / "empty", PAYLOAD_CAP), (path, 1)]
+    before = len(os.listdir("/proc/self/fd"))
+    for _ in range(20):
+        assert read_bounded(path, PAYLOAD_CAP) == b'{"a":1}'
+        for refused_path, cap in refused:
+            with pytest.raises(ValueError, match="bounded regular file"):
+                read_bounded(refused_path, cap)
+    assert len(os.listdir("/proc/self/fd")) == before
 
 
 def test_private_input_rejects_public_permissions_and_symlink(tmp_path):

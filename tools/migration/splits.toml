@@ -3,296 +3,88 @@
 # definition now, compared by AST text after the declared rewrite with exactly the declared remaining lines, or is
 # removed; every definition now has an origin or is added, with its source. A later split rewrites this table
 # against its own base; each version is checked at the commit that applies it (history keeps them: S5 WU-E1 at
-# 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99, S5 WU-S3 at fd3086b0, S5 IMP-23 at 2864a184). S7
-# deletes tools/migration/.
+# 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99, S5 WU-S3 at fd3086b0, S5 IMP-23 at 2864a184, S5 WU-E2 at
+# b1271cf4). S7 deletes tools/migration/.
 #
-# S5 WU-E2 (owner decision DN-22: BatchedSession stays separate and only the other two sessions merge; no vote
-# rewrite): the sampled base session Ws32RequestSession and its greedy subclass PackedRequestSession become one
-# RequestSession, the class the engine builds. Its methods are the base's shared ones and the subclass's greedy step,
-# verbatim; its constructor is the subclass's signature and policy check followed by the base body. The sampled parts
-# that production never ran go: the seeded SampledRequestPolicy and request_uniform (FOLLOWUPS 24), the uniform
-# replicator, the sampled step and both next_uniform methods. The session tests follow: the sampled-session tests are
-# ported to RequestSession and the tests of tests/models/glm_moe_dsa/test_decode_program.py move into
-# tests/engine/test_request_session.py (FOLLOWUPS 47, first half); that module is deleted (restructure.py records
-# the removed S3 destination in DISSOLVED_BY_HAND). No message, vote, value or program changes.
+# S5 WU-F (F = file input; a planned behaviour change): read_bounded checks the open descriptor with fstat before
+# any file object exists and closes it in a `finally` on every path. A directory therefore gets the same ValueError
+# ("request input is not a bounded regular file") as every other input that is not a regular file of 1 to cap
+# bytes, instead of the IsADirectoryError that os.fdopen raised while leaking the descriptor (FOLLOWUPS 29, 74).
+# Open flags, both messages, the read and every other outcome are unchanged; the function gains a docstring. The
+# tests follow: the directory assertion expects the ValueError, one test counts the process's open descriptors
+# around 20 reads and refusals of each kind, and one runs `glm-tpu prepare-request` on a directory (its JSON error
+# field now names ValueError).
 
 [stage]
-name = "S5 WU-E2"
+name = "S5 WU-F"
 kind = "splits"
-base = "2864a184"   # the tree this table was written against
+base = "93147c55"   # the tree this table was written against
 files = [
-  "glm_tpu/engine/request_session.py",
-  "glm_tpu/engine/llm_engine.py",
-  "tests/engine/test_request_session.py",
-  "tests/models/glm_moe_dsa/test_decode_program.py",
-  "tests/engine/fleet_fakes.py",
-  "tests/test_production_helper_homes.py",
+  "glm_tpu/utils/io_utils.py",
+  "tests/utils_/test_io_utils.py",
+  "tests/entrypoints/cli/test_prepare.py",
 ]
-deleted = ["tests/models/glm_moe_dsa/test_decode_program.py"]
 
-# the sampled base class becomes the one sequential session: its docstring describes the greedy decode
-# (the sentences about the sampled decoder, its uniform and the RNG index go; the others stay verbatim)
-[definitions."glm_tpu/engine/request_session.py:RequestSession"]
-from = "glm_tpu/engine/request_session.py:Ws32RequestSession"
+# fstat the descriptor before wrapping it, the file object does not own it, one close in `finally`; the docstring
+# is new (the lines between are unchanged: the regular-file check and its message)
+[definitions."glm_tpu/utils/io_utils.py:read_bounded"]
 diff = [
-  "-    \"\"\"Consume one prefill result, then decode/emit with a resumable RNG index.",
-  "+    \"\"\"Consume one prefill result, then decode/emit one greedy token per step.",
-  "-    ``decode_step`` is the already-compiled sampled decoder with weights/RoPE",
-  "-    bound; ``replicate_uniform`` supplies its one replicated FP32 scalar. No",
-  "-    per-token compile, transformer dispatch or RNG reset lives in this class.",
-  "+    ``decode_step(token, state)`` is the already-compiled greedy decoder with",
-  "+    weights and rotary data bound; it returns the ``PackedDecodeResult`` of",
-  "+    ``glm_tpu.models.glm_moe_dsa.model``, whose compact status row each step",
-  "+    reads once and votes on with the fleet. No per-token compile or transformer",
-  "+    dispatch lives in this class.",
+  "+    \"\"\"The bytes of the regular file ``path``, 1 to ``cap`` of them, opened without following a symlink.",
+  "+",
+  "+    Refused with ``ValueError``: a path through a symlink; anything but a regular file of 1 to ``cap`` bytes, such as",
+  "+    a directory, a device, a FIFO (opened non-blocking, never waited on) or an empty or oversized file, checked on the",
+  "+    open descriptor before any read (\"request input is not a bounded regular file\"); a file whose size leaves that",
+  "+    range while it is read. ``OSError`` from the open (a missing or unreadable file) propagates. The descriptor is",
+  "+    closed on every path.\"\"\"",
+  "-    with os.fdopen(fd, 'rb') as stream:",
+  "-        facts = os.fstat(stream.fileno())",
+  "+    try:",
+  "+        facts = os.fstat(fd)",
+  "-        raw = stream.read(cap + 1)",
+  "+        with os.fdopen(fd, 'rb', closefd=False) as stream:",
+  "+            raw = stream.read(cap + 1)",
+  "+    finally:",
+  "+        os.close(fd)",
 ]
 
-# the greedy subclass's signature (no replicate_uniform) and its policy check, which ran first, before the base
-# body; the base body verbatim without the uniform replicator
-[definitions."glm_tpu/engine/request_session.py:RequestSession.__init__"]
-from = "glm_tpu/engine/request_session.py:Ws32RequestSession.__init__"
+# a directory is refused with the ValueError of every other input that is not a bounded regular file
+[definitions."tests/utils_/test_io_utils.py:test_read_bounded_refuses_symlinks_oversize_and_non_regular_files"]
 diff = [
-  "-def __init__(self, policy: SampledRequestPolicy, *, decode_step: Callable[[Any, Any, Any], DecodeStepResult], replicate_uniform: Callable[[np.ndarray], Any], fleet_all: Callable[[bool], bool], deliver: Callable[[TokenEvent], None], delivery_boundary: str, request_started: float, clock: Callable[[], float]=perf_counter) -> None:",
-  "+def __init__(self, policy: RequestPolicy, *, decode_step: Callable[[Any, Any], PackedDecodeResult], fleet_all: Callable[[bool], bool], deliver: Callable[[TokenEvent], None], delivery_boundary: str, request_started: float, clock: Callable[[], float]=perf_counter) -> None:",
-  "+    if not isinstance(policy, RequestPolicy):",
-  "+        raise ValueError('an explicit greedy RequestPolicy is required')",
-  "-    self._replicate = replicate_uniform",
+  "-    with pytest.raises(IsADirectoryError):",
+  "+    with pytest.raises(ValueError, match='bounded regular file'):",
 ]
 
-# the greedy step production runs, verbatim (the sampled step is removed below)
-[definitions."glm_tpu/engine/request_session.py:RequestSession.step"]
-from = "glm_tpu/engine/request_session.py:PackedRequestSession.step"
-
-# the engine builds the merged session (one name)
-[definitions."glm_tpu/engine/llm_engine.py:LLMEngine.generate"]
-rewrite = {"PackedRequestSession" = "RequestSession"}
-
-# ADAPTER (FOLLOWUPS 108): the recorded sequential session is patched where the engine looks it up
-[definitions."tests/engine/fleet_fakes.py:install"]
-diff = [
-  "-    monkeypatch.setattr(llm_engine, 'PackedRequestSession', _recorded(llm_engine.PackedRequestSession, fleet))",
-  "+    monkeypatch.setattr(llm_engine, 'RequestSession', _recorded(llm_engine.RequestSession, fleet))",
-]
-
-# the sampled session's fixture ported to the greedy session: the decode fake returns the packed status
-# row the greedy step reads ([token, health, position, length]); no uniform, no draws
-[definitions."tests/engine/test_request_session.py:setup"]
-diff = [
-  "-    calls, draws, emitted = ([], [], [])",
-  "-    policy = SampledRequestPolicy('request-a', 42, 3, max_new, 20, 256, (10,))",
-  "+    calls, emitted = ([], [])",
-  "+    policy = RequestPolicy('request-a', 3, max_new, 20, 256, (10,))",
-  "-    def decode(token, previous, uniform):",
-  "+    def decode(token, previous):",
-  "-        draws.append(float(uniform))",
-  "-        return DecodeStepResult(state(3 + len(calls)), np.array([outputs[len(calls) - 1]], np.int32), np.zeros((1, 1)))",
-  "+        output = outputs[len(calls) - 1]",
-  "+        result = DecodeStepResult(state(3 + len(calls)), np.array([output], np.int32), np.zeros((1, 1)))",
-  "+        return PackedDecodeResult(result, np.array([output, 1, 3 + len(calls), 4 + len(calls)], np.int32))",
-  "-    session = Ws32RequestSession(policy, decode_step=decode, replicate_uniform=lambda x: x, fleet_all=vote or (lambda x: x), deliver=sink, delivery_boundary='fake unit-test sink', request_started=1.0, clock=lambda: clock[0])",
-  "-    return (session, calls, draws, emitted)",
-  "+    session = RequestSession(policy, decode_step=decode, fleet_all=vote or (lambda x: x), deliver=sink, delivery_boundary='fake unit-test sink', request_started=1.0, clock=lambda: clock[0])",
-  "+    return (session, calls, emitted)",
-]
-
-# the ten sampled-session tests, ported (same properties; the RNG draws go)
-[definitions."tests/engine/test_request_session.py:test_first_token_delivery_eos_live_resume_and_frontier"]
-from = "tests/engine/test_request_session.py:test_first_token_delivery_eos_live_resume_and_rng_frontier"
-diff = [
-  "-    session, calls, draws, emitted = setup()",
-  "-    assert float(session.next_uniform()) == request_uniform(seed=42, request_id='request-a', token_index=0)",
-  "+    session, calls, emitted = setup()",
-  "-    assert draws == [request_uniform(seed=42, request_id='request-a', token_index=i) for i in (1, 2)]",
-]
-
-# moved from tests/models/glm_moe_dsa/test_decode_program.py (FOLLOWUPS 47, first half): its fixture, renamed
-# because this module's `setup` is the ported one, and its tests, calling it by the new name
-[definitions."tests/engine/test_request_session.py:packed_setup"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:setup"
-rewrite = {"PackedRequestSession" = "RequestSession"}
-
-# the greedy session no longer has next_uniform (its refusal was test-only): the two lines expecting it go
-[definitions."tests/engine/test_request_session.py:test_packed_loop_events_pause_eos_and_boundary_work"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_packed_loop_events_pause_eos_and_boundary_work"
-rewrite = {"setup" = "packed_setup"}
-diff = [
-  "-    with pytest.raises(RuntimeError):",
-  "-        session.next_uniform()",
-]
-
-[definitions."tests/engine/test_request_session.py:test_first_token_can_finish_without_decode"]
-diff = [
-  "-    session, calls, _, emitted = setup(max_new=1)",
-  "+    session, calls, emitted = setup(max_new=1)",
-  "-        session.next_uniform()",
-  "+        session.step()",
-  "+    assert not calls",
-]
-
-[definitions."tests/engine/test_request_session.py:test_unhealthy_prefill_is_never_emitted_and_cannot_retry"]
-diff = [
-  "-    session, calls, _, emitted = setup()",
-  "+    session, calls, emitted = setup()",
-]
-
-[definitions."tests/engine/test_request_session.py:test_sink_failure_preserves_generated_token_but_no_false_delivery_or_retry"]
-diff = [
-  "-    session, calls, _, emitted = setup(deliver=fail)",
-  "+    session, calls, emitted = setup(deliver=fail)",
-]
-
-[definitions."tests/engine/test_request_session.py:test_remote_refusal_never_emits_local_healthy_token"]
-diff = [
-  "-    session, _, _, emitted = setup(vote=lambda _: False)",
-  "+    session, _, emitted = setup(vote=lambda _: False)",
-]
-
-[definitions."tests/engine/test_request_session.py:test_nonboolean_vote_cannot_admit_execution"]
-diff = [
-  "-    session, calls, _, emitted = setup(vote=lambda _: 'yes')",
-  "+    session, calls, emitted = setup(vote=lambda _: 'yes')",
-]
-
-[definitions."tests/engine/test_request_session.py:test_dispatch_exception_poisoned_without_duplicate_first_token"]
-diff = [
-  "-    session, calls, _, emitted = setup(outputs=())",
-  "+    session, calls, emitted = setup(outputs=())",
-]
-
-[definitions."tests/engine/test_request_session.py:test_wrong_frontier_or_token_cannot_be_delivered"]
-diff = [
-  "-        session, _, _, emitted = setup()",
-  "+        session, _, emitted = setup()",
-]
-
-[definitions."tests/engine/test_request_session.py:test_no_decode_before_prefill_and_no_second_prefill"]
-diff = [
-  "-    session, calls, _, _ = setup()",
-  "+    session, calls, _ = setup()",
-  "-    session, _, _, emitted = setup()",
-  "+    session, _, emitted = setup()",
-]
-
-[definitions."tests/engine/test_request_session.py:test_request_policy_preserves_registered_cap"]
-diff = [
-  "-    policy = SampledRequestPolicy('a', 0, 3, 4, 20, 256, (10,))",
-  "-    for updates in ({'max_new_tokens': 18}, {'max_new_tokens': True}, {'eos_ids': ()}, {'eos_ids': (10, 10)}, {'eos_ids': (256,)}, {'seed': -1}, {'request_id': ''}):",
-  "+    policy = RequestPolicy('a', 3, 4, 20, 256, (10,))",
-  "+    for updates in ({'max_new_tokens': 18}, {'max_new_tokens': True}, {'eos_ids': ()}, {'eos_ids': (10, 10)}, {'eos_ids': (256,)}, {'request_id': ''}):",
-]
-
-[definitions."tests/engine/test_request_session.py:test_invalid_compact_status_never_emits_or_retries"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_invalid_compact_status_never_emits_or_retries"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:test_remote_or_nonboolean_refusal_prevents_delivery"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_remote_or_nonboolean_refusal_prevents_delivery"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:test_sink_failure_commits_once_then_poisoned"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_sink_failure_commits_once_then_poisoned"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:test_length_stop_without_extra_decode_and_first_token_stop"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_length_stop_without_extra_decode_and_first_token_stop"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:test_invalid_step_clock_never_emits"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_invalid_step_clock_never_emits"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:test_remote_delivery_failure_is_terminal_after_commit"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_remote_delivery_failure_is_terminal_after_commit"
-rewrite = {"setup" = "packed_setup"}
-
-[definitions."tests/engine/test_request_session.py:_outcome"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:_outcome"
-
-[definitions."tests/engine/test_request_session.py:test_greedy_policy_refuses_exactly_like_the_frozen_policy_at_seed_zero"]
-from = "tests/models/glm_moe_dsa/test_decode_program.py:test_greedy_policy_refuses_exactly_like_the_frozen_policy_at_seed_zero"
-
-# added: pins the merged constructor's check order (the policy check before the clock read), which split_check's
-# context-free diff lines cannot place; the same test passes on 2864a184 against PackedRequestSession
 [added]
-"tests/engine/test_request_session.py:test_constructor_refuses_a_foreign_policy_before_reading_the_clock" = "WU-E: the merged constructor refuses a foreign policy before it reads the clock"
+"tests/utils_/test_io_utils.py:test_read_bounded_closes_its_descriptor_on_every_path" = "WU-F: a read and every refusal, a directory's included, leave no descriptor open"
+"tests/entrypoints/cli/test_prepare.py:test_a_directory_is_refused_as_a_value_error" = "WU-F: prepare-request refuses a directory as a ValueError"
 
 [added_source]
-"tests/engine/test_request_session.py:test_constructor_refuses_a_foreign_policy_before_reading_the_clock" = [
-  "def test_constructor_refuses_a_foreign_policy_before_reading_the_clock():",
-  "    reads = []",
-  "",
-  "    def clock():",
-  "        reads.append(None)",
-  "        return 10.0",
-  "    arguments = dict(decode_step=None, fleet_all=None, deliver=None, delivery_boundary='fake sink', clock=clock)",
-  "    with pytest.raises(ValueError, match='an explicit greedy RequestPolicy is required'):",
-  "        RequestSession(('request-a', 3, 4, 20, 256, (10,)), request_started=11.0, **arguments)",
-  "    assert reads == []",
-  "    with pytest.raises(ValueError, match='request clock and named delivery boundary required'):",
-  "        RequestSession(RequestPolicy('request-a', 3, 4, 20, 256, (10,)), request_started=11.0, **arguments)",
-  "    assert len(reads) == 1",
+"tests/entrypoints/cli/test_prepare.py:test_a_directory_is_refused_as_a_value_error" = [
+  "def test_a_directory_is_refused_as_a_value_error(tmp_path, capsys):",
+  "    \"\"\"The messages are read first: a directory is refused like every input that is not a bounded regular file.\"\"\"",
+  "    assert not any((p.is_symlink() for p in (tmp_path, *tmp_path.parents)))",
+  "    argv = list(ARGV)",
+  "    argv[argv.index('--messages') + 1] = str(tmp_path)",
+  "    capsys.readouterr()",
+  "    assert main(argv) == 1",
+  "    refusal = json.dumps(dict(error='ValueError', status='request preparation refused')) + '\\n'",
+  "    assert capsys.readouterr() == ('', refusal)",
 ]
-
-# removed (FOLLOWUPS 24 and the merge; none of them runs in production)
-[removed]
-"glm_tpu/engine/request_session.py:request_uniform" = "WU-E: FU-24, the seeded uniform only the sampled session drew"
-"glm_tpu/engine/request_session.py:SampledRequestPolicy" = "WU-E: FU-24, the frozen sampled policy (production uses RequestPolicy)"
-"glm_tpu/engine/request_session.py:SampledRequestPolicy.__post_init__" = "WU-E: FU-24, with its class"
-"glm_tpu/engine/request_session.py:Ws32RequestSession.next_uniform" = "WU-E: the sampled session's uniform draw (FU-24)"
-"glm_tpu/engine/request_session.py:Ws32RequestSession.step" = "WU-E: the sampled step (FU-24); RequestSession.step is the greedy one"
-"glm_tpu/engine/request_session.py:PackedRequestSession" = "WU-E: merged into RequestSession"
-"glm_tpu/engine/request_session.py:PackedRequestSession.__init__" = "WU-E: merged into RequestSession.__init__ (its policy check comes first there)"
-"glm_tpu/engine/request_session.py:PackedRequestSession.next_uniform" = "WU-E: the greedy refusal of a uniform draw, only tests called it"
-
-[docstrings]
-"tests/engine/test_request_session.py" = "WU-E: names both sessions and carries the moved module's history of POLICY_CASES"
-"tests/models/glm_moe_dsa/test_decode_program.py" = "WU-E: deleted; its history note joins tests/engine/test_request_session.py"
-
-[imports."glm_tpu/engine/request_session.py"]
-removed = ["hashlib:sha256", "glm_tpu.models.glm_moe_dsa.state:DecodeStepResult"]
-
-[imports."glm_tpu/engine/llm_engine.py"]
-added = ["glm_tpu.engine.request_session:RequestSession"]
-removed = ["glm_tpu.engine.request_session:PackedRequestSession"]
-
-[imports."tests/engine/test_request_session.py"]
-added = [
-  "glm_tpu.engine.request_session:RequestPolicy",
-  "glm_tpu.engine.request_session:RequestSession",
-  "glm_tpu.models.glm_moe_dsa.model:PackedDecodeResult",
-]
-removed = [
-  "glm_tpu.engine.request_session:SampledRequestPolicy",
-  "glm_tpu.engine.request_session:Ws32RequestSession",
-  "glm_tpu.engine.request_session:request_uniform",
-]
-
-[imports."tests/models/glm_moe_dsa/test_decode_program.py"]
-removed = [
-  "glm_tpu.engine.request_session:PackedRequestSession",
-  "glm_tpu.engine.request_session:RequestPolicy",
-  "glm_tpu.models.glm_moe_dsa.model:PackedDecodeResult",
-  "glm_tpu.models.glm_moe_dsa.state:DecodeStepResult",
-  "numpy as np",
-  "pytest",
-  "tests.engine.test_request_session:prefill",
-  "tests.engine.test_request_session:state",
-]
-
-# POLICY_CASES moves with its test, unchanged (the two lines are the same text); S5_DECLARED gains the WU-E rows
-[statements."tests/engine/test_request_session.py"]
-diff = [
-  "+POLICY_CASES = [(('request-a', 3, 4, 20, 256, (10,)), None), (('r', 1, 1, 2, 1, (0,)), None), (('', 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), ((None, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), ((7, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), (('\\ud800', 3, 4, 20, 256, (10,)), ('UnicodeEncodeError', \"'utf-8' codec can't encode character '\\\\ud800' in position 0: surrogates not allowed\")), (('ok', 0, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', True, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4.0, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4, -20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4, 20, 0, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 18, 20, 256, (10,)), ('ValueError', 'full registered generation cap must fit; no silent truncation')), (('ok', 3, 4, 20, 256, [10]), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, ()), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (10, 10)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (256,)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (True,)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('', 0, 0, 0, 0, ()), ('ValueError', 'a nonempty request id is required')), (('ok', 0, 0, 0, 0, [1, 1]), ('ValueError', 'positive integer request dimensions required'))]",
-]
-
-[statements."tests/models/glm_moe_dsa/test_decode_program.py"]
-diff = [
-  "-POLICY_CASES = [(('request-a', 3, 4, 20, 256, (10,)), None), (('r', 1, 1, 2, 1, (0,)), None), (('', 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), ((None, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), ((7, 3, 4, 20, 256, (10,)), ('ValueError', 'a nonempty request id is required')), (('\\ud800', 3, 4, 20, 256, (10,)), ('UnicodeEncodeError', \"'utf-8' codec can't encode character '\\\\ud800' in position 0: surrogates not allowed\")), (('ok', 0, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', True, 4, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4.0, 20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4, -20, 256, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 4, 20, 0, (10,)), ('ValueError', 'positive integer request dimensions required')), (('ok', 3, 18, 20, 256, (10,)), ('ValueError', 'full registered generation cap must fit; no silent truncation')), (('ok', 3, 4, 20, 256, [10]), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, ()), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (10, 10)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (256,)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('ok', 3, 4, 20, 256, (True,)), ('ValueError', 'unique in-vocabulary EOS ids required')), (('', 0, 0, 0, 0, ()), ('ValueError', 'a nonempty request id is required')), (('ok', 0, 0, 0, 0, [1, 1]), ('ValueError', 'positive integer request dimensions required'))]",
-]
-
-
-[statements."tests/test_production_helper_homes.py"]
-diff = [
-  "-S5_DECLARED: dict[tuple[str, str], str] = {('glm_tpu/layers/contracts.py', 'MlaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'StageLocalKvLayout'): 'WU-S: rewritten', ('glm_tpu/layers/contracts.py', 'DsaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'GlmMoeNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py'}",
-  "+S5_DECLARED: dict[tuple[str, str], str] = {('glm_tpu/layers/contracts.py', 'MlaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'StageLocalKvLayout'): 'WU-S: rewritten', ('glm_tpu/layers/contracts.py', 'DsaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'GlmMoeNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/engine/request_session.py', 'SampledRequestPolicy'): 'WU-E: removed', ('glm_tpu/engine/request_session.py', 'Ws32RequestSession'): 'WU-E: rewritten', ('glm_tpu/engine/request_session.py', 'request_uniform'): 'WU-E: removed'}",
+"tests/utils_/test_io_utils.py:test_read_bounded_closes_its_descriptor_on_every_path" = [
+  "@pytest.mark.skipif(not os.path.isdir('/proc/self/fd'), reason=\"counts this process's open descriptors\")",
+  "def test_read_bounded_closes_its_descriptor_on_every_path(tmp_path):",
+  "    \"\"\"A read and every refusal, a directory's included, leave no descriptor open.\"\"\"",
+  "    path = tmp_path / 'request.json'",
+  "    path.write_bytes(b'{\"a\":1}')",
+  "    (tmp_path / 'empty').write_bytes(b'')",
+  "    fifo = tmp_path / 'fifo'",
+  "    os.mkfifo(fifo)",
+  "    refused = [(tmp_path, PAYLOAD_CAP), (fifo, PAYLOAD_CAP), (tmp_path / 'empty', PAYLOAD_CAP), (path, 1)]",
+  "    before = len(os.listdir('/proc/self/fd'))",
+  "    for _ in range(20):",
+  "        assert read_bounded(path, PAYLOAD_CAP) == b'{\"a\":1}'",
+  "        for refused_path, cap in refused:",
+  "            with pytest.raises(ValueError, match='bounded regular file'):",
+  "                read_bounded(refused_path, cap)",
+  "    assert len(os.listdir('/proc/self/fd')) == before",
 ]
