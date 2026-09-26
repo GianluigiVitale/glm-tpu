@@ -4,22 +4,26 @@
 # AST-equal to its base-commit original with the renames undone and the messages mapped back (imports aside),
 # and every file under [messages] equal to its base-commit text through the same table. A later work unit or
 # H-numbered host change that renames or rewrites literals rewrites this table against its own base; each version
-# is checked at the commit that applies it (history keeps it). S7 deletes tools/migration/.
+# is checked at the commit that applies it (history keeps them: S5 WU-R at f5745edb, S5 H11 at e61145fc). S7
+# deletes tools/migration/.
 #
-# S5 H11 (the sanctioned host change H11 of DESIGN 6.9, "H11 renames the HLO admission profile string"; owner
-# decision DN-21, 2026-09-25: H11 covers only the admission profile string): the HLO admission report's profile
-# loses the research label. Every host writes that report to its runtime record (runtime.json,
-# programs.<name>.hlo_admission). No definition is renamed; the refusal messages and the report's other keys and
-# values are unchanged. The previous version of this table (S5 WU-R, base e04300af: the admission renames and
-# refusal wording) is in history at f5745edb; its tools/equivalence/driver.py RECORDED_NAMES rows are permanent.
+# S5 WU-C2 (C = the command line; owner decision DN-24(b), 2026-09-25: the public `checkpoint inventory` and
+# `checkpoint verify` commands are added, `finalize` and the packing driver stay private): the two checkpoint
+# verification helpers that writer.py and manifest.py import from sharded_state.verify get public names (FOLLOWUPS
+# 66; the S4.4 rule R5: a helper another module imports drops its leading underscore). No production message changes;
+# no alias stays under the old names. The one [messages] row is the attribute name a test patches on the writer module,
+# which imports the helper (the engine follows patch targets only on a module whose definitions the table renames).
+# The equivalence harness names neither helper (its G1/G2/G7 driver replaces verify_runtime_checkpoint by a fake, so
+# G7 traces neither).
 
 [stage]
-name = "S5 H11"
+name = "S5 WU-C2"
 kind = "renames"
-base = "f0e8bc8a"   # the tree this table was written against
+base = "66842e0e"   # the tree this table was written against
 
-[messages."glm_tpu/runner/admission.py"]
-"research_ws32_axis_payload_v1" = "ws32_axis_payload_v1"   # runtime.json hlo_admission.profile; G1-/G2-protocol verdicts.hlo.physical_axes_pod_4096_bytes.detail.profile
+[renames]
+"glm_tpu/model_loader/sharded_state/verify.py:_verify_runtime_value" = "verify_runtime_value"   # the manifest ledger check (writer.py, manifest.py)
+"glm_tpu/model_loader/sharded_state/verify.py:_verify_runtime_files" = "verify_runtime_files"   # the file size and hash check (writer.py)
 
-[messages."tests/runner/test_admission.py"]
-"research_ws32_axis_payload_v1" = "ws32_axis_payload_v1"   # the literal pin of the accepted report
+[messages."tests/model_loader/sharded_state/test_format.py"]
+"_verify_runtime_value" = "verify_runtime_value"   # the monkeypatch target on the writer module (writer.py imports it)

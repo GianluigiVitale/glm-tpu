@@ -70,17 +70,18 @@ for name in ("jax", "jaxlib", "libtpu", "torch", "transformers"):
 # between Python versions (the literals are Python 3.12's).
 HELP = {
     "": """\
-usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request} ...
+usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...
 
 Release information, local preparation and protected question submission.
 
 positional arguments:
-  {info,ask,collect-env,doctor,prepare-request}
+  {info,ask,collect-env,doctor,prepare-request,checkpoint}
     info                show supported scope and release limitations
     ask                 answer questions on the retained TPU site; optionally batch up to four
     collect-env (doctor)
                         check installed version metadata without initializing TPU
     prepare-request     tokenize a private chat locally; does NOT launch inference
+    checkpoint          inventory a checkpoint source or verify a sealed checkpoint on local files
 
 options:
   -h, --help            show this help message and exit
@@ -138,6 +139,44 @@ options:
   --request-id REQUEST_ID
   --profile {ordinary-greedy-8k,ordinary-greedy-128k}
   --max-new-tokens MAX_NEW_TOKENS
+""",
+    "checkpoint": """\
+usage: glm-tpu checkpoint [-h] {inventory,verify} ...
+
+positional arguments:
+  {inventory,verify}
+    inventory         write the inventory of a local safetensors source (no payload is read)
+    verify            verify a local sealed runtime checkpoint against the site file's pins
+
+options:
+  -h, --help          show this help message and exit
+""",
+    "checkpoint inventory": """\
+usage: glm-tpu checkpoint inventory [-h] --output OUTPUT --model-id MODEL_ID --revision REVISION
+                                    source
+
+positional arguments:
+  source               directory of model.safetensors.index.json, its shards and config.json
+
+options:
+  -h, --help           show this help message and exit
+  --output OUTPUT      the new inventory file (never overwritten)
+  --model-id MODEL_ID  the model id to record, e.g. zai-org/GLM-5.3
+  --revision REVISION  the source revision to record
+""",
+    "checkpoint verify": """\
+usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]
+                                 [--local-slot-layout]
+
+options:
+  -h, --help            show this help message and exit
+  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else
+                        $GLM_TPU_CONFIG_ROOT/site.toml)
+  --root ROOT           checkpoint root (default: the site's checkpoint.root)
+  --slots SLOT [SLOT ...]
+                        hash only these device slots, 0..31 (default: all)
+  --local-slot-layout   the root holds only the --slots files (a worker's layout); any other slot
+                        file is refused
 """,
 }
 HELP["doctor"] = HELP["collect-env"]  # the alias's parser is collect-env's
@@ -234,7 +273,7 @@ ARGUMENTS = {
     "": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
         "_SubParsersAction command dest=command nargs='A...' "
-        "choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request'] required",
+        "choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request', 'checkpoint'] required",
     ],
     "info": ["_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='"],
     "ask": [
@@ -269,6 +308,24 @@ ARGUMENTS = {
         "choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']",
         "_StoreAction --max-new-tokens dest=max_new_tokens type='int' required",
     ],
+    "checkpoint": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'verify'] required",
+    ],
+    "checkpoint inventory": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction source dest=source type='Path' required",
+        "_StoreAction --output dest=output type='Path' required",
+        "_StoreAction --model-id dest=model_id required",
+        "_StoreAction --revision dest=revision required",
+    ],
+    "checkpoint verify": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --site dest=site type='Path'",
+        "_StoreAction --root dest=root type='Path'",
+        "_StoreAction --slots dest=slots nargs='+' type='int' metavar='SLOT'",
+        "_StoreTrueAction --local-slot-layout dest=local_slot_layout nargs=0 const=True default=False",
+    ],
 }
 
 
@@ -279,6 +336,10 @@ def test_every_argument_is_unchanged(monkeypatch):
     parser = built_parser(monkeypatch)
     (commands,) = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
     parsers = {"": parser, **commands.choices}
+    for name, subparser in commands.choices.items():  # a subcommand's own subcommands: "checkpoint inventory"
+        for action in subparser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                parsers.update({f"{name} {inner}": p for inner, p in action.choices.items()})
     assert {name: arguments(p) for name, p in parsers.items()} == ARGUMENTS
     assert commands.choices["doctor"] is commands.choices["collect-env"]
     assert [(p.prog, p.description) for p in parsers.values()] == [
@@ -327,11 +388,23 @@ def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, 
 
 
 @pytest.mark.parametrize(
-    "argv", [["info"], ["collect-env"], ["doctor"], ["--help"], ["collect-env", "--help"]], ids=" ".join
+    "argv",
+    [
+        ["info"],
+        ["collect-env"],
+        ["doctor"],
+        ["--help"],
+        ["collect-env", "--help"],
+        ["checkpoint", "--help"],
+        ["checkpoint", "inventory", "--help"],
+        ["checkpoint", "verify", "--help"],
+    ],
+    ids=" ".join,
 )
-def test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded(argv):
+def test_info_collect_env_and_help_leave_the_command_modules_unloaded(argv):
     """The subcommands that need neither load neither the ask module nor the request module (imported by `ask` and
-    `prepare-request` when they run), nor a model library."""
+    `prepare-request` when they run) nor the checkpoint library (imported by `checkpoint` when it runs), nor a model
+    library."""
     code = f"""
 import contextlib, io, sys
 from glm_tpu.entrypoints.cli.main import main
@@ -340,7 +413,8 @@ with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.St
         main({argv!r})
     except SystemExit:
         pass
-unloaded = ("glm_tpu.entrypoints.cli.ask", "glm_tpu.engine.request", "jax", "jaxlib", "libtpu", "torch", "transformers")
+unloaded = ("glm_tpu.entrypoints.cli.ask", "glm_tpu.engine.request", "glm_tpu.model_loader", "jax", "jaxlib", "libtpu",
+            "torch", "transformers")
 loaded = [name for name in unloaded if name in sys.modules]
 assert not loaded, loaded
 """

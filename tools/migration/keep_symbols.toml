@@ -20,7 +20,9 @@
 # request_session.Ws32RequestSession and its seeded RequestPolicy/request_uniform (reachable
 # through the class the packed session extends; S5 merges the sessions); runtime_checkpoint.
 # finalize_ws32_runtime_checkpoint and source_inventory.write_source_inventory (checkpoint tooling
-# with kept tests; WU-C's checkpoint commands); ws32_io.ws32_final_sample_mapped (kept IO test).
+# with kept tests; WU-C's checkpoint commands: S5 WU-C2 writes the inventory with the latter in
+# `glm-tpu checkpoint inventory`, and the former stays a library function of the private packing
+# driver, with no command, owner decision DN-24(b)); ws32_io.ws32_final_sample_mapped (kept IO test).
 
 ["glm_tpu.api"]
 keep = ["ALIASES", "ARGUMENT", "Api", "ApiError", "CALL", "EFFORTS", "MESSAGES_CAP", "MODEL_ID", "ROLES", "TOOLS_CAP", "_arguments", "_text", "check_tools", "convert", "finish", "instruct", "parse", "usage"]

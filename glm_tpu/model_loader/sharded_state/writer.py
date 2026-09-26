@@ -27,7 +27,7 @@ from glm_tpu.model_loader.sharded_state.format import (
     sha256_file,
     build_runtime_file_plans,
 )
-from glm_tpu.model_loader.sharded_state.verify import RuntimeMetadata, _verify_runtime_files, _verify_runtime_value
+from glm_tpu.model_loader.sharded_state.verify import RuntimeMetadata, verify_runtime_files, verify_runtime_value
 from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory
 
 
@@ -274,12 +274,12 @@ def _build_runtime_manifest(
         "tensor_schema": [item.schema_dict() for item in plans[0].tensors],
     }
     manifest["manifest_sha256"] = mapping_hash(manifest, field="manifest_sha256")
-    by_slot = _verify_runtime_value(
+    by_slot = verify_runtime_value(
         config.output_dir,
         manifest,
         plans,
     )
-    _verify_runtime_files(
+    verify_runtime_files(
         RuntimeMetadata(config.output_dir, manifest, {}, tuple(plans), by_slot),
         verify_file_hashes=False,
         verify_file_hash_slots=None,

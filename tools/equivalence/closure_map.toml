@@ -9,9 +9,14 @@
 
 [functions]
 # "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
+# S5 WU-C2 (tools/migration/work_units.toml): moved or renamed definitions, current = recorded
+"glm_tpu.model_loader.sharded_state.verify:verify_runtime_files" = "glm_tpu.model_loader.sharded_state.verify:_verify_runtime_files"
+"glm_tpu.model_loader.sharded_state.verify:verify_runtime_value" = "glm_tpu.model_loader.sharded_state.verify:_verify_runtime_value"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+# S5 WU-C2: cli/main.py imports the checkpoint subcommand at module level.
+"glm_tpu.entrypoints.cli.checkpoint" = "WU-C: the checkpoint subcommand, inventory and verify (G6 controller stage)"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

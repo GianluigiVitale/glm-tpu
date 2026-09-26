@@ -14,7 +14,8 @@ A Pallas kernel name S4.2b made public (``glm_tpu.kernels.names.KERNEL_NAMES[key
 the 181c013e name the equivalence harness patches it back to (``tools/equivalence/kernel_renames.toml``),
 and a ``jax.named_scope`` name S4.4 renamed as the name it replaced (``helper_names.toml [named_scopes]``).
 A definition an S5 work unit changes is declared in ``S5_DECLARED``: compared under its new name or at its
-new home when renamed or moved, not compared when rewritten, removed or given a new docstring.
+new home when renamed or moved, not compared when rewritten, removed or given a new docstring; a reference to a
+definition an S5 unit renamed is compared as renamed where the current module defines or imports it by its new name.
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -208,6 +209,9 @@ S5_DECLARED: dict[tuple[str, str], str] = {
     ("glm_tpu/engine/request_session.py", "SampledRequestPolicy"): "WU-E: removed",
     ("glm_tpu/engine/request_session.py", "Ws32RequestSession"): "WU-E: rewritten",
     ("glm_tpu/engine/request_session.py", "request_uniform"): "WU-E: removed",
+    # WU-C2 (FOLLOWUPS 66): the verification helpers writer.py and manifest.py import lose their leading underscore.
+    ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_value"): "WU-C: renamed -> verify_runtime_value",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_files"): "WU-C: renamed -> verify_runtime_files",
 }
 S5_DECLARATION = re.compile(
     r"(?:WU-[A-Z][A-Za-z]*|H[1-9][0-9]?): "
@@ -290,10 +294,29 @@ def _helpers_bound_in(path: str) -> dict[str, str]:
     return out
 
 
+def _s5_renames_bound_in(path: str) -> dict[str, str]:
+    """S5: old -> new name of the definitions an S5 unit renamed (``S5_DECLARED``) that module ``path`` defines or
+    imports by their new name, as ``_helpers_bound_in`` for the S4.4 helpers."""
+    imported = {
+        (node.module, alias.name)
+        for node in ast.walk(_current(path))
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    out = {}
+    for (home, old), declared in S5_DECLARED.items():
+        kind = declared.partition(": ")[2]
+        if kind.startswith("renamed -> "):
+            new = kind.removeprefix("renamed -> ")
+            if home == path or (home[:-3].replace("/", "."), new) in imported:
+                out[old] = new
+    return out
+
+
 def _as_renamed_in(home: str, node: ast.AST, name: str) -> ast.AST:
     """``node`` (the original definition ``name`` of ``home``) with its references to the definitions
-    S4.1 renamed in ``home``, to every definition S4.2 renamed and to the S4.4 helpers its current
-    module binds spelled as renamed."""
+    S4.1 renamed in ``home``, to every definition S4.2 renamed and to the S4.4 helpers and the S5-renamed
+    definitions its current module binds spelled as renamed."""
     import copy
 
     renames = {
@@ -303,15 +326,18 @@ def _as_renamed_in(home: str, node: ast.AST, name: str) -> ast.AST:
     }
     public = {key.partition(":")[2]: new for key, new in _public_names().items()}
     helpers = _helpers_bound_in(_final_home(home, name)[0])
+    s5 = _s5_renames_bound_in(_final_home(home, name)[0])
     node = copy.deepcopy(node)
     for inner in ast.walk(node):
         if isinstance(inner, ast.Name):
             current = public.get(renames.get(inner.id, inner.id), renames.get(inner.id, inner.id))
-            inner.id = helpers.get(current, current)
+            current = helpers.get(current, current)
+            inner.id = s5.get(current, current)
         elif isinstance(inner, ast.ImportFrom):  # the name an import binds (an ``as`` alias stays)
             for alias in inner.names:
                 current = public.get(alias.name, alias.name)
-                alias.name = helpers.get(current, current)
+                current = helpers.get(current, current)
+                alias.name = s5.get(current, current)
     return node
 
 

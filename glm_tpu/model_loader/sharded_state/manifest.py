@@ -72,5 +72,5 @@ def assemble_owner_manifest(
     manifest["manifest_sha256"] = retained.mapping_hash(manifest, field="manifest_sha256")
     # Validate the complete original schema, owner geometry and tensor hash ledger.
     # No sparse placeholders or fabricated remote files are needed on rank zero.
-    verify._verify_runtime_value(Path("."), manifest, plans)
+    verify.verify_runtime_value(Path("."), manifest, plans)
     return manifest

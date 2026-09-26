@@ -249,7 +249,7 @@ def test_ws32_runtime_validation_failure_never_commits_manifest(
         del args, kwargs
         raise CheckpointValidationError("injected final validation failure")
 
-    monkeypatch.setattr(module, "_verify_runtime_value", fail)
+    monkeypatch.setattr(module, "verify_runtime_value", fail)
     with pytest.raises(CheckpointValidationError, match="injected"):
         pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)
     assert not (config.output_dir / "manifest.json").exists()

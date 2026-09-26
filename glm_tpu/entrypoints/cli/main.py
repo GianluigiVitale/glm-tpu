@@ -8,6 +8,7 @@ from importlib import metadata
 import json
 from pathlib import Path
 
+from glm_tpu.entrypoints.cli.checkpoint import CheckpointSubcommand
 from glm_tpu.entrypoints.cli.collect_env import CollectEnvSubcommand
 from glm_tpu.entrypoints.cli.prepare import PrepareRequestSubcommand
 from glm_tpu.entrypoints.cli.types import CLISubcommand
@@ -121,7 +122,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     # The help lists the subcommands in this order. argparse stores the name the command was called by (an alias
     # such as ``doctor`` included), so each subcommand is keyed under every name its parser answers to.
     commands: dict[str, CLISubcommand] = {}
-    for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand()):
+    for command in (
+        InfoSubcommand(),
+        AskSubcommand(),
+        CollectEnvSubcommand(),
+        PrepareRequestSubcommand(),
+        CheckpointSubcommand(),
+    ):
         subparser = command.subparser_init(sub)
         commands.update({name: command for name, choice in sub.choices.items() if choice is subparser})
     args = parser.parse_args(argv)

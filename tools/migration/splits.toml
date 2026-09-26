@@ -4,455 +4,500 @@
 # removed; every definition now has an origin or is added, with its source. A later split rewrites this table
 # against its own base; each version is checked at the commit that applies it (history keeps them: S5 WU-E1 at
 # 43fa28cb, S5 WU-S1/S2 at 4f225279, S5 WU-C1 at 7cfe5e99, S5 WU-S3 at fd3086b0, S5 IMP-23 at 2864a184, S5 WU-E2 at
-# b1271cf4, S5 WU-F at f0e8bc8a). S7 deletes tools/migration/.
+# b1271cf4, S5 WU-F at f0e8bc8a, S5 WU-C3 at 66842e0e). S7 deletes tools/migration/.
 #
-# S5 WU-C3 (C = the command line; a planned behaviour change, owner decision DN-24): the environment command is
-# `glm-tpu collect-env`, with `doctor` kept as its alias (main keys each subcommand under every name its parser
-# answers to, so the alias dispatches). Its pins are the requirements glm-tpu declares, read from the installed
-# distribution's metadata, else from the checkout's pyproject.toml, else refused; glm_tpu/environment.json and the
-# benchmark profile and extra are gone (restructure.py records the removed S3 destination in DISSOLVED_BY_HAND). A
-# local version label matches its public version, and the running Python must satisfy the requires-python
-# specifier (report schema v2). `glm-tpu info` drops the STATUS pointers and "WS32_2D" and names the serving API/UI
-# and the 256K context with its recorded HBM-admission refusal. The tests follow: the manifest test goes, the help,
-# info and argument literals and the report tests change with them, one fresh-process test checks what info,
-# collect-env and --help leave unloaded, and tests/entrypoints/cli/test_collect_env.py covers the report's sources,
-# rules and refusals.
+# S5 WU-C2 (C = the command line; a planned, additive behaviour change, owner decision DN-24(b)): `glm-tpu checkpoint
+# inventory` writes the source inventory of a local safetensors checkpoint and reads it back, and `glm-tpu checkpoint
+# verify` checks a local sealed runtime checkpoint against the site file's pins; the new module
+# glm_tpu/entrypoints/cli/checkpoint.py calls the checkpoint library and nothing else (packing, sealing and finalize
+# stay outside the command line), and main registers the subcommand last. The two verification helpers that writer.py
+# and manifest.py import lose their leading underscore (FOLLOWUPS 66, applied by tools/migration/work_units.toml): the
+# rows below compare every definition of the four checkpoint files unchanged but for that rename. The tests follow: the
+# help and argument literals gain the subcommand, the argument test reads the nested parsers, the fresh-process test
+# also checks the checkpoint library stays unloaded, a test patches the renamed helper, the provenance test compares
+# the renamed helpers under their new names (and the references to them as renamed), and
+# tests/entrypoints/cli/test_checkpoint.py drives both commands on the G4 tiny checkpoint against the library.
 
 [stage]
-name = "S5 WU-C3"
+name = "S5 WU-C2"
 kind = "splits"
-base = "cad90e6e"   # the tree this table was written against
+base = "66842e0e"   # the tree this table was written against
 files = [
-  "glm_tpu/entrypoints/cli/collect_env.py",
   "glm_tpu/entrypoints/cli/main.py",
+  "glm_tpu/entrypoints/cli/checkpoint.py",
+  "glm_tpu/model_loader/sharded_state/verify.py",
+  "glm_tpu/model_loader/sharded_state/writer.py",
+  "glm_tpu/model_loader/sharded_state/manifest.py",
   "tests/entrypoints/cli/test_main.py",
-  "tests/entrypoints/cli/test_collect_env.py",
+  "tests/entrypoints/cli/test_checkpoint.py",
+  "tests/model_loader/sharded_state/test_format.py",
+  "tests/test_production_helper_homes.py",
 ]
-created = ["tests/entrypoints/cli/test_collect_env.py"]
+created = ["glm_tpu/entrypoints/cli/checkpoint.py", "tests/entrypoints/cli/test_checkpoint.py"]
 
-# the pins of the profile's declared groups (was the manifest); a local label matches its public version; the running
-# Python (major.minor.micro) against the requires-python specifier; schema v2 with declared_by; benchmark gone
-[definitions."glm_tpu/entrypoints/cli/collect_env.py:environment_report"]
+# FOLLOWUPS 66: renamed (work_units.toml), the body verbatim
+[definitions."glm_tpu/model_loader/sharded_state/verify.py:verify_runtime_value"]
+from = "glm_tpu/model_loader/sharded_state/verify.py:_verify_runtime_value"
+
+# FOLLOWUPS 66: renamed (work_units.toml), the body verbatim
+[definitions."glm_tpu/model_loader/sharded_state/verify.py:verify_runtime_files"]
+from = "glm_tpu/model_loader/sharded_state/verify.py:_verify_runtime_files"
+
+# calls the renamed helper; nothing else changes
+[definitions."glm_tpu/model_loader/sharded_state/verify.py:verify_runtime_checkpoint"]
+rewrite = {"_verify_runtime_files" = "verify_runtime_files"}
+
+# calls the renamed helper; nothing else changes
+[definitions."glm_tpu/model_loader/sharded_state/verify.py:_read_runtime_metadata"]
+rewrite = {"_verify_runtime_value" = "verify_runtime_value"}
+
+# calls the renamed helpers; nothing else changes
+[definitions."glm_tpu/model_loader/sharded_state/writer.py:_build_runtime_manifest"]
+rewrite = {"_verify_runtime_value" = "verify_runtime_value", "_verify_runtime_files" = "verify_runtime_files"}
+
+# calls the renamed helper through the verify module; nothing else changes
+[definitions."glm_tpu/model_loader/sharded_state/manifest.py:assemble_owner_manifest"]
+rewrite = {"verify._verify_runtime_value" = "verify.verify_runtime_value"}
+
+# FOLLOWUPS 150 test, renamed: the checkpoint helps join, and the checkpoint library must stay unloaded too
+[definitions."tests/entrypoints/cli/test_main.py:test_info_collect_env_and_help_leave_the_command_modules_unloaded"]
+from = "tests/entrypoints/cli/test_main.py:test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded"
 diff = [
-  "-def environment_report(profile: str, *, version: Callable[[str], str]=metadata.version, python_version: tuple[int, int] | None=None) -> dict:",
-  "-    \"\"\"Compare distribution metadata only; a match is NOT hardware admission.\"\"\"",
-  "-    manifest = environment_manifest()",
-  "-    groups = {'core': ('core',), 'runtime': ('core', 'runtime'), 'tpu': ('core', 'runtime', 'tpu'), 'benchmark': ('core', 'runtime', 'tpu', 'benchmark'), 'dev': ('core', 'dev')}",
-  "-    if profile not in groups:",
-  "+def environment_report(profile: str, *, version: Callable[[str], str]=metadata.version, python_version: tuple[int, ...] | None=None) -> dict:",
-  "+    \"\"\"Compare distribution metadata only; a match is NOT hardware admission.",
-  "+",
-  "+    The expected versions are the declared pins of the profile's groups (``declared_requirements``). A package",
-  "+    matches when its installed version equals the pin or, for a pin without a local label, when its public version",
-  "+    (before ``+``) does: ``torch 2.10.0+cpu`` matches ``torch==2.10.0``. The running Python (major.minor.micro) must",
-  "+    satisfy the declared requires-python specifier.",
-  "+    \"\"\"",
-  "+    if profile not in PROFILES:",
-  "-    expected = {name: pin for group in groups[profile] for name, pin in manifest['profiles'][group].items()}",
-  "+    declared = declared_requirements()",
-  "+    expected: dict[str, str] = {}",
-  "+    for group in PROFILES[profile]:",
-  "+        if not declared['groups'].get(group):",
-  "+            raise ValueError(f'glm-tpu declares no {group} requirements')",
-  "+        for name, pin in declared['groups'][group].items():",
-  "+            if expected.setdefault(name, pin) != pin:",
-  "+                raise ValueError(f'conflicting pins for {name}')",
-  "-        rows.append(dict(package=name, expected=pin, installed=actual, status='match' if actual == pin else 'missing' if actual is None else 'mismatch'))",
-  "-    major, minor = python_version if python_version is not None else sys.version_info[:2]",
-  "-    python = f'{major}.{minor}'",
-  "-    return dict(schema='glm_tpu_environment_report_v1', profile=profile, python=python, expected_python=manifest['python'], packages=rows, passed=python == manifest['python'] and all((row['status'] == 'match' for row in rows)), scope='distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or launch authorization')",
-  "+        rows.append(dict(package=name, expected=pin, installed=actual, status='missing' if actual is None else 'match' if _matches(actual, pin) else 'mismatch'))",
-  "+    running = tuple(python_version if python_version is not None else sys.version_info[:3])",
-  "+    return dict(schema='glm_tpu_environment_report_v2', profile=profile, declared_by=declared['declared_by'], python='.'.join((str(part) for part in running)), expected_python=declared['python'], packages=rows, passed=_satisfies(running, declared['python']) and all((row['status'] == 'match' for row in rows)), scope='distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or launch authorization')",
+  "-@pytest.mark.parametrize('argv', [['info'], ['collect-env'], ['doctor'], ['--help'], ['collect-env', '--help']], ids=' '.join)",
+  "+@pytest.mark.parametrize('argv', [['info'], ['collect-env'], ['doctor'], ['--help'], ['collect-env', '--help'], ['checkpoint', '--help'], ['checkpoint', 'inventory', '--help'], ['checkpoint', 'verify', '--help']], ids=' '.join)",
+  "-    `prepare-request` when they run), nor a model library.\"\"\"",
+  "-    code = f'\\nimport contextlib, io, sys\\nfrom glm_tpu.entrypoints.cli.main import main\\nwith contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):\\n    try:\\n        main({argv!r})\\n    except SystemExit:\\n        pass\\nunloaded = (\"glm_tpu.entrypoints.cli.ask\", \"glm_tpu.engine.request\", \"jax\", \"jaxlib\", \"libtpu\", \"torch\", \"transformers\")\\nloaded = [name for name in unloaded if name in sys.modules]\\nassert not loaded, loaded\\n'",
+  "+    `prepare-request` when they run) nor the checkpoint library (imported by `checkpoint` when it runs), nor a model",
+  "+    library.\"\"\"",
+  "+    code = f'\\nimport contextlib, io, sys\\nfrom glm_tpu.entrypoints.cli.main import main\\nwith contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):\\n    try:\\n        main({argv!r})\\n    except SystemExit:\\n        pass\\nunloaded = (\"glm_tpu.entrypoints.cli.ask\", \"glm_tpu.engine.request\", \"glm_tpu.model_loader\", \"jax\", \"jaxlib\", \"libtpu\",\\n            \"torch\", \"transformers\")\\nloaded = [name for name in unloaded if name in sys.modules]\\nassert not loaded, loaded\\n'",
 ]
 
-# the command is collect-env (doctor is its alias); the docstring names the refusal
-[definitions."glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand"]
-diff = [
-  "-    \"\"\"``glm-tpu doctor``: the environment report of one profile; exit 0 only when it passed.\"\"\"",
-  "-    name = 'doctor'",
-  "+    \"\"\"``glm-tpu collect-env`` (alias ``doctor``): the environment report of one profile; exit 0 only when it passed.",
-  "+",
-  "+    A refusal (no declared requirements, or one the report cannot read) prints its type and message as JSON on",
-  "+    standard error and exits 1.",
-  "+    \"\"\"",
-  "+    name = 'collect-env'",
-]
-
-# a report that cannot be made is refused as JSON on standard error, exit 1
-[definitions."glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.cmd"]
-diff = [
-  "-    report = environment_report(args.profile)",
-  "+    try:",
-  "+        report = environment_report(args.profile)",
-  "+    except (ValueError, OSError) as exc:",
-  "+        refusal = dict(error=type(exc).__name__, message=str(exc), status='environment report refused')",
-  "+        print(json.dumps(refusal), file=sys.stderr)",
-  "+        return 1",
-]
-
-# collect-env with the alias doctor; the profiles without benchmark
-[definitions."glm_tpu/entrypoints/cli/collect_env.py:CollectEnvSubcommand.subparser_init"]
-diff = [
-  "-    doctor = subparsers.add_parser('doctor', help='check installed version metadata without initializing TPU')",
-  "-    doctor.add_argument('--profile', choices=('core', 'runtime', 'tpu', 'benchmark', 'dev'), default='core')",
-  "-    return doctor",
-  "+    collect_env = subparsers.add_parser('collect-env', aliases=['doctor'], help='check installed version metadata without initializing TPU')",
-  "+    collect_env.add_argument('--profile', choices=tuple(PROFILES), default='core')",
-  "+    return collect_env",
-]
-
-# five values: no STATUS pointers, no WS32_2D, the 256K context (with its recorded HBM-admission refusal) and the
-# serving API/UI (every other value verbatim)
-[definitions."glm_tpu/entrypoints/cli/main.py:InfoSubcommand.cmd"]
-diff = [
-  "-    print(json.dumps(dict(project='glm-tpu', version=version, release_status='private project; see docs/release/STATUS.md for trained admission and promotion', engine='native JAX WS32_2D', hardware='8 hosts / 32 TPU v4 chips', ordinary_profile='greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope', concurrent_requests=4, model='zai-org/GLM-5.3', concurrent_validation='GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only', concurrent_context_capacity=32768, concurrent_scope='fixed submitted group; see STATUS for hardware evidence; no online request admission', queued_questions=10, resume='resident ordinary inbox reuses the live model; no process-restart or durable KV recovery', serving='site-specific protected request harness; no supported HTTP endpoint', installation='wheel contains Python components only; full deployment requires source checkout and external assets', quality='full benchmark/model-card parity not established'), indent=2, sort_keys=True))",
-  "+    print(json.dumps(dict(project='glm-tpu', version=version, release_status='private project', engine='native JAX', hardware='8 hosts / 32 TPU v4 chips', ordinary_profile='greedy; 8K combined, concurrent 32K per conversation, 128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)', concurrent_requests=4, model='zai-org/GLM-5.3', concurrent_validation='GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only', concurrent_context_capacity=32768, concurrent_scope='fixed submitted group; no online request admission', queued_questions=10, resume='resident ordinary inbox reuses the live model; no process-restart or durable KV recovery', serving='site-specific protected request harness; loopback chat UI and OpenAI-compatible /v1 API attached to a resident controller (python -m glm_tpu.entrypoints.serve.server)', installation='wheel contains Python components only; full deployment requires source checkout and external assets', quality='full benchmark/model-card parity not established'), indent=2, sort_keys=True))",
-]
-
-# each subcommand keyed under every name its parser answers to (the doctor alias dispatches; FOLLOWUPS 152)
+# registers the checkpoint subcommand last (the help lists it last)
 [definitions."glm_tpu/entrypoints/cli/main.py:main"]
 diff = [
-  "-    commands = {command.name: command for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand())}",
-  "-    for command in commands.values():",
-  "-        command.subparser_init(sub)",
-  "+    commands: dict[str, CLISubcommand] = {}",
-  "+    for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand()):",
-  "+        subparser = command.subparser_init(sub)",
-  "+        commands.update({name: command for name, choice in sub.choices.items() if choice is subparser})",
+  "-    for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand()):",
+  "+    for command in (InfoSubcommand(), AskSubcommand(), CollectEnvSubcommand(), PrepareRequestSubcommand(), CheckpointSubcommand()):",
 ]
 
-# the declared pins; the tpu profile (benchmark is gone); torch's local label matches its pin
-[definitions."tests/entrypoints/cli/test_main.py:CliTests.test_complete_metadata"]
-diff = [
-  "-    pins = {name: value for group in environment_manifest()['profiles'].values() for name, value in group.items()}",
-  "-    result = environment_report('benchmark', version=pins.__getitem__, python_version=(3, 12))",
-  "+    pins = {name: value for group in declared_requirements()['groups'].values() for name, value in group.items()}",
-  "+    installed = {**pins, 'torch': pins['torch'] + '+cpu'}",
-  "+    result = environment_report('tpu', version=installed.__getitem__, python_version=(3, 12))",
-  "-    self.assertTrue(any((row['expected'] == '2.10.0+cpu' for row in result['packages'])))",
-  "+    self.assertIn(dict(package='torch', expected='2.10.0', installed='2.10.0+cpu', status='match'), result['packages'])",
-]
-
-# the declared core pins
-[definitions."tests/entrypoints/cli/test_main.py:CliTests.test_wrong_python_refuses"]
-diff = [
-  "-    pins = environment_manifest()['profiles']['core']",
-  "+    pins = declared_requirements()['groups']['core']",
-]
-
-# the alias's parser is collect-env's, and so is its prog
+# the nested parsers (checkpoint inventory, checkpoint verify) are compared too
 [definitions."tests/entrypoints/cli/test_main.py:test_every_argument_is_unchanged"]
 diff = [
-  "-    assert [(p.prog, p.description) for p in parsers.values()] == [('glm-tpu', 'Release information, local preparation and protected question submission.'), *((f'glm-tpu {name}', None) for name in list(ARGUMENTS)[1:])]",
-  "+    assert commands.choices['doctor'] is commands.choices['collect-env']",
-  "+    assert [(p.prog, p.description) for p in parsers.values()] == [('glm-tpu', 'Release information, local preparation and protected question submission.'), *((f'glm-tpu {ALIASES.get(name, name)}', None) for name in list(ARGUMENTS)[1:])]",
+  "+    for name, subparser in commands.choices.items():",
+  "+        for action in subparser._actions:",
+  "+            if isinstance(action, argparse._SubParsersAction):",
+  "+                parsers.update({f'{name} {inner}': p for inner, p in action.choices.items()})",
 ]
 
-# the declared pins, the four profiles, run as collect-env and as doctor
-[definitions."tests/entrypoints/cli/test_main.py:test_doctor_prints_the_report_and_exits_by_its_verdict"]
+# patches the renamed helper on the writer module (work_units.toml [messages])
+[definitions."tests/model_loader/sharded_state/test_format.py:test_ws32_runtime_validation_failure_never_commits_manifest"]
 diff = [
-  "-@pytest.mark.parametrize('profile', ['core', 'runtime', 'tpu', 'benchmark', 'dev', 'missing jax'])",
-  "-def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, profile):",
-  "-    \"\"\"`doctor` prints the profile's report and exits 0 exactly when it passed (every pin installed, Python 3.12).\"\"\"",
-  "-    pins = {name: value for group in environment_manifest()['profiles'].values() for name, value in group.items()}",
-  "+@pytest.mark.parametrize('command', ['collect-env', 'doctor'])",
-  "+@pytest.mark.parametrize('profile', ['core', 'runtime', 'tpu', 'dev', 'missing jax'])",
-  "+def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, profile, command):",
-  "+    \"\"\"`collect-env` and its alias `doctor` print the profile's report and exit 0 exactly when it passed (every pin",
-  "+    installed, Python 3.12).\"\"\"",
-  "+    pins = {name: value for group in declared_requirements()['groups'].values() for name, value in group.items()}",
-  "-    assert main(['doctor', '--profile', name]) == (0 if report['passed'] else 1)",
-  "+    assert main([command, '--profile', name]) == (0 if report['passed'] else 1)",
+  "-    monkeypatch.setattr(module, '_verify_runtime_value', fail)",
+  "+    monkeypatch.setattr(module, 'verify_runtime_value', fail)",
 ]
 
-[removed]
-"glm_tpu/entrypoints/cli/collect_env.py:environment_manifest" = "WU-C: environment.json is removed; declared_requirements reads the declared requirements"
-"tests/entrypoints/cli/test_main.py:CliTests.test_manifest_matches_declared_dependencies" = "WU-C: no manifest; tests/entrypoints/cli/test_collect_env.py pins the checkout's declared requirements"
+# references to an S5-renamed definition are spelled as renamed where its module binds it
+[definitions."tests/test_production_helper_homes.py:_as_renamed_in"]
+diff = [
+  "-    S4.1 renamed in ``home``, to every definition S4.2 renamed and to the S4.4 helpers its current",
+  "-    module binds spelled as renamed.\"\"\"",
+  "+    S4.1 renamed in ``home``, to every definition S4.2 renamed and to the S4.4 helpers and the S5-renamed",
+  "+    definitions its current module binds spelled as renamed.\"\"\"",
+  "+    s5 = _s5_renames_bound_in(_final_home(home, name)[0])",
+  "-            inner.id = helpers.get(current, current)",
+  "+            current = helpers.get(current, current)",
+  "+            inner.id = s5.get(current, current)",
+  "-                alias.name = helpers.get(current, current)",
+  "+                current = helpers.get(current, current)",
+  "+                alias.name = s5.get(current, current)",
+]
 
 [added]
-"glm_tpu/entrypoints/cli/collect_env.py:declared_requirements" = "WU-C: the declared requirements, from the installed metadata, else the checkout's pyproject.toml"
-"glm_tpu/entrypoints/cli/collect_env.py:_matches" = "WU-C: a local version label matches its public version (PEP 440 ==)"
-"glm_tpu/entrypoints/cli/collect_env.py:_satisfies" = "WU-C: the running Python against the requires-python specifier"
-"tests/entrypoints/cli/test_main.py:test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded" = "WU-C: info, collect-env and --help load neither ask nor the request module (FOLLOWUPS 150)"
-"tests/entrypoints/cli/test_collect_env.py:uninstalled" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:pins_of" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:dist_info" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:setuptools_requires" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:pyproject" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:source" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_the_checkout_declares_one_exact_pin_per_package_for_every_profile" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_the_installed_metadata_is_read_first" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_the_installed_metadata_decides_the_report" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_the_checkout_pyproject_is_read_when_not_installed" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_a_local_version_label_matches_its_public_version" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_requires_python_is_a_specifier" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_unreadable_requirements_are_refused" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_pins_that_differ_between_groups_are_refused" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_a_marker_other_than_an_extra_is_refused" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_without_declared_requirements_the_command_refuses" = "WU-C: the environment report's sources, rules and refusals"
-"tests/entrypoints/cli/test_collect_env.py:test_an_installed_distribution_is_found_on_the_path" = "WU-C: the environment report's sources, rules and refusals"
+"glm_tpu/entrypoints/cli/checkpoint.py:inventory_source" = "WU-C: checkpoint inventory: read the source inventory, write it to a new file, read it back"
+"glm_tpu/entrypoints/cli/checkpoint.py:verify_checkpoint" = "WU-C: checkpoint verify: the site's inventory and pins, the library's verification"
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand" = "WU-C: the checkpoint subcommand (DN-24(b))"
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand.cmd" = "WU-C: runs inventory or verify; a refusal as JSON on standard error, exit 1"
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand.subparser_init" = "WU-C: the checkpoint parser and its inventory and verify parsers"
+"tests/entrypoints/cli/test_checkpoint.py:run" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:refused" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:Packed" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:packed" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:library" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:local_root" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:flip_last_byte" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_prints_what_the_library_verified" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_a_workers_local_layout" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_hashes_only_the_slots_given" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_flip_slot_31" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_remove_slot_5" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_remove_success" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_manifest_not_json" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_refuses_exactly_as_the_library" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_uses_the_pinned_glm53_geometry_by_default" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_refuses_a_missing_site_file_as_the_site_loader" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_in_a_fresh_process_loads_no_model_library" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:source" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:inventory_argv" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_writes_what_the_library_reads" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_existing_output" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_no_config" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_no_index" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:_index_names_a_missing_tensor" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_refuses_exactly_as_the_library" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_in_a_fresh_process_loads_no_model_library" = "WU-C: the checkpoint commands on the G4 tiny checkpoint, against the library"
+"tests/test_production_helper_homes.py:_s5_renames_bound_in" = "WU-C: the S5-renamed definitions a module binds, for the reference renaming"
 
 [added_source]
-"glm_tpu/entrypoints/cli/collect_env.py:declared_requirements" = [
-  "def declared_requirements(*, distribution: Callable[[str], metadata.Distribution]=metadata.distribution, pyproject: Path=PYPROJECT) -> dict:",
-  "    \"\"\"The requirements glm-tpu declares: its installed distribution's metadata, else the checkout's pyproject.toml.",
+"glm_tpu/entrypoints/cli/checkpoint.py:inventory_source" = [
+  "def inventory_source(source: Path, output: Path, *, model_id: str, revision: str) -> dict:",
+  "    \"\"\"Inventory the safetensors checkpoint in ``source`` under the identity given, write it to ``output`` and read the",
+  "    written file back; returns the inventory's identity and summary.",
   "",
-  "    Returns ``declared_by`` (where they were read), ``python`` (the requires-python specifier) and ``groups``",
-  "    (``core`` and each extra: package -> pinned version). Refused with ``ValueError``: glm-tpu is not installed and",
-  "    ``pyproject`` does not exist or declares another project; a requirement that is not one exact ``name==version``",
-  "    pin, of the core dependencies or conditioned only on ``extra == \"<name>\"``; two pins of one package in one group;",
-  "    no requires-python.",
+  "    ``read_source_inventory`` reads the index, every file's header and ``config.json`` (no tensor payload),",
+  "    ``write_source_inventory`` writes a new file (an existing one is refused) and ``inspect_source_inventory`` parses",
+  "    and re-hashes it.",
   "    \"\"\"",
-  "    try:",
-  "        installed = distribution('glm-tpu')",
-  "    except metadata.PackageNotFoundError:",
-  "        installed = None",
-  "    if installed is not None:",
-  "        declared_by = f'glm-tpu {installed.version} distribution metadata'",
-  "        python = installed.metadata.get('Requires-Python')",
-  "        rows = []",
-  "        for requirement in installed.requires or ():",
-  "            pin, _, marker = requirement.partition(';')",
-  "            extra = _EXTRA.fullmatch(marker.strip())",
-  "            if marker.strip() and extra is None:",
-  "                raise ValueError(f'unsupported requirement marker: {requirement}')",
-  "            rows.append(('core' if extra is None else extra.group(2), pin))",
-  "    else:",
-  "        if not pyproject.is_file():",
-  "            raise ValueError(f'glm-tpu is not installed and {pyproject} does not exist: no declared requirements')",
-  "        project = tomllib.loads(pyproject.read_text()).get('project', {})",
-  "        if project.get('name') != 'glm-tpu':",
-  "            raise ValueError(f'{pyproject} does not declare the glm-tpu project')",
-  "        declared_by = str(pyproject)",
-  "        python = project.get('requires-python')",
-  "        rows = [('core', pin) for pin in project.get('dependencies', [])]",
-  "        rows += [(extra, pin) for extra, pins in project.get('optional-dependencies', {}).items() for pin in pins]",
-  "    if not python:",
-  "        raise ValueError('glm-tpu declares no requires-python')",
-  "    groups: dict[str, dict[str, str]] = {}",
-  "    for group, requirement in rows:",
-  "        pin = _PIN.fullmatch(requirement.strip())",
-  "        if pin is None:",
-  "            raise ValueError(f'not an exact pin: {requirement}')",
-  "        if groups.setdefault(group, {}).setdefault(pin.group(1), pin.group(2)) != pin.group(2):",
-  "            raise ValueError(f'conflicting pins for {pin.group(1)}')",
-  "    return dict(declared_by=declared_by, python=python, groups=groups)",
+  "    from glm_tpu.exceptions import CheckpointValidationError",
+  "    from glm_tpu.model_loader.source_inventory import inspect_source_inventory, read_source_inventory, write_source_inventory",
+  "    inventory = read_source_inventory(source, model_id=model_id, source_revision=revision)",
+  "    write_source_inventory(inventory, output)",
+  "    written = inspect_source_inventory(output)",
+  "    if written != inventory:",
+  "        raise CheckpointValidationError(f'source inventory {output} does not read back as written')",
+  "    return dict(schema='glm_tpu_source_inventory_report_v1', output=str(output), model_id=written.model_id, source_revision=written.source_revision, index_sha256=written.index_sha256, config_sha256=written.config_sha256, **written.summary_dict())",
 ]
-"glm_tpu/entrypoints/cli/collect_env.py:_matches" = [
-  "def _matches(installed: str, pin: str) -> bool:",
-  "    \"\"\"PEP 440 ``==pin`` for exact release pins: a pin without a local label also matches it with any local label.\"\"\"",
-  "    return installed == pin or ('+' not in pin and installed.split('+', 1)[0] == pin)",
-]
-"glm_tpu/entrypoints/cli/collect_env.py:_satisfies" = [
-  "def _satisfies(version: tuple[int, ...], specifier: str) -> bool:",
-  "    \"\"\"Whether the release ``version`` satisfies every comma-separated clause of ``specifier``, release numbers",
-  "    compared zero-padded (``3.12`` is ``3.12.0``). Any other clause (``~=``, a wildcard, a pre-release) is refused.\"\"\"",
-  "    results = []",
-  "    for clause in specifier.split(','):",
-  "        match = _CLAUSE.fullmatch(clause.strip())",
-  "        if match is None:",
-  "            raise ValueError(f'unsupported requires-python clause: {clause.strip()!r}')",
-  "        bound = tuple((int(part) for part in match.group(2).split('.')))",
-  "        width = max(len(version), len(bound))",
-  "        padded = (version + (0,) * (width - len(version)), bound + (0,) * (width - len(bound)))",
-  "        results.append(_COMPARE[match.group(1)](*padded))",
-  "    return all(results)",
-]
-"tests/entrypoints/cli/test_main.py:test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded" = [
-  "@pytest.mark.parametrize('argv', [['info'], ['collect-env'], ['doctor'], ['--help'], ['collect-env', '--help']], ids=' '.join)",
-  "def test_info_collect_env_and_help_leave_ask_and_the_request_module_unloaded(argv):",
-  "    \"\"\"The subcommands that need neither load neither the ask module nor the request module (imported by `ask` and",
-  "    `prepare-request` when they run), nor a model library.\"\"\"",
-  "    code = f'\\nimport contextlib, io, sys\\nfrom glm_tpu.entrypoints.cli.main import main\\nwith contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):\\n    try:\\n        main({argv!r})\\n    except SystemExit:\\n        pass\\nunloaded = (\"glm_tpu.entrypoints.cli.ask\", \"glm_tpu.engine.request\", \"jax\", \"jaxlib\", \"libtpu\", \"torch\", \"transformers\")\\nloaded = [name for name in unloaded if name in sys.modules]\\nassert not loaded, loaded\\n'",
-  "    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)",
-  "    assert result.returncode == 0, result.stderr",
-]
-"tests/entrypoints/cli/test_collect_env.py:uninstalled" = [
-  "def uninstalled(name):",
-  "    raise metadata.PackageNotFoundError(name)",
-]
-"tests/entrypoints/cli/test_collect_env.py:pins_of" = [
-  "def pins_of(requirements: list[str]) -> dict[str, str]:",
-  "    return dict((requirement.split('==') for requirement in requirements))",
-]
-"tests/entrypoints/cli/test_collect_env.py:dist_info" = [
-  "def dist_info(root: Path, *, version: str, python: str, requires: list[str]) -> Path:",
-  "    \"\"\"An installed distribution's metadata as setuptools 78.1.0 writes it (Requires-Python reordered, one",
-  "    ``extra == \"<name>\"`` marker per optional pin).\"\"\"",
-  "    path = root / f'glm_tpu-{version}.dist-info'",
-  "    path.mkdir()",
-  "    lines = ['Metadata-Version: 2.4', 'Name: glm-tpu', f'Version: {version}', f'Requires-Python: {python}']",
-  "    lines += [f'Requires-Dist: {requirement}' for requirement in requires]",
-  "    (path / 'METADATA').write_text('\\n'.join(lines) + '\\n')",
-  "    return path",
-]
-"tests/entrypoints/cli/test_collect_env.py:setuptools_requires" = [
-  "def setuptools_requires(project: dict) -> list[str]:",
-  "    rows = list(project['dependencies'])",
-  "    for extra, pins in project.get('optional-dependencies', {}).items():",
-  "        rows += [f'{pin}; extra == \"{extra}\"' for pin in pins]",
-  "    return rows",
-]
-"tests/entrypoints/cli/test_collect_env.py:pyproject" = [
-  "def pyproject(root: Path, text: str) -> Path:",
-  "    path = root / 'pyproject.toml'",
-  "    path.write_text(text)",
-  "    return path",
-]
-"tests/entrypoints/cli/test_collect_env.py:source" = [
-  "@pytest.fixture",
-  "def source(monkeypatch):",
-  "    \"\"\"Point the report at ``distribution`` and ``pyproject`` (the checkout's own when not given).\"\"\"",
+"glm_tpu/entrypoints/cli/checkpoint.py:verify_checkpoint" = [
+  "def verify_checkpoint(site: SiteConfig, *, root: Path | None=None, slots: Sequence[int] | None=None, local_slot_layout: bool=False, geometry: ModelGeometry | None=None) -> dict:",
+  "    \"\"\"Verify the sealed runtime checkpoint at ``root`` (default: the site's ``checkpoint.root``) against the pins of",
+  "    ``site``, installed as the current site for the call (its approved source buckets).",
   "",
-  "    def point(*, distribution=uninstalled, path=collect_env.PYPROJECT):",
-  "        monkeypatch.setitem(declared_requirements.__kwdefaults__, 'distribution', distribution)",
-  "        monkeypatch.setitem(declared_requirements.__kwdefaults__, 'pyproject', path)",
-  "    return point",
+  "    ``authenticated_inventory`` reads the site's source inventory and checks its pinned digest;",
+  "    ``verify_runtime_checkpoint`` checks the manifest, SUCCESS, mesh and topology pins, re-derives every file record",
+  "    from the inventory and ``geometry`` (default: the pinned GLM-5.3 geometry), and hashes every file, or only those of",
+  "    ``slots``; with ``local_slot_layout`` the root holds only those slots (a worker's layout).",
+  "    \"\"\"",
+  "    from glm_tpu.config import model",
+  "    from glm_tpu.config.site import set_current_site",
+  "    from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint",
+  "    from glm_tpu.model_loader.source_inventory import authenticated_inventory",
+  "    checkpoint, topology = (site.checkpoint, site.topology)",
+  "    previous = set_current_site(site)",
+  "    try:",
+  "        inventory = authenticated_inventory(checkpoint.source_inventory, checkpoint.source_inventory_sha256)",
+  "        verified = verify_runtime_checkpoint(checkpoint.root if root is None else root, expected_manifest_sha256=checkpoint.manifest_sha256, expected_success_sha256=checkpoint.success_sha256, expected_mesh_hash=topology.mesh_sha256, expected_topology_hash=topology.topology_sha256, inventory=inventory, geometry=model.geometry() if geometry is None else geometry, verify_file_hashes=True, verify_file_hash_slots=None if slots is None else tuple(slots), local_slot_layout=local_slot_layout)",
+  "    finally:",
+  "        set_current_site(previous)",
+  "    return dict(schema='glm_tpu_checkpoint_verification_v1', root=str(verified.root), manifest_sha256=verified.manifest['manifest_sha256'], success_sha256=verified.success['success_sha256'], source_inventory_sha256=inventory.inventory_sha256, mesh_sha256=topology.mesh_sha256, topology_sha256=topology.topology_sha256, files=len(verified.plans), hashed_slots=sorted(verified.records_by_slot if slots is None else slots), local_slot_layout=local_slot_layout, passed=True, scope='manifest, SUCCESS seal and every file record re-derived from the source inventory and the geometry; the size of every file present and the hashes of the hashed slots; no TPU, fleet, lock or remote host')",
 ]
-"tests/entrypoints/cli/test_collect_env.py:test_the_checkout_declares_one_exact_pin_per_package_for_every_profile" = [
-  "def test_the_checkout_declares_one_exact_pin_per_package_for_every_profile(source):",
-  "    source()",
-  "    declared = declared_requirements()",
-  "    assert declared == dict(declared_by=str(REPO / 'pyproject.toml'), python=PROJECT['requires-python'], groups=dict(core=pins_of(PROJECT['dependencies']), **{extra: pins_of(pins) for extra, pins in PROJECT['optional-dependencies'].items()}))",
-  "    assert set(declared['groups']) == {'core', 'runtime', 'tpu', 'dev'}",
-  "    assert collect_env.PROFILES == {'core': ('core',), 'runtime': ('core', 'runtime'), 'tpu': ('core', 'runtime', 'tpu'), 'dev': ('core', 'dev')}",
-  "    with pytest.raises(ValueError, match='unknown environment profile'):",
-  "        environment_report('benchmark')",
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand" = [
+  "class CheckpointSubcommand(CLISubcommand):",
+  "    \"\"\"``glm-tpu checkpoint inventory|verify``: the report as JSON, exit 0; a refusal (the library's ``ValueError`` or",
+  "    ``OSError``, a site-file refusal included) prints its type and message as JSON on standard error and exits 1.\"\"\"",
+  "    name = 'checkpoint'",
 ]
-"tests/entrypoints/cli/test_collect_env.py:test_the_installed_metadata_is_read_first" = [
-  "def test_the_installed_metadata_is_read_first(tmp_path, source):",
-  "    \"\"\"The installed distribution's metadata wins; the pyproject named here does not even exist.\"\"\"",
-  "    installed = dist_info(tmp_path, version='0.1.0a1', python='<3.13,>=3.12', requires=setuptools_requires(PROJECT))",
-  "    source(distribution=lambda name: metadata.PathDistribution(installed), path=tmp_path / 'missing.toml')",
-  "    declared = declared_requirements()",
-  "    source()",
-  "    checkout = declared_requirements()",
-  "    assert declared == dict(checkout, declared_by='glm-tpu 0.1.0a1 distribution metadata', python='<3.13,>=3.12')",
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand.cmd" = [
+  "@staticmethod",
+  "def cmd(args: argparse.Namespace) -> int:",
+  "    try:",
+  "        if args.action == 'inventory':",
+  "            report = inventory_source(args.source, args.output, model_id=args.model_id, revision=args.revision)",
+  "        else:",
+  "            from glm_tpu.config.site import SiteConfig",
+  "            report = verify_checkpoint(SiteConfig.load(args.site), root=args.root, slots=args.slots, local_slot_layout=args.local_slot_layout)",
+  "    except (ValueError, OSError) as exc:",
+  "        refusal = dict(error=type(exc).__name__, message=str(exc), status=f'checkpoint {args.action} refused')",
+  "        print(json.dumps(refusal), file=sys.stderr)",
+  "        return 1",
+  "    print(json.dumps(report, indent=2, sort_keys=True))",
+  "    return 0",
 ]
-"tests/entrypoints/cli/test_collect_env.py:test_the_installed_metadata_decides_the_report" = [
-  "def test_the_installed_metadata_decides_the_report(tmp_path, source):",
-  "    installed = dist_info(tmp_path, version='9.9.9', python='>=3.12', requires=['jax==1.0', 'torch==2.10.0; extra == \"runtime\"', \"pytest==9.0.3; extra == 'dev'\"])",
-  "    source(distribution=lambda name: metadata.PathDistribution(installed))",
-  "    report = environment_report('dev', version={'jax': '1.0', 'pytest': '9.0.3'}.__getitem__, python_version=(3, 12, 1))",
-  "    assert report['declared_by'] == 'glm-tpu 9.9.9 distribution metadata'",
-  "    assert report['expected_python'] == '>=3.12'",
-  "    assert [(row['package'], row['status']) for row in report['packages']] == [('jax', 'match'), ('pytest', 'match')]",
-  "    assert report['passed']",
+"glm_tpu/entrypoints/cli/checkpoint.py:CheckpointSubcommand.subparser_init" = [
+  "def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:",
+  "    checkpoint = subparsers.add_parser('checkpoint', help='inventory a checkpoint source or verify a sealed checkpoint on local files')",
+  "    actions = checkpoint.add_subparsers(dest='action', required=True)",
+  "    inventory = actions.add_parser('inventory', help='write the inventory of a local safetensors source (no payload is read)')",
+  "    inventory.add_argument('source', type=Path, help='directory of model.safetensors.index.json, its shards and config.json')",
+  "    inventory.add_argument('--output', type=Path, required=True, help='the new inventory file (never overwritten)')",
+  "    inventory.add_argument('--model-id', required=True, help='the model id to record, e.g. zai-org/GLM-5.3')",
+  "    inventory.add_argument('--revision', required=True, help='the source revision to record')",
+  "    verify = actions.add_parser('verify', help=\"verify a local sealed runtime checkpoint against the site file's pins\")",
+  "    verify.add_argument('--site', type=Path, help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')",
+  "    verify.add_argument('--root', type=Path, help=\"checkpoint root (default: the site's checkpoint.root)\")",
+  "    verify.add_argument('--slots', type=int, nargs='+', metavar='SLOT', help='hash only these device slots, 0..31 (default: all)')",
+  "    verify.add_argument('--local-slot-layout', action='store_true', help=\"the root holds only the --slots files (a worker's layout); any other slot file is refused\")",
+  "    return checkpoint",
 ]
-"tests/entrypoints/cli/test_collect_env.py:test_the_checkout_pyproject_is_read_when_not_installed" = [
-  "def test_the_checkout_pyproject_is_read_when_not_installed(tmp_path, source):",
-  "    path = pyproject(tmp_path, SMALL)",
-  "    source(path=path)",
-  "    installed = {'jax': '1.0', 'torch': '2.10.0+cpu', 'safetensors': '0.7.0', 'libtpu': '0.0.41', 'local': '1.0+cpu'}",
-  "    report = environment_report('tpu', version=installed.__getitem__, python_version=(3, 12, 13))",
-  "    assert report == dict(schema='glm_tpu_environment_report_v2', profile='tpu', declared_by=str(path), python='3.12.13', expected_python='>=3.12,<3.13', packages=[dict(package=name, expected=pin, installed=installed[name], status='match') for name, pin in sorted({'jax': '1.0', 'torch': '2.10.0', 'safetensors': '0.7.0', 'libtpu': '0.0.41', 'local': '1.0+cpu'}.items())], passed=True, scope='distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or launch authorization')",
-  "    assert environment_report('core', version=installed.__getitem__)['python'] == '.'.join((str(part) for part in sys.version_info[:3]))",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_a_local_version_label_matches_its_public_version" = [
-  "@pytest.mark.parametrize(('installed', 'pin', 'status'), [('2.10.0+cpu', '2.10.0', 'match'), ('2.10.0+cu128', '2.10.0', 'match'), ('2.10.0', '2.10.0', 'match'), ('2.10.1+cpu', '2.10.0', 'mismatch'), ('2.10.0.post1', '2.10.0', 'mismatch'), ('1.0+cpu', '1.0+cpu', 'match'), ('1.0', '1.0+cpu', 'mismatch'), ('1.0+cu128', '1.0+cpu', 'mismatch')])",
-  "def test_a_local_version_label_matches_its_public_version(tmp_path, source, installed, pin, status):",
-  "    text = f'[project]\\nname = \"glm-tpu\"\\nrequires-python = \">=3.12\"\\ndependencies = [\"torch=={pin}\"]\\n'",
-  "    source(path=pyproject(tmp_path, text))",
-  "    row, = environment_report('core', version=lambda name: installed, python_version=(3, 12))['packages']",
-  "    assert row == dict(package='torch', expected=pin, installed=installed, status=status)",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_requires_python_is_a_specifier" = [
-  "@pytest.mark.parametrize(('python', 'specifier', 'passed'), [((3, 12, 13), '>=3.12,<3.13', True), ((3, 12), '>=3.12,<3.13', True), ((3, 12, 13), '<3.13,>=3.12', True), ((3, 13, 0), '>=3.12,<3.13', False), ((3, 11, 9), '>=3.12,<3.13', False), ((3, 12, 0), '==3.12', True), ((3, 12, 1), '==3.12', False), ((3, 12, 1), '!=3.12.1', False), ((3, 12, 1), '>3.12', True), ((3, 12, 0), '>3.12', False), ((3, 12, 5), '<=3.12.5', True)])",
-  "def test_requires_python_is_a_specifier(tmp_path, source, python, specifier, passed):",
-  "    source(path=pyproject(tmp_path, SMALL.replace('\">=3.12,<3.13\"', f'\"{specifier}\"')))",
-  "    installed = {'jax': '1.0', 'torch': '2.10.0'}",
-  "    report = environment_report('core', version=installed.__getitem__, python_version=python)",
-  "    assert (report['python'], report['expected_python'], report['passed']) == ('.'.join(map(str, python)), specifier, passed)",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_unreadable_requirements_are_refused" = [
-  "@pytest.mark.parametrize(('change', 'message'), [(('\">=3.12,<3.13\"', '\"~=3.12\"'), \"unsupported requires-python clause: '~=3.12'\"), (('\">=3.12,<3.13\"', '\"==3.12.*\"'), 'unsupported requires-python clause'), (('\">=3.12,<3.13\"', '\">=3.12,\"'), \"unsupported requires-python clause: ''\"), (('requires-python = \">=3.12,<3.13\"\\n', ''), 'glm-tpu declares no requires-python'), (('\"jax==1.0\"', '\"jax>=1.0\"'), 'not an exact pin: jax>=1.0'), (('\"jax==1.0\"', '\"jax[tpu]==1.0\"'), 'not an exact pin'), (('\"jax==1.0\"', '\"jax==1.0; python_version < \\'3.13\\'\"'), 'not an exact pin'), (('\"torch==2.10.0\"', '\"jax==1.1\"'), 'conflicting pins for jax'), (('name = \"glm-tpu\"', 'name = \"other\"'), 'does not declare the glm-tpu project'), (('dev = [\"pytest==9.0.3\"]', 'dev = []'), 'glm-tpu declares no dev requirements')])",
-  "def test_unreadable_requirements_are_refused(tmp_path, source, change, message):",
-  "    old, new = change",
-  "    assert old in SMALL",
-  "    source(path=pyproject(tmp_path, SMALL.replace(old, new)))",
-  "    with pytest.raises(ValueError, match=re.escape(message)):",
-  "        environment_report('dev', version=lambda name: '1.0', python_version=(3, 12))",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_pins_that_differ_between_groups_are_refused" = [
-  "def test_pins_that_differ_between_groups_are_refused(tmp_path, source):",
-  "    source(path=pyproject(tmp_path, SMALL.replace('runtime = [\"safetensors==0.7.0\"]', 'runtime = [\"jax==1.1\"]')))",
-  "    assert environment_report('dev', version=lambda name: '1.0', python_version=(3, 12))['passed'] is False",
-  "    with pytest.raises(ValueError, match='conflicting pins for jax'):",
-  "        environment_report('runtime', version=lambda name: '1.0', python_version=(3, 12))",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_a_marker_other_than_an_extra_is_refused" = [
-  "def test_a_marker_other_than_an_extra_is_refused(tmp_path, source):",
-  "    installed = dist_info(tmp_path, version='9.9.9', python='>=3.12', requires=['jax==1.0', 'torch==2.10.0; python_version < \"3.13\"'])",
-  "    source(distribution=lambda name: metadata.PathDistribution(installed))",
-  "    with pytest.raises(ValueError, match=re.escape('unsupported requirement marker: torch==2.10.0; python_version')):",
-  "        environment_report('core', version=lambda name: '1.0', python_version=(3, 12))",
-]
-"tests/entrypoints/cli/test_collect_env.py:test_without_declared_requirements_the_command_refuses" = [
-  "@pytest.mark.parametrize('command', ['collect-env', 'doctor'])",
-  "def test_without_declared_requirements_the_command_refuses(tmp_path, source, capsys, command):",
-  "    missing = tmp_path / 'pyproject.toml'",
-  "    source(path=missing)",
-  "    with pytest.raises(ValueError, match='glm-tpu is not installed and .* does not exist'):",
-  "        environment_report('core')",
+"tests/entrypoints/cli/test_checkpoint.py:run" = [
+  "def run(capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, str, str]:",
+  "    \"\"\"``glm-tpu ARGV``: exit code, standard output, standard error.\"\"\"",
   "    capsys.readouterr()",
-  "    assert main([command]) == 1",
-  "    refusal = dict(error='ValueError', message=f'glm-tpu is not installed and {missing} does not exist: no declared requirements', status='environment report refused')",
-  "    assert capsys.readouterr() == ('', json.dumps(refusal) + '\\n')",
+  "    code = main(argv)",
+  "    out, err = capsys.readouterr()",
+  "    return (code, out, err)",
 ]
-"tests/entrypoints/cli/test_collect_env.py:test_an_installed_distribution_is_found_on_the_path" = [
-  "def test_an_installed_distribution_is_found_on_the_path(tmp_path):",
-  "    \"\"\"End to end: ``python -m glm_tpu collect-env`` in a fresh process finds a distribution on its path (run from",
-  "    that directory, first on the path, so no metadata of the checkout itself can shadow it).\"\"\"",
-  "    dist_info(tmp_path, version='9.9.9', python='>=3.12', requires=['jax==0.0.1', 'pytest==0.0.2; extra == \"dev\"'])",
-  "    environment = dict(os.environ, PYTHONPATH=os.pathsep.join([str(tmp_path), str(REPO)]))",
-  "    result = subprocess.run([sys.executable, '-m', 'glm_tpu', 'collect-env', '--profile', 'dev'], cwd=tmp_path, env=environment, capture_output=True, text=True)",
-  "    report = json.loads(result.stdout)",
-  "    assert (result.returncode, result.stderr) == (1, ''), result.stderr",
-  "    assert report['declared_by'] == 'glm-tpu 9.9.9 distribution metadata'",
-  "    assert [(row['package'], row['expected'], row['status']) for row in report['packages']] == [('jax', '0.0.1', 'mismatch'), ('pytest', '0.0.2', 'mismatch')]",
+"tests/entrypoints/cli/test_checkpoint.py:refused" = [
+  "def refused(capsys: pytest.CaptureFixture[str], argv: list[str], expected: BaseException) -> None:",
+  "    \"\"\"The command refuses with ``expected``, the exception the library raised for the same input.\"\"\"",
+  "    code, out, err = run(capsys, argv)",
+  "    assert (code, out) == (1, '')",
+  "    assert json.loads(err) == dict(error=type(expected).__name__, message=str(expected), status=f'checkpoint {argv[1]} refused')",
+]
+"tests/entrypoints/cli/test_checkpoint.py:Packed" = [
+  "@dataclass",
+  "class Packed:",
+  "    root: Path",
+  "    mapping: dict[str, Any]",
+  "    site_file: Path",
+]
+"tests/entrypoints/cli/test_checkpoint.py:packed" = [
+  "@pytest.fixture",
+  "def packed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Packed:",
+  "    \"\"\"The G4 tiny checkpoint packed and sealed under ``tmp_path``, its source inventory written and a site file pinning",
+  "    both; the command's geometry is the tiny one (verify_checkpoint's keyword default: the pinned GLM-5.3 one).\"\"\"",
+  "    with installed_site(example_site(tmp_path / 'pack')):",
+  "        _, inventory, config = _fixture(tmp_path)",
+  "        manifest = pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)",
+  "    success = _seal(config.output_dir, manifest, topology_hash=TOPOLOGY)",
+  "    inventory_path = tmp_path / 'inventories' / 'tiny' / 'source_inventory.json'",
+  "    write_source_inventory(inventory, inventory_path)",
+  "    mapping = example_mapping(tmp_path, checkpoint=dict(namespace=str(tmp_path), root=str(config.output_dir), inventory_namespace=str(tmp_path / 'inventories'), source_inventory=str(inventory_path), source_inventory_sha256=inventory.inventory_sha256, manifest_sha256=manifest['manifest_sha256'], success_sha256=success['success_sha256']), topology=dict(mesh_sha256=MESH, topology_sha256=TOPOLOGY))",
+  "    monkeypatch.setitem(verify_checkpoint.__kwdefaults__, 'geometry', _geometry())",
+  "    return Packed(config.output_dir, mapping, write_example_site(tmp_path / 'site.toml', mapping))",
+]
+"tests/entrypoints/cli/test_checkpoint.py:library" = [
+  "def library(mapping: dict[str, Any], root: Path | None=None, geometry: Any=None, **options: Any) -> Any:",
+  "    \"\"\"The library calls the command makes, spelled out: the site's source inventory against its pin, then the",
+  "    verification of the root with the site's pins and every file hashed unless ``options`` name the slots.\"\"\"",
+  "    checkpoint, topology = (mapping['checkpoint'], mapping['topology'])",
+  "    with installed_site(SiteConfig.from_mapping(mapping)):",
+  "        inventory = authenticated_inventory(Path(checkpoint['source_inventory']), checkpoint['source_inventory_sha256'])",
+  "        return verify_runtime_checkpoint(Path(checkpoint['root']) if root is None else root, expected_manifest_sha256=checkpoint['manifest_sha256'], expected_success_sha256=checkpoint['success_sha256'], expected_mesh_hash=topology['mesh_sha256'], expected_topology_hash=topology['topology_sha256'], inventory=inventory, geometry=_geometry() if geometry is None else geometry, verify_file_hashes=True, **options)",
+]
+"tests/entrypoints/cli/test_checkpoint.py:local_root" = [
+  "def local_root(packed: Packed, slots: tuple[int, ...]) -> Path:",
+  "    \"\"\"A worker's local layout: the manifest, the seal and the files of ``slots`` only.\"\"\"",
+  "    local = packed.root.parent / 'local'",
+  "    local.mkdir()",
+  "    for name in ('manifest.json', 'SUCCESS', *(f'device_slot_{slot:02d}.safetensors' for slot in slots)):",
+  "        (local / name).write_bytes((packed.root / name).read_bytes())",
+  "    return local",
+]
+"tests/entrypoints/cli/test_checkpoint.py:flip_last_byte" = [
+  "def flip_last_byte(path: Path) -> None:",
+  "    data = bytearray(path.read_bytes())",
+  "    data[-1] ^= 1",
+  "    path.write_bytes(bytes(data))",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_prints_what_the_library_verified" = [
+  "def test_verify_prints_what_the_library_verified(packed: Packed, capsys: pytest.CaptureFixture[str], tmp_path: Path):",
+  "    verified = library(packed.mapping)",
+  "    sentinel = example_site(tmp_path / 'other')",
+  "    with installed_site(sentinel):",
+  "        code, out, err = run(capsys, ['checkpoint', 'verify', '--site', str(packed.site_file)])",
+  "        assert get_current_site() is sentinel",
+  "    assert (code, err) == (0, '')",
+  "    report = json.loads(out)",
+  "    assert out == json.dumps(report, indent=2, sort_keys=True) + '\\n'",
+  "    assert report == dict(schema='glm_tpu_checkpoint_verification_v1', root=str(packed.root), manifest_sha256=verified.manifest['manifest_sha256'], success_sha256=verified.success['success_sha256'], source_inventory_sha256=packed.mapping['checkpoint']['source_inventory_sha256'], mesh_sha256=MESH, topology_sha256=TOPOLOGY, files=len(verified.plans), hashed_slots=list(range(32)), local_slot_layout=False, passed=True, scope=report['scope'])",
+  "    assert report['files'] == 32",
+  "    assert report['scope'].endswith('no TPU, fleet, lock or remote host')",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_a_workers_local_layout" = [
+  "def test_verify_a_workers_local_layout(packed: Packed, capsys: pytest.CaptureFixture[str]):",
+  "    local = local_root(packed, (0, 1, 2, 3))",
+  "    library(packed.mapping, root=local, verify_file_hash_slots=(0, 1, 2, 3), local_slot_layout=True)",
+  "    argv = ['checkpoint', 'verify', '--site', str(packed.site_file), '--root', str(local)]",
+  "    code, out, err = run(capsys, [*argv, '--slots', '3', '1', '0', '2', '--local-slot-layout'])",
+  "    assert (code, err) == (0, '')",
+  "    report = json.loads(out)",
+  "    assert (report['root'], report['hashed_slots'], report['local_slot_layout']) == (str(local), [0, 1, 2, 3], True)",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_hashes_only_the_slots_given" = [
+  "def test_verify_hashes_only_the_slots_given(packed: Packed, capsys: pytest.CaptureFixture[str]):",
+  "    \"\"\"As the library: a slot that is not hashed is checked by size only (each host hashes its own slots).\"\"\"",
+  "    flip_last_byte(packed.root / 'device_slot_31.safetensors')",
+  "    library(packed.mapping, verify_file_hash_slots=(0, 1, 2, 3))",
+  "    code, out, err = run(capsys, ['checkpoint', 'verify', '--site', str(packed.site_file), '--slots', '0', '1', '2', '3'])",
+  "    assert (code, err, json.loads(out)['hashed_slots']) == (0, '', [0, 1, 2, 3])",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_flip_slot_31" = [
+  "def _flip_slot_31(root: Path) -> None:",
+  "    flip_last_byte(root / 'device_slot_31.safetensors')",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_remove_slot_5" = [
+  "def _remove_slot_5(root: Path) -> None:",
+  "    (root / 'device_slot_05.safetensors').unlink()",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_remove_success" = [
+  "def _remove_success(root: Path) -> None:",
+  "    (root / 'SUCCESS').unlink()",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_manifest_not_json" = [
+  "def _manifest_not_json(root: Path) -> None:",
+  "    (root / 'manifest.json').write_text('not json')",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_refuses_exactly_as_the_library" = [
+  "@pytest.mark.parametrize('case', list(REFUSALS))",
+  "def test_verify_refuses_exactly_as_the_library(packed: Packed, capsys: pytest.CaptureFixture[str], case: str):",
+  "    changes, arguments, options, tamper = REFUSALS[case]",
+  "    mapping = {table: dict(values, **changes.get(table, {})) if isinstance(values, dict) else values for table, values in packed.mapping.items()}",
+  "    if tamper is not None:",
+  "        tamper(packed.root)",
+  "    with pytest.raises((ValueError, OSError)) as raised:",
+  "        library(mapping, **options)",
+  "    site_file = write_example_site(packed.root.parent / 'refused-site.toml', mapping)",
+  "    refused(capsys, ['checkpoint', 'verify', '--site', str(site_file), *arguments], raised.value)",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_uses_the_pinned_glm53_geometry_by_default" = [
+  "def test_verify_uses_the_pinned_glm53_geometry_by_default(packed: Packed, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch):",
+  "    \"\"\"Without the tiny geometry the command re-derives the layout from GLM-5.3's, which this checkpoint is not.\"\"\"",
+  "    monkeypatch.setitem(verify_checkpoint.__kwdefaults__, 'geometry', None)",
+  "    with pytest.raises((ValueError, OSError)) as raised:",
+  "        library(packed.mapping, geometry=model.geometry())",
+  "    refused(capsys, ['checkpoint', 'verify', '--site', str(packed.site_file)], raised.value)",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_refuses_a_missing_site_file_as_the_site_loader" = [
+  "@pytest.mark.parametrize('given', [True, False], ids=['--site', 'default'])",
+  "def test_verify_refuses_a_missing_site_file_as_the_site_loader(tmp_path: Path, capsys: pytest.CaptureFixture[str], given: bool):",
+  "    path = tmp_path / 'absent.toml' if given else None",
+  "    with pytest.raises(ValueError) as raised:",
+  "        SiteConfig.load(path)",
+  "    refused(capsys, ['checkpoint', 'verify', *(['--site', str(path)] if given else [])], raised.value)",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_verify_in_a_fresh_process_loads_no_model_library" = [
+  "def test_verify_in_a_fresh_process_loads_no_model_library(packed: Packed):",
+  "    geometry = _geometry().to_dict()",
+  "    code = f'\\nimport json, sys\\nfrom glm_tpu.config.model import ModelGeometry\\nfrom glm_tpu.entrypoints.cli.checkpoint import verify_checkpoint\\nfrom glm_tpu.entrypoints.cli.main import main\\nvalue = {geometry!r}\\nvalue.update((k, tuple(value[k])) for k in (\"fp8_block_shape\", \"mlp_layer_types\", \"indexer_types\"))\\nverify_checkpoint.__kwdefaults__[\"geometry\"] = ModelGeometry.from_dict(value)\\nassert main([\"checkpoint\", \"verify\", \"--site\", {str(packed.site_file)!r}]) == 0\\nprint(json.dumps([name for name in {UNLOADED!r} if name in sys.modules]))\\n'",
+  "    environment = dict(os.environ, JAX_PLATFORMS='cpu', PYTHONDONTWRITEBYTECODE='1')",
+  "    result = subprocess.run([sys.executable, '-c', code], cwd=REPO, env=environment, capture_output=True, text=True)",
+  "    assert result.returncode == 0, result.stderr",
+  "    assert json.loads(result.stdout.splitlines()[-1]) == []",
+]
+"tests/entrypoints/cli/test_checkpoint.py:source" = [
+  "@pytest.fixture",
+  "def source(tmp_path: Path) -> Path:",
+  "    \"\"\"The G4 tiny checkpoint's source directory (index and one shard) with a config.json.\"\"\"",
+  "    with installed_site(example_site(tmp_path / 'pack')):",
+  "        _, _, config = _fixture(tmp_path)",
+  "    (config.source_root / 'config.json').write_text(json.dumps({'model_type': 'glm_moe_dsa'}))",
+  "    return config.source_root",
+]
+"tests/entrypoints/cli/test_checkpoint.py:inventory_argv" = [
+  "def inventory_argv(source: Path, output: Path) -> list[str]:",
+  "    return ['checkpoint', 'inventory', str(source), '--output', str(output), '--model-id', MODEL_ID, '--revision', REVISION]",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_writes_what_the_library_reads" = [
+  "def test_inventory_writes_what_the_library_reads(source: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]):",
+  "    output = tmp_path / 'inventories' / 'source_inventory.json'",
+  "    code, out, err = run(capsys, inventory_argv(source, output))",
+  "    assert (code, err) == (0, '')",
+  "    expected = read_source_inventory(source, model_id=MODEL_ID, source_revision=REVISION)",
+  "    reference = tmp_path / 'reference.json'",
+  "    write_source_inventory(expected, reference)",
+  "    assert output.read_bytes() == reference.read_bytes()",
+  "    assert inspect_source_inventory(output) == expected",
+  "    report = dict(schema='glm_tpu_source_inventory_report_v1', output=str(output), model_id=MODEL_ID, source_revision=REVISION, index_sha256=expected.index_sha256, config_sha256=expected.config_sha256, **expected.summary_dict())",
+  "    assert out == json.dumps(report, indent=2, sort_keys=True) + '\\n'",
+  "    assert not list(output.parent.glob('.*.tmp'))",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_existing_output" = [
+  "def _existing_output(source: Path, output: Path) -> None:",
+  "    output.write_text('earlier inventory\\n')",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_no_config" = [
+  "def _no_config(source: Path, output: Path) -> None:",
+  "    (source / 'config.json').unlink()",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_no_index" = [
+  "def _no_index(source: Path, output: Path) -> None:",
+  "    (source / 'model.safetensors.index.json').unlink()",
+]
+"tests/entrypoints/cli/test_checkpoint.py:_index_names_a_missing_tensor" = [
+  "def _index_names_a_missing_tensor(source: Path, output: Path) -> None:",
+  "    index = source / 'model.safetensors.index.json'",
+  "    value = json.loads(index.read_text())",
+  "    value['weight_map']['model.norm.weight'] = 'model.safetensors'",
+  "    index.write_text(json.dumps(value))",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_refuses_exactly_as_the_library" = [
+  "@pytest.mark.parametrize('tamper', [_existing_output, _no_config, _no_index, _index_names_a_missing_tensor], ids=lambda f: f.__name__[1:])",
+  "def test_inventory_refuses_exactly_as_the_library(source: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], tamper: Any):",
+  "    output = tmp_path / 'source_inventory.json'",
+  "    tamper(source, output)",
+  "    before = output.read_bytes() if output.exists() else None",
+  "    with pytest.raises((ValueError, OSError)) as raised:",
+  "        write_source_inventory(read_source_inventory(source, model_id=MODEL_ID, source_revision=REVISION), output)",
+  "    refused(capsys, inventory_argv(source, output), raised.value)",
+  "    assert (output.read_bytes() if output.exists() else None) == before",
+]
+"tests/entrypoints/cli/test_checkpoint.py:test_inventory_in_a_fresh_process_loads_no_model_library" = [
+  "def test_inventory_in_a_fresh_process_loads_no_model_library(source: Path, tmp_path: Path):",
+  "    output = tmp_path / 'source_inventory.json'",
+  "    code = f'\\nimport json, sys\\nfrom glm_tpu.entrypoints.cli.main import main\\nassert main({inventory_argv(source, output)!r}) == 0\\nprint(json.dumps([name for name in {UNLOADED!r} if name in sys.modules]))\\n'",
+  "    environment = dict(os.environ, JAX_PLATFORMS='cpu', PYTHONDONTWRITEBYTECODE='1')",
+  "    result = subprocess.run([sys.executable, '-c', code], cwd=REPO, env=environment, capture_output=True, text=True)",
+  "    assert result.returncode == 0, result.stderr",
+  "    assert json.loads(result.stdout.splitlines()[-1]) == []",
+  "    assert inspect_source_inventory(output) == read_source_inventory(source, model_id=MODEL_ID, source_revision=REVISION)",
+]
+"tests/test_production_helper_homes.py:_s5_renames_bound_in" = [
+  "def _s5_renames_bound_in(path: str) -> dict[str, str]:",
+  "    \"\"\"S5: old -> new name of the definitions an S5 unit renamed (``S5_DECLARED``) that module ``path`` defines or",
+  "    imports by their new name, as ``_helpers_bound_in`` for the S4.4 helpers.\"\"\"",
+  "    imported = {(node.module, alias.name) for node in ast.walk(_current(path)) if isinstance(node, ast.ImportFrom) for alias in node.names}",
+  "    out = {}",
+  "    for (home, old), declared in S5_DECLARED.items():",
+  "        kind = declared.partition(': ')[2]",
+  "        if kind.startswith('renamed -> '):",
+  "            new = kind.removeprefix('renamed -> ')",
+  "            if home == path or (home[:-3].replace('/', '.'), new) in imported:",
+  "                out[old] = new",
+  "    return out",
 ]
 
 [docstrings]
-"glm_tpu/entrypoints/cli/collect_env.py" = "WU-C: the collect-env command, its alias and where the requirements are read (FOLLOWUPS 151)"
-"tests/entrypoints/cli/test_collect_env.py" = "WU-C: the new test module"
+"glm_tpu/entrypoints/cli/checkpoint.py" = "WU-C: the new checkpoint subcommand module"
+"tests/entrypoints/cli/test_checkpoint.py" = "WU-C: the new test module"
+"tests/test_production_helper_homes.py" = "WU-C: references to an S5-renamed definition are compared as renamed"
 
-[imports."glm_tpu/entrypoints/cli/collect_env.py"]
-added = ["operator", "pathlib:Path", "re", "tomllib"]
-removed = ["importlib:resources"]
+[imports."glm_tpu/entrypoints/cli/main.py"]
+added = ["glm_tpu.entrypoints.cli.checkpoint:CheckpointSubcommand"]
 
-[imports."tests/entrypoints/cli/test_main.py"]
-added = ["glm_tpu.entrypoints.cli.collect_env:declared_requirements"]
-removed = ["glm_tpu.entrypoints.cli.collect_env:environment_manifest", "pathlib:Path", "tomllib"]
+[imports."glm_tpu/entrypoints/cli/checkpoint.py"]
+added = ["__future__:annotations", "argparse", "collections.abc:Sequence", "glm_tpu.entrypoints.cli.types:CLISubcommand", "json", "pathlib:Path", "sys", "typing:TYPE_CHECKING"]
 
-[imports."tests/entrypoints/cli/test_collect_env.py"]
-added = ["glm_tpu.entrypoints.cli.collect_env:declared_requirements", "glm_tpu.entrypoints.cli.collect_env:environment_report", "glm_tpu.entrypoints.cli.main:main", "glm_tpu.entrypoints.cli:collect_env", "importlib:metadata", "json", "os", "pathlib:Path", "pytest", "re", "subprocess", "sys", "tomllib"]
+[imports."glm_tpu/model_loader/sharded_state/writer.py"]
+added = ["glm_tpu.model_loader.sharded_state.verify:verify_runtime_files", "glm_tpu.model_loader.sharded_state.verify:verify_runtime_value"]
+removed = ["glm_tpu.model_loader.sharded_state.verify:_verify_runtime_files", "glm_tpu.model_loader.sharded_state.verify:_verify_runtime_value"]
 
-[statements."glm_tpu/entrypoints/cli/collect_env.py"]
+[imports."tests/entrypoints/cli/test_checkpoint.py"]
+added = ["__future__:annotations", "dataclasses:dataclass", "glm_tpu.config.site:SiteConfig", "glm_tpu.config.site:get_current_site", "glm_tpu.config:model", "glm_tpu.entrypoints.cli.checkpoint:verify_checkpoint", "glm_tpu.entrypoints.cli.main:main", "glm_tpu.model_loader.sharded_state.verify:verify_runtime_checkpoint", "glm_tpu.model_loader.sharded_state.writer:pack_runtime_checkpoint", "glm_tpu.model_loader.source_inventory:authenticated_inventory", "glm_tpu.model_loader.source_inventory:inspect_source_inventory", "glm_tpu.model_loader.source_inventory:read_source_inventory", "glm_tpu.model_loader.source_inventory:write_source_inventory", "json", "os", "pathlib:Path", "pytest", "subprocess", "sys", "tests.fixtures.site:example_mapping", "tests.fixtures.site:example_site", "tests.fixtures.site:installed_site", "tests.fixtures.site:write_example_site", "tests.model_loader.sharded_state.test_format:_fixture", "tests.model_loader.sharded_state.test_format:_geometry", "tests.model_loader.sharded_state.test_format:_seal", "typing:Any"]
+
+[statements."glm_tpu/entrypoints/cli/checkpoint.py"]
 diff = [
-  "+PYPROJECT = Path(__file__).resolve().parents[3] / 'pyproject.toml'",
-  "+PROFILES = {'core': ('core',), 'runtime': ('core', 'runtime'), 'tpu': ('core', 'runtime', 'tpu'), 'dev': ('core', 'dev')}",
-  "+_PIN = re.compile('([A-Za-z0-9][A-Za-z0-9._-]*)\\\\s*==\\\\s*([A-Za-z0-9][A-Za-z0-9.+!_-]*)')",
-  "+_EXTRA = re.compile('extra\\\\s*==\\\\s*([\"\\'])([A-Za-z0-9._-]+)\\\\1')",
-  "+_CLAUSE = re.compile('(>=|<=|==|!=|>|<)\\\\s*([0-9]+(?:\\\\.[0-9]+)*)')",
-  "+_COMPARE = {'>=': operator.ge, '<=': operator.le, '>': operator.gt, '<': operator.lt, '==': operator.eq, '!=': operator.ne}",
+  "+if TYPE_CHECKING:",
+  "+    from glm_tpu.config.model import ModelGeometry",
+  "+    from glm_tpu.config.site import SiteConfig",
 ]
 
 [statements."tests/entrypoints/cli/test_main.py"]
 diff = [
-  "-HELP = {'': 'usage: glm-tpu [-h] {info,ask,doctor,prepare-request} ...\\n\\nRelease information, local preparation and protected question submission.\\n\\npositional arguments:\\n  {info,ask,doctor,prepare-request}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the retained TPU site; optionally batch up to four\\n    doctor              check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'doctor': 'usage: glm-tpu doctor [-h] [--profile {core,runtime,tpu,benchmark,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,benchmark,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n'}",
-  "-INFO = '{\\n  \"concurrent_context_capacity\": 32768,\\n  \"concurrent_requests\": 4,\\n  \"concurrent_scope\": \"fixed submitted group; see STATUS for hardware evidence; no online request admission\",\\n  \"concurrent_validation\": \"GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only\",\\n  \"engine\": \"native JAX WS32_2D\",\\n  \"hardware\": \"8 hosts / 32 TPU v4 chips\",\\n  \"installation\": \"wheel contains Python components only; full deployment requires source checkout and external assets\",\\n  \"model\": \"zai-org/GLM-5.3\",\\n  \"ordinary_profile\": \"greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope\",\\n  \"project\": \"glm-tpu\",\\n  \"quality\": \"full benchmark/model-card parity not established\",\\n  \"queued_questions\": 10,\\n  \"release_status\": \"private project; see docs/release/STATUS.md for trained admission and promotion\",\\n  \"resume\": \"resident ordinary inbox reuses the live model; no process-restart or durable KV recovery\",\\n  \"serving\": \"site-specific protected request harness; no supported HTTP endpoint\",\\n  \"version\": \"source checkout (not installed)\"\\n}\\n'",
-  "-ARGUMENTS = {'': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_SubParsersAction command dest=command nargs='A...' choices=['info', 'ask', 'doctor', 'prepare-request'] required\"], 'info': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\"], 'ask': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction question dest=question nargs='?'\", \"_StoreAction --questions dest=questions type='Path'\", \"_StoreAction --context dest=context default='32k' choices=['8k', '32k', '128k', '256k']\", '_StoreTrueAction --keep-loaded dest=keep_loaded nargs=0 const=True default=False', '_StoreTrueAction --concurrent dest=concurrent nargs=0 const=True default=False', \"_StoreAction --max-new-tokens dest=max_new_tokens type='int'\", \"_StoreAction --wall-seconds dest=wall_seconds default=86400 type='int'\", '_StoreTrueAction --prepare-only dest=prepare_only nargs=0 const=True default=False', \"_StoreAction --site dest=site type='Path'\", 'exclusive required=True: question questions'], 'doctor': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'benchmark', 'dev']\"], 'prepare-request': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --messages dest=messages type='Path' required\", \"_StoreAction --output dest=output type='Path' required\", \"_StoreAction --repo dest=repo type='Path' required\", \"_StoreAction --tokenizer-root dest=tokenizer_root type='Path' required\", '_StoreAction --request-id dest=request_id required', \"_StoreAction --profile dest=profile default='ordinary-greedy-8k' choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']\", \"_StoreAction --max-new-tokens dest=max_new_tokens type='int' required\"]}",
-  "+HELP = {'': 'usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request} ...\\n\\nRelease information, local preparation and protected question submission.\\n\\npositional arguments:\\n  {info,ask,collect-env,doctor,prepare-request}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the retained TPU site; optionally batch up to four\\n    collect-env (doctor)\\n                        check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'collect-env': 'usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n'}",
-  "+HELP['doctor'] = HELP['collect-env']",
-  "+INFO = '{\\n  \"concurrent_context_capacity\": 32768,\\n  \"concurrent_requests\": 4,\\n  \"concurrent_scope\": \"fixed submitted group; no online request admission\",\\n  \"concurrent_validation\": \"GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only\",\\n  \"engine\": \"native JAX\",\\n  \"hardware\": \"8 hosts / 32 TPU v4 chips\",\\n  \"installation\": \"wheel contains Python components only; full deployment requires source checkout and external assets\",\\n  \"model\": \"zai-org/GLM-5.3\",\\n  \"ordinary_profile\": \"greedy; 8K combined, concurrent 32K per conversation, 128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)\",\\n  \"project\": \"glm-tpu\",\\n  \"quality\": \"full benchmark/model-card parity not established\",\\n  \"queued_questions\": 10,\\n  \"release_status\": \"private project\",\\n  \"resume\": \"resident ordinary inbox reuses the live model; no process-restart or durable KV recovery\",\\n  \"serving\": \"site-specific protected request harness; loopback chat UI and OpenAI-compatible /v1 API attached to a resident controller (python -m glm_tpu.entrypoints.serve.server)\",\\n  \"version\": \"source checkout (not installed)\"\\n}\\n'",
-  "+ARGUMENTS = {'': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_SubParsersAction command dest=command nargs='A...' choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request'] required\"], 'info': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\"], 'ask': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction question dest=question nargs='?'\", \"_StoreAction --questions dest=questions type='Path'\", \"_StoreAction --context dest=context default='32k' choices=['8k', '32k', '128k', '256k']\", '_StoreTrueAction --keep-loaded dest=keep_loaded nargs=0 const=True default=False', '_StoreTrueAction --concurrent dest=concurrent nargs=0 const=True default=False', \"_StoreAction --max-new-tokens dest=max_new_tokens type='int'\", \"_StoreAction --wall-seconds dest=wall_seconds default=86400 type='int'\", '_StoreTrueAction --prepare-only dest=prepare_only nargs=0 const=True default=False', \"_StoreAction --site dest=site type='Path'\", 'exclusive required=True: question questions'], 'collect-env': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'doctor': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'prepare-request': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --messages dest=messages type='Path' required\", \"_StoreAction --output dest=output type='Path' required\", \"_StoreAction --repo dest=repo type='Path' required\", \"_StoreAction --tokenizer-root dest=tokenizer_root type='Path' required\", '_StoreAction --request-id dest=request_id required', \"_StoreAction --profile dest=profile default='ordinary-greedy-8k' choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']\", \"_StoreAction --max-new-tokens dest=max_new_tokens type='int' required\"]}",
-  "+ALIASES = {'doctor': 'collect-env'}",
+  "-HELP = {'': 'usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request} ...\\n\\nRelease information, local preparation and protected question submission.\\n\\npositional arguments:\\n  {info,ask,collect-env,doctor,prepare-request}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the retained TPU site; optionally batch up to four\\n    collect-env (doctor)\\n                        check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'collect-env': 'usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n'}",
+  "+HELP = {'': 'usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...\\n\\nRelease information, local preparation and protected question submission.\\n\\npositional arguments:\\n  {info,ask,collect-env,doctor,prepare-request,checkpoint}\\n    info                show supported scope and release limitations\\n    ask                 answer questions on the retained TPU site; optionally batch up to four\\n    collect-env (doctor)\\n                        check installed version metadata without initializing TPU\\n    prepare-request     tokenize a private chat locally; does NOT launch inference\\n    checkpoint          inventory a checkpoint source or verify a sealed checkpoint on local files\\n\\noptions:\\n  -h, --help            show this help message and exit\\n', 'info': 'usage: glm-tpu info [-h]\\n\\noptions:\\n  -h, --help  show this help message and exit\\n', 'ask': 'usage: glm-tpu ask [-h] [--questions QUESTIONS] [--context {8k,32k,128k,256k}] [--keep-loaded]\\n                   [--concurrent] [--max-new-tokens MAX_NEW_TOKENS] [--wall-seconds WALL_SECONDS]\\n                   [--prepare-only] [--site SITE]\\n                   [question]\\n\\npositional arguments:\\n  question\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --questions QUESTIONS\\n                        private JSON array of one to ten question strings\\n  --context {8k,32k,128k,256k}\\n  --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop\\n                        required\\n  --concurrent          batch up to four conversations; requires --context 32k\\n  --max-new-tokens MAX_NEW_TOKENS\\n                        optional output cap; default: all remaining context slots (up to 163840 in\\n                        128k mode); thinking and answer share this space\\n  --wall-seconds WALL_SECONDS\\n  --prepare-only        prepare private inputs without launching the model\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n', 'collect-env': 'usage: glm-tpu collect-env [-h] [--profile {core,runtime,tpu,dev}]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --profile {core,runtime,tpu,dev}\\n', 'prepare-request': 'usage: glm-tpu prepare-request [-h] --messages MESSAGES --output OUTPUT --repo REPO\\n                               --tokenizer-root TOKENIZER_ROOT --request-id REQUEST_ID\\n                               [--profile {ordinary-greedy-8k,ordinary-greedy-128k}]\\n                               --max-new-tokens MAX_NEW_TOKENS\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --messages MESSAGES\\n  --output OUTPUT\\n  --repo REPO\\n  --tokenizer-root TOKENIZER_ROOT\\n  --request-id REQUEST_ID\\n  --profile {ordinary-greedy-8k,ordinary-greedy-128k}\\n  --max-new-tokens MAX_NEW_TOKENS\\n', 'checkpoint': \"usage: glm-tpu checkpoint [-h] {inventory,verify} ...\\n\\npositional arguments:\\n  {inventory,verify}\\n    inventory         write the inventory of a local safetensors source (no payload is read)\\n    verify            verify a local sealed runtime checkpoint against the site file's pins\\n\\noptions:\\n  -h, --help          show this help message and exit\\n\", 'checkpoint inventory': 'usage: glm-tpu checkpoint inventory [-h] --output OUTPUT --model-id MODEL_ID --revision REVISION\\n                                    source\\n\\npositional arguments:\\n  source               directory of model.safetensors.index.json, its shards and config.json\\n\\noptions:\\n  -h, --help           show this help message and exit\\n  --output OUTPUT      the new inventory file (never overwritten)\\n  --model-id MODEL_ID  the model id to record, e.g. zai-org/GLM-5.3\\n  --revision REVISION  the source revision to record\\n', 'checkpoint verify': \"usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]\\n                                 [--local-slot-layout]\\n\\noptions:\\n  -h, --help            show this help message and exit\\n  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else\\n                        $GLM_TPU_CONFIG_ROOT/site.toml)\\n  --root ROOT           checkpoint root (default: the site's checkpoint.root)\\n  --slots SLOT [SLOT ...]\\n                        hash only these device slots, 0..31 (default: all)\\n  --local-slot-layout   the root holds only the --slots files (a worker's layout); any other slot\\n                        file is refused\\n\"}",
+  "-ARGUMENTS = {'': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_SubParsersAction command dest=command nargs='A...' choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request'] required\"], 'info': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\"], 'ask': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction question dest=question nargs='?'\", \"_StoreAction --questions dest=questions type='Path'\", \"_StoreAction --context dest=context default='32k' choices=['8k', '32k', '128k', '256k']\", '_StoreTrueAction --keep-loaded dest=keep_loaded nargs=0 const=True default=False', '_StoreTrueAction --concurrent dest=concurrent nargs=0 const=True default=False', \"_StoreAction --max-new-tokens dest=max_new_tokens type='int'\", \"_StoreAction --wall-seconds dest=wall_seconds default=86400 type='int'\", '_StoreTrueAction --prepare-only dest=prepare_only nargs=0 const=True default=False', \"_StoreAction --site dest=site type='Path'\", 'exclusive required=True: question questions'], 'collect-env': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'doctor': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'prepare-request': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --messages dest=messages type='Path' required\", \"_StoreAction --output dest=output type='Path' required\", \"_StoreAction --repo dest=repo type='Path' required\", \"_StoreAction --tokenizer-root dest=tokenizer_root type='Path' required\", '_StoreAction --request-id dest=request_id required', \"_StoreAction --profile dest=profile default='ordinary-greedy-8k' choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']\", \"_StoreAction --max-new-tokens dest=max_new_tokens type='int' required\"]}",
+  "+ARGUMENTS = {'': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_SubParsersAction command dest=command nargs='A...' choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request', 'checkpoint'] required\"], 'info': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\"], 'ask': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction question dest=question nargs='?'\", \"_StoreAction --questions dest=questions type='Path'\", \"_StoreAction --context dest=context default='32k' choices=['8k', '32k', '128k', '256k']\", '_StoreTrueAction --keep-loaded dest=keep_loaded nargs=0 const=True default=False', '_StoreTrueAction --concurrent dest=concurrent nargs=0 const=True default=False', \"_StoreAction --max-new-tokens dest=max_new_tokens type='int'\", \"_StoreAction --wall-seconds dest=wall_seconds default=86400 type='int'\", '_StoreTrueAction --prepare-only dest=prepare_only nargs=0 const=True default=False', \"_StoreAction --site dest=site type='Path'\", 'exclusive required=True: question questions'], 'collect-env': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'doctor': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --profile dest=profile default='core' choices=['core', 'runtime', 'tpu', 'dev']\"], 'prepare-request': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --messages dest=messages type='Path' required\", \"_StoreAction --output dest=output type='Path' required\", \"_StoreAction --repo dest=repo type='Path' required\", \"_StoreAction --tokenizer-root dest=tokenizer_root type='Path' required\", '_StoreAction --request-id dest=request_id required', \"_StoreAction --profile dest=profile default='ordinary-greedy-8k' choices=['ordinary-greedy-8k', 'ordinary-greedy-128k']\", \"_StoreAction --max-new-tokens dest=max_new_tokens type='int' required\"], 'checkpoint': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'verify'] required\"], 'checkpoint inventory': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction source dest=source type='Path' required\", \"_StoreAction --output dest=output type='Path' required\", '_StoreAction --model-id dest=model_id required', '_StoreAction --revision dest=revision required'], 'checkpoint verify': [\"_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='\", \"_StoreAction --site dest=site type='Path'\", \"_StoreAction --root dest=root type='Path'\", \"_StoreAction --slots dest=slots nargs='+' type='int' metavar='SLOT'\", '_StoreTrueAction --local-slot-layout dest=local_slot_layout nargs=0 const=True default=False']}",
 ]
 
-[statements."tests/entrypoints/cli/test_collect_env.py"]
+[statements."tests/entrypoints/cli/test_checkpoint.py"]
 diff = [
   "+REPO = Path(__file__).resolve().parents[3]",
-  "+PROJECT = tomllib.loads((REPO / 'pyproject.toml').read_text())['project']",
-  "+SMALL = '[project]\\nname = \"glm-tpu\"\\nrequires-python = \">=3.12,<3.13\"\\ndependencies = [\"jax==1.0\", \"torch==2.10.0\"]\\n\\n[project.optional-dependencies]\\nruntime = [\"safetensors==0.7.0\"]\\ntpu = [\"libtpu==0.0.41\", \"local==1.0+cpu\"]\\ndev = [\"pytest==9.0.3\"]\\n'",
+  "+MESH, TOPOLOGY = ('b' * 64, 'c' * 64)",
+  "+MODEL_ID, REVISION = ('zai-org/GLM-5.3', 'unit-fixture')",
+  "+UNLOADED = ('jax', 'jaxlib', 'libtpu', 'torch', 'transformers')",
+  "+REFUSALS: dict[str, tuple[dict[str, dict[str, str]], list[str], dict[str, Any], Any]] = {'manifest pin': (dict(checkpoint=dict(manifest_sha256='0' * 64)), [], {}, None), 'success pin': (dict(checkpoint=dict(success_sha256='0' * 64)), [], {}, None), 'mesh pin': (dict(topology=dict(mesh_sha256='0' * 64)), [], {}, None), 'topology pin': (dict(topology=dict(topology_sha256='0' * 64)), [], {}, None), 'inventory pin': (dict(checkpoint=dict(source_inventory_sha256='0' * 64)), [], {}, None), 'payload byte': ({}, [], {}, _flip_slot_31), 'hashed slot payload byte': ({}, ['--slots', '31'], dict(verify_file_hash_slots=(31,)), _flip_slot_31), 'missing file': ({}, [], {}, _remove_slot_5), 'no SUCCESS': ({}, [], {}, _remove_success), 'manifest not JSON': ({}, [], {}, _manifest_not_json), 'local layout without slots': ({}, ['--local-slot-layout'], dict(local_slot_layout=True), None), 'duplicate slot': ({}, ['--slots', '0', '0'], dict(verify_file_hash_slots=(0, 0)), None), 'slot 32': ({}, ['--slots', '32'], dict(verify_file_hash_slots=(32,)), None), 'foreign slots in a local layout': ({}, ['--slots', '0', '1', '2', '3', '--local-slot-layout'], dict(verify_file_hash_slots=(0, 1, 2, 3), local_slot_layout=True), None)}",
+]
+
+[statements."tests/test_production_helper_homes.py"]
+diff = [
+  "-S5_DECLARED: dict[tuple[str, str], str] = {('glm_tpu/layers/contracts.py', 'MlaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'StageLocalKvLayout'): 'WU-S: rewritten', ('glm_tpu/layers/contracts.py', 'DsaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'GlmMoeNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/engine/request_session.py', 'SampledRequestPolicy'): 'WU-E: removed', ('glm_tpu/engine/request_session.py', 'Ws32RequestSession'): 'WU-E: rewritten', ('glm_tpu/engine/request_session.py', 'request_uniform'): 'WU-E: removed'}",
+  "+S5_DECLARED: dict[tuple[str, str], str] = {('glm_tpu/layers/contracts.py', 'MlaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'StageLocalKvLayout'): 'WU-S: rewritten', ('glm_tpu/layers/contracts.py', 'DsaNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/layers/contracts.py', 'GlmMoeNumericalContract'): 'WU-S: moved -> glm_tpu/config/cache.py', ('glm_tpu/engine/request_session.py', 'SampledRequestPolicy'): 'WU-E: removed', ('glm_tpu/engine/request_session.py', 'Ws32RequestSession'): 'WU-E: rewritten', ('glm_tpu/engine/request_session.py', 'request_uniform'): 'WU-E: removed', ('glm_tpu/model_loader/sharded_state/verify.py', '_verify_runtime_value'): 'WU-C: renamed -> verify_runtime_value', ('glm_tpu/model_loader/sharded_state/verify.py', '_verify_runtime_files'): 'WU-C: renamed -> verify_runtime_files'}",
 ]

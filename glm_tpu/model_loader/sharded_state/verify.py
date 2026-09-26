@@ -61,7 +61,7 @@ class VerifiedRuntimeCheckpoint(RuntimeMetadata):
     """Checkpoint admitted by the existing full-runtime verification policy."""
 
 
-def _verify_runtime_value(
+def verify_runtime_value(
     root: Path,
     manifest: Mapping[str, Any],
     plans: Sequence[RuntimeFilePlan],
@@ -119,7 +119,7 @@ def _verify_runtime_value(
     return by_slot
 
 
-def _verify_runtime_files(
+def verify_runtime_files(
     metadata: RuntimeMetadata,
     *,
     verify_file_hashes: bool,
@@ -193,7 +193,7 @@ def verify_runtime_checkpoint(
         inventory=inventory,
         geometry=geometry,
     )
-    _verify_runtime_files(
+    verify_runtime_files(
         metadata,
         verify_file_hashes=verify_file_hashes,
         verify_file_hash_slots=selected_hash_slots,
@@ -309,7 +309,7 @@ def _read_runtime_metadata(
     tag = success.get("tag")
     if not isinstance(tag, str) or SUCCESS_TAG.fullmatch(tag) is None:
         raise CheckpointValidationError("WS32 runtime SUCCESS tag drifted")
-    by_slot = _verify_runtime_value(
+    by_slot = verify_runtime_value(
         root,
         manifest,
         plans,
