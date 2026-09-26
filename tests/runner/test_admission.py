@@ -152,7 +152,7 @@ def optimized_hlo(
 def test_physical_axes_with_a_4_kib_full_pod_payload_are_admitted():
     assert check_hlo_collectives(optimized_hlo()) == dict(
         passed=True,
-        profile="research_ws32_axis_payload_v1",
+        profile="ws32_axis_payload_v1",
         num_partitions=32,
         instructions=10,
         collectives={"all-reduce": 2, "all-gather": 1},

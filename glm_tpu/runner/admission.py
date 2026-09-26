@@ -56,7 +56,7 @@ def check_hlo_collectives(text: str) -> dict:
         raise ValueError("model graph has no parsed collectives")
     return dict(
         passed=True,
-        profile="research_ws32_axis_payload_v1",
+        profile="ws32_axis_payload_v1",
         num_partitions=32,
         instructions=len(module.instructions),
         collectives=dict(Counter(op.opcode for op in module.collectives)),
