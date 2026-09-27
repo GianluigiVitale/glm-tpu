@@ -299,8 +299,8 @@ def record(
             )
         if not valid_reason(reason):
             raise SystemExit(
-                "this re-baseline needs --reason set to exactly one H number declared in DESIGN 6.9 "
-                "(e.g. H11), stage token (e.g. S2d, S4.2b) or work unit (e.g. WU-E)"
+                "this re-baseline needs --reason set to exactly one H number (e.g. H11), stage token "
+                "(e.g. S2d, S4.2b) or work unit (e.g. WU-E)"
             )
     marker = dict(kind="rename-only" if rename_only else "reviewed", reason=reason) if reason else None
     if marker is not None and set(gates) & set(FROZEN_DATA):

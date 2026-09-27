@@ -173,7 +173,8 @@ stopping point limit the interpretation of the partial score.
 | [Architecture](docs/release/ARCHITECTURE.md) | the module map, the request path, parallelism and numerical conventions |
 | [Testing](docs/release/TESTING.md) · [Equivalence harness](tools/equivalence/README.md) | the test layout, tiers and gates |
 | [Reviewer guide](docs/release/REVIEWER_GUIDE.md) | a reading order and the source package |
-| [Release status](docs/release/STATUS.md) · [Migration history](docs/release/GLM53_MIGRATION.md) | the measured GLM-5.3 release and how it was reached |
+| [Release status](docs/release/STATUS.md) · [Migration history](docs/release/GLM53_MIGRATION.md) | the measured GLM-5.3 release, the TPU comparison of this tree, and how the release was reached |
+| [Handoff](HANDOFF.md) · [Goal](goal.md) · [Agent instructions](AGENTS.md) | the current state, the goal and the working rules |
 | [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | the development policy and the release checks |
 
 ## History

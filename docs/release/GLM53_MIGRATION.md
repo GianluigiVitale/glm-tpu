@@ -50,7 +50,8 @@ acquired the 124 missing shards. Its transfer checks retain exact failure phases
 byte counts, hashes and traceback locations. Eight offline transfer and
 failure-reporting cases passed. The original failed script and receipts stayed
 unchanged in the private task folder. A resumed transfer is not inference
-validation. [Goal and authorization at the time](../../goal.md).
+validation. The goal and authorization at the time:
+`git show archive/research-20260922:goal.md`.
 
 ## Preserved initial acquisition failure
 

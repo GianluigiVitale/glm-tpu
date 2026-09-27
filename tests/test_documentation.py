@@ -4,9 +4,8 @@ its target), and every test file a documented command names exists.
 The pages are the tracked Markdown files at the repository root and under ``docs/``, ``tests/`` and ``tools/``, and
 a link or a documented test file must name a tracked path (``git ls-files``): an untracked file in a checkout is not
 documentation and does not satisfy a link. In a tree without git metadata (a ``git archive`` export, which holds the
-tracked files only) the file system stands in. The release records of the GLM-5.3 release (``AGENTS.md``,
-``HANDOFF.md``, ``goal.md``, ``docs/release/STATUS.md``) are not checked: they are kept as written for that release
-until they are revised together, and ``docs/release/STATUS.md`` still links a configuration file that release had.
+tracked files only) the file system stands in. The governance files (``AGENTS.md``, ``HANDOFF.md``, ``goal.md``,
+``docs/release/STATUS.md``) are pages like every other.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ import subprocess
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-RELEASE_RECORDS = {"AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md"}
+GOVERNANCE = {"AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md"}
 
 
 def _tracked() -> frozenset[str] | None:
@@ -45,7 +44,6 @@ PAGES = sorted(
     name
     for name in MARKDOWN
     if name.endswith(".md") and ("/" not in name or name.split("/")[0] in ("docs", "tests", "tools"))
-    if name not in RELEASE_RECORDS
 )
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 REFERENCE = re.compile(r"^ {0,3}\[[^\]]+\]:\s*(\S+)")  # a reference-style link definition
@@ -105,7 +103,7 @@ def _expand(name: str) -> list[str]:
 
 def test_the_documentation_pages_are_found():
     assert {"README.md", "docs/release/TESTING.md", "tools/equivalence/README.md"} <= set(PAGES)
-    assert not RELEASE_RECORDS & set(PAGES)
+    assert set(PAGES) >= GOVERNANCE
     assert all((REPO / page).is_file() for page in PAGES)
 
 

@@ -20,9 +20,9 @@
   "executable_commit": "5c3c1d6bee18817fdd4d665923747e233e76ee4a",
   "hardware": {
     "hosts": 8,
-    "site": "db-v4-64-od",
+    "site": "<redacted>",
     "tpu_v4_chips": 32,
-    "zone": "us-central2-b"
+    "zone": "<redacted>"
   },
   "limitations": [
     "Owner-stopped ordered prefix, not full GSM8K or uncontaminated held-out accuracy",

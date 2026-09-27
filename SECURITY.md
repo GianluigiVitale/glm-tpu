@@ -44,8 +44,11 @@ Also build the wheel from an exported copy of the commit
 ([INSTALLATION](docs/release/INSTALLATION.md#the-wheel)) and inspect what it
 contains. `tests/golden/test_data_contract.py` (part of the second pytest run)
 refuses home-directory paths, private addresses, private run names and bucket
-URIs in the equivalence harness and its records. These checks cover the software contracts; they do not
-authorize a deployment, which needs the hardware steps of
+URIs in the equivalence harness and its records, and the same literals and cloud
+zone names in the governance files (`AGENTS.md`, `HANDOFF.md`, `goal.md`,
+`docs/release/STATUS.md`) and the release receipts, where a receipt may name a
+run only under its `run` or `run_id` key. These checks cover the software
+contracts; they do not authorize a deployment, which needs the hardware steps of
 [OPERATIONS](docs/release/OPERATIONS.md).
 
 The research release had its own release check and a Git-history content audit

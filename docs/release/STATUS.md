@@ -1,19 +1,93 @@
-# GLM-5.3 release status
+# Release status
+
+What was measured on the hardware, and what the current tree is. Two releases
+are covered: the **GLM-5.3 inference release** of 2026-09-22, whose
+measurements below are unchanged, and the **public-structure release** (this
+tree), which restructured that engine without changing what runs on the TPU and
+proved it on the CPU and on the fleet. The state of the work is in the
+[handoff](../../HANDOFF.md).
+
+## The current tree
+
+The branch `release/public-structure-20260922` restructures the released engine
+(the research tree at `181c013e`, preserved at the tag
+`archive/research-20260922`) into the layout of the
+[README](../../README.md#repository-layout): one package with public module,
+class, function and Pallas kernel names; one untracked, validated site file for
+every deployment value ([template](../../examples/site.example.toml)); a launch
+policy that admits only a clean checkout of a pushed commit on an allowed
+branch; a command line split into subcommands, with `checkpoint inventory`,
+`checkpoint verify` and `collect-env`; rewritten documentation; the Apache
+License 2.0. The pre-refactor release is on `main` (tag
+`pre-refactor-main-20260922`); merging the branch is the owner's decision.
+
+The restructuring was checked on the CPU, commit by commit, against records of
+`181c013e` ([equivalence harness](../../tools/equivalence/README.md)): the TPU
+device programs of the 98 fixture-tier and 66 production-tier programs, lowered
+for the TPU with the compiler options production binds; the CPU execution
+goldens; the checkpoint identities; the import closures; the executed functions;
+the wire formats. A few early commits deferred the heavy gates to their stage's
+close, as their messages state. The device-program, numerics and identity
+records have not changed since the harness was finished (`d54572a3`, before the
+first restructuring commit) and were only ever recorded from the `181c013e`
+production paths. After that the other records changed only in separate,
+reviewed re-baseline commits that name the stage, work unit or host change
+behind the difference.
+
+Behaviour changes, each declared and tested in its commit: the resident stop
+keeps every collected record (the release crashed there with `FileExistsError`;
+fixed in `79e9b39e`); the site file replaces the committed site configuration
+and the launch policy replaces the frozen-source guard; the remote helpers are
+real modules whose exact text is pinned for each run; `read_bounded` refuses a
+directory like any other input that is not a regular file; the HLO admission
+profile, the admission functions, help texts and error messages no longer carry
+development labels; `collect-env` replaces the environment file (`doctor` stays
+as an alias).
+
+## TPU comparison of the current tree
+
+On 2026-09-27 the tree at `ab4c6582` ran on the eight hosts and 32 TPU v4 chips
+of the release, against golden runs of `181c013e` made the same day on the same
+fleet (the original golden runs were lost when the TPU slice was recreated on
+2026-09-24). Both used a checkpoint re-packed from the pinned source whose 32
+slot records equal the sealed manifest, 32,768 combined slots, greedy decoding
+and the same prepared GSM8K requests. No file under `glm_tpu/` changed after
+`ab4c6582`. [Method](../../tools/equivalence/README.md#tpu-comparison-compare_runpy).
+
+| Check | Result |
+|---|---|
+| B1: 10 sequential requests | 10/10 token streams and answers identical |
+| B2: 4 concurrent conversations | 4/4 identical |
+| R3: resident session, first request and two inbox rounds, then stop | 3/3 identical; the stop exits 0 with every record collected, where `181c013e` ends in `FileExistsError` |
+| Slowest-host decode speed, this tree / `181c013e` | 0.994–1.024 |
+| Compiled programs (`authenticity`) | the TPU originals of both trees equal the programs the harness lowers on the CPU: 9/9 programs, 1,062/1,062 Pallas kernels |
+| Site identity (`site-check`) | pass before and after the runs; a baseline with one changed fact fails |
+| Launch policy | a checkout with an untracked file is refused; the remote helpers each run staged were the commit's own |
+| Chat UI and `/v1` API on a resident session | the model list, a chat answer and a streamed chat answer returned 200, the stream ended with `[DONE]`, the UI page carried its content-security policy, and the stop exited 0 |
+
+This proves token identity for these 17 requests at 32,768 slots. It is not a
+new speed or quality measurement. The other capacities are covered on the CPU:
+the program fingerprints include 8,192, 32,768 and 166,912 slots, and 262,144
+slots is covered by a unit test. The raw run directories are kept privately;
+this page and the harness README are the committed record.
+
+## GLM-5.3 release measurements
 
 Resident ordinary inference was executed at
-`5c3c1d6bee18817fdd4d665923747e233e76ee4a`, run
-`optimized_request_20260921T233911390408Z`. It produced a correct solo answer,
+`5c3c1d6bee18817fdd4d665923747e233e76ee4a`. It produced a correct solo answer,
 then reused the same loaded model for 770 independent GSM8K requests.
 [Resident result receipt](glm53-resident-results-20260922.json).
 
-That 32K session was stopped on 2026-09-22 at the owner's instruction and replaced
-by a 166,912-slot session for agent work. Every measurement below therefore
-describes the earlier 32K session and remains historical. The current session has
-one completed answer of its own at 11.20 decode tokens/s and 28.94 GB peak HBM per
-chip; a 262,144-slot profile was refused by HBM admission.
-[Capacity profiles](glm53-context-profiles-20260922.json).
+That 32K session was stopped on 2026-09-22 at the owner's instruction and
+replaced by a 166,912-slot session for agent work. Every measurement below
+describes the earlier 32K session. The 166,912-slot session has one completed
+answer of its own at 11.20 decode tokens/s and 28.94 GB peak HBM per chip; a
+262,144-slot profile was refused by HBM admission.
+[Capacity profiles](glm53-context-profiles-20260922.json). That session ended
+when the TPU slice was recreated on 2026-09-24; at the close of the TPU
+comparison on 2026-09-27 no resident session ran.
 
-## Single-chat measurement
+### Single-chat measurement
 
 | Measurement | Slowest-host result |
 |---|---:|
@@ -32,7 +106,7 @@ be added. The completed final answer was 70,000, checked against reference and
 arithmetic. All eight hosts agreed on tokens and graphs, and memory checks
 passed. Authenticated workers remained live with libtpu after answering.
 
-## Partial GSM8K evaluation
+### Partial GSM8K evaluation
 
 The owner stopped at the ordered prefix of test rows 0–769 from
 `openai/gsm8k`, configuration `main`, revision
@@ -74,31 +148,60 @@ This is **not a full-test-set GSM8K result**. Public benchmark familiarity,
 ordered-prefix selection and stopping after observed progress limit comparison
 with independently chosen complete evaluations. No full-32K-input quality claim.
 
-## Concurrent behavior and release verification
+### Four concurrent chats
 
 The separate four-chat run at `c2f60efe` completed four correct normal-EOS answers,
 with 4.89–5.12 tokens/s per active chat and 9.269431 aggregate tokens/s.
 Its 317-token sequential prefill took 3.884926 s; cold startup took 1,178.091731 s;
 peak HBM was 28,789,189,632 bytes/chip. That invocation verified eight-host cleanup.
-[Original receipt](glm53-four-answers-20260921.json) preserves all boundaries.
+The [receipt](glm53-four-answers-20260921.json) preserves all boundaries.
 Its concise-explanation suffix differs from the partial benchmark prompt.
 
-The preceding main passed 629 CPU tests with one skip. The resident change passed
-65 affected tests; unchanged numerical code reuses those and actual TPU evidence.
-Final affected/source/content/package/archive checks and assistant self-review
-are bound to the final commit in
-`/home/gianl/glm-run/glm53_resident_release_20260922/publication/promotion.json`.
-Final main, private release/tag and backup are established by that receipt and
-its release publication receipt, not by this status text alone.
+The receipts are the release's records. When this page was revised on
+2026-09-27, the TPU node name and the zone in the four-chat and resident
+receipts, and a host path in the four-chat receipt, were replaced by
+`<redacted>`; every measured value, hash and run name is unchanged, and the
+originals are in the history (`git show 60b68b4a:docs/release/<file>`).
+
+## Verification and review
+
+At the commit that last revised this page (2026-09-27), the CPU suite outside
+the equivalence wrappers had 785 passing tests and one skip (the site-bound test,
+without a site file); the light equivalence wrappers (`-m "not cpu32"`) had 154
+passing tests and the `cpu32` wrappers 8; `check`, `check --tier production`,
+`check --gates G6-static` and `selftest` (23 cases) passed with every record
+unchanged; the helper contract tests had 49 passing tests
+([TESTING](TESTING.md)).
+
+Before the restructure, the release's main passed 629 CPU tests with one skip,
+and its resident change passed 65 affected tests; unchanged numerical code
+reused those and the TPU evidence. Its final release checks were recorded in
+publication receipts kept outside the repository.
+
+Review: the GLM-5.3 release was reviewed by the assistant that built it. The
+public-structure release was implemented by assistant sessions. From S4.2b on,
+each unit's code commit was checked with its raw gate evidence by a separate
+adversarial verifier session before it was pushed (in all units but one, on the
+local commit); fixes for its findings were amended into the unpushed commit, the
+other findings were recorded as follow-ups, and a re-baseline commit, where the
+unit needed one, was recorded after that pass. Before S4.2b there was no
+standing verifier step: some commits cite review rounds or a verifier, many cite
+none. The owner reviews afterwards. None of this is independent human review.
+
+## Limitations
 
 Source: 141 verified shards / 755,632,050,320 bytes; owner pack: 32 files /
-786,181,673,984 bytes. [Checkpoint bindings](../../configs/glm53-site.json).
-No new hardware run or model interruption is needed for source promotion.
-The resident code is staged in its original run directory; merging Git does
-not redeploy it. The [local chat UI](../UI.md) and its stateless
-[OpenAI-compatible API](../API.md) attach through the resident inbox. Ordinary
-capacity profiles are 8,192 / 32,768 / 166,912 / 262,144 combined slots; the
-256K agent profile carries no measured speed or quality claim of its own.
-No dynamic cache capacity, online batch admission or durable restart recovery.
-Review is self-review, not independent review.
+786,181,673,984 bytes. The checkpoint and source identities are pins in the
+untracked site file's `[checkpoint]` table ([CHECKPOINTS](CHECKPOINTS.md),
+[template](../../examples/site.example.toml)). The [local chat UI](../UI.md) and
+its stateless [OpenAI-compatible API](../API.md) attach to a resident session
+through its inbox. Ordinary capacity profiles are 8,192 / 32,768 / 166,912 /
+262,144 combined slots; the 256K agent profile carries no measured speed or
+quality claim of its own. No dynamic cache capacity, online batch admission or
+durable restart recovery.
+
+The equivalence proof lowers the TPU programs on the CPU but does not run XLA's
+TPU compilation, so a compiler or libtpu change is caught only by a TPU
+comparison; the site check reads rank 0's assets only. The history keeps private
+infrastructure literals; any publication is the owner's decision.
 [History](GLM53_MIGRATION.md) preserves earlier results and failures.

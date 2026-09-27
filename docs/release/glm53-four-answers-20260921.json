@@ -8,8 +8,8 @@
   "hardware": {
     "hosts": 8,
     "tpu_v4_chips": 32,
-    "site": "db-v4-64-od",
-    "zone": "us-central2-b"
+    "site": "<redacted>",
+    "zone": "<redacted>"
   },
   "profile": {
     "concurrent_conversations": 4,
@@ -123,7 +123,7 @@
     "Self-review, not independent review."
   ],
   "originals": {
-    "private_run_root": "/home/gianl/glm-run/optimized_request_20260921T223026777871Z",
+    "private_run_root": "<redacted>",
     "sha256": {
       "controller_identity.json": "350845c18c1293e0d607bcf4f532b1e6d5cad0adf8225874f8aa41a2557c3de4",
       "controller_terminal.json": "69155ba7c357b4da4c92e6eda51142a975d643e601dfa832705eba1c6b46d2e5",

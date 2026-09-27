@@ -596,7 +596,7 @@ it as `unchanged`).
 and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
 field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records
 G1-protocol, G2-protocol, G6, G7 and G9 only with `--reason` set to exactly one token -- an H
-number declared in DESIGN 6.9 (`H1`, `H11`, ...), a stage (`S1`, `S1a`, `S2d`, `S4.2b`, ...) or an
+number of a sanctioned host change (`H1`, `H11`, ...), a stage (`S1`, `S1a`, `S2d`, `S4.2b`, ...) or an
 S5 work unit (`WU-E`, ...); free text, commit hashes or a word that merely contains hex letters
 are refused -- written into the file as a `rebaseline` marker (`tests/golden/test_data_contract.py`
 requires it). The safety facts cannot be absorbed by such a re-baseline: they are in the frozen

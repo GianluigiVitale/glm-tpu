@@ -1,6 +1,7 @@
 """Golden data stay compact and public-safe (digests and small summaries, versions recorded, no host
 paths or run directories), the harness source carries no private infrastructure literals, and a data
-file recorded on a changed production tree says why."""
+file recorded on a changed production tree says why. The governance files and the release receipts are
+public records too: they carry no such literal either."""
 
 import json
 import re
@@ -29,6 +30,13 @@ HARNESS_SOURCES = sorted(
         *(HARNESS_REPO / "tests" / "golden").glob("*.py"),
     ]
 )
+# The governance files and the release receipts, scanned with PRIVATE_SOURCE and a cloud-zone pattern. A receipt
+# names the run it measured by its timestamped run directory (the value of its ``run`` or ``run_id`` key, the evidence
+# id); no other key or value of it may match.
+GOVERNANCE_FILES = ("AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md")
+RECEIPTS = sorted((HARNESS_REPO / "docs" / "release").glob("*.json"))
+ZONE = re.compile(r"\b(?:us|europe|asia|australia|northamerica|southamerica|me|africa)-[a-z]+[0-9]+-[a-z]\b")
+RUN_ID_KEYS = frozenset({"run", "run_id"})
 
 
 @pytest.mark.parametrize("path", sorted(DATA.glob("*.json")), ids=lambda p: p.name)
@@ -74,3 +82,43 @@ def test_harness_source_has_no_private_literals(path: Path):
         return  # this file spells the patterns
     match = PRIVATE_SOURCE.search(path.read_text())
     assert match is None, f"{path.relative_to(HARNESS_REPO)}: private-looking literal at offset {match.start()}"
+
+
+def _private(text: str) -> re.Match[str] | None:
+    return PRIVATE_SOURCE.search(text) or ZONE.search(text)
+
+
+def _receipt_findings(value: object, where: str = "$") -> list[str]:
+    """The JSON paths of a receipt's keys and string values that look private (a run id value excepted)."""
+    if isinstance(value, dict):
+        found = []
+        for key, item in value.items():
+            if _private(key):
+                found.append(f"{where}: a key")
+            if not (key in RUN_ID_KEYS and isinstance(item, str)):
+                found += _receipt_findings(item, f"{where}.{key}")
+        return found
+    if isinstance(value, list):
+        return [path for index, item in enumerate(value) for path in _receipt_findings(item, f"{where}[{index}]")]
+    return [where] if isinstance(value, str) and _private(value) else []
+
+
+def test_the_public_records_are_found():
+    assert all((HARNESS_REPO / name).is_file() for name in GOVERNANCE_FILES)
+    assert [path.name for path in RECEIPTS] == [
+        "glm53-context-profiles-20260922.json",
+        "glm53-four-answers-20260921.json",
+        "glm53-resident-results-20260922.json",
+    ]
+
+
+@pytest.mark.parametrize("name", GOVERNANCE_FILES)
+def test_governance_file_has_no_private_literals(name: str):
+    match = _private((HARNESS_REPO / name).read_text())
+    offset = match.start() if match else None  # never the literal itself
+    assert offset is None, f"{name}: private-looking literal at offset {offset}"
+
+
+@pytest.mark.parametrize("path", RECEIPTS, ids=lambda p: p.name)
+def test_release_receipt_has_no_private_literals(path: Path):
+    assert _receipt_findings(json.loads(path.read_text())) == []

@@ -1,6 +1,7 @@
-"""The harness command line: ``site-check`` exits 1 on a difference, and ``authenticity`` lowers under the
-kernel-name mode it is given (``--kernel-names recorded|public``). Light: no child process and no 32-device mesh;
-the production build is faked here, and G14 case ``j-public`` proves the mode on the real build."""
+"""The harness command line: ``site-check`` exits 1 on a difference, ``authenticity`` lowers under the
+kernel-name mode it is given (``--kernel-names recorded|public``), and ``record`` refuses a changed tree without one
+reason token. Light: no child process and no 32-device mesh; the production build is faked here, and G14 case
+``j-public`` proves the mode on the real build."""
 
 from __future__ import annotations
 
@@ -55,6 +56,22 @@ def test_authenticity_refuses_an_unknown_kernel_name_mode(monkeypatch, tmp_path)
     assert refused.value.code == 2
     with pytest.raises(ValueError, match="kernel-name mode"), lowering.kernel_names("legacy"):
         pass
+
+
+@pytest.mark.parametrize("reason", [[], ["--reason", "S9 governance"], ["--reason", "60b68b4a"]])
+def test_record_refuses_a_changed_tree_without_one_reason_token(monkeypatch, reason):
+    """The refusal comes before anything runs or is written, and it names the accepted tokens by example only: it
+    points to no document outside the repository."""
+    monkeypatch.setattr(gates, "refuse_if_live", lambda requested: requested)
+    monkeypatch.setattr(gates, "source_record", lambda: dict(production_paths_equal_baseline=False))
+    monkeypatch.setattr(gates, "run_child", lambda *args, **kwargs: pytest.fail("no gate may run"))
+    monkeypatch.setattr(gates, "write_json", lambda *args, **kwargs: pytest.fail("no record may be written"))
+    with pytest.raises(SystemExit) as refused:
+        cli.main(["record", "--gates", "G7", *reason])
+    assert refused.value.code == (
+        "this re-baseline needs --reason set to exactly one H number (e.g. H11), stage token (e.g. S2d, S4.2b) or "
+        "work unit (e.g. WU-E)"
+    )
 
 
 def _current() -> dict[str, str]:
