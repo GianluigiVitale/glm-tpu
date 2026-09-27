@@ -5,7 +5,7 @@ exception's type and message as JSON on standard error, nothing on standard outp
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -27,8 +27,8 @@ from glm_tpu.model_loader.source_inventory import (
     read_source_inventory,
     write_source_inventory,
 )
+from tests.fixtures import tiny_checkpoint
 from tests.fixtures.site import example_mapping, example_site, installed_site, write_example_site
-from tests.model_loader.sharded_state.test_format import _fixture, _geometry, _seal
 
 REPO = Path(__file__).resolve().parents[3]
 MESH, TOPOLOGY = "b" * 64, "c" * 64  # the pins the fixture packs and seals with
@@ -66,9 +66,9 @@ def packed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Packed:
     """The G4 tiny checkpoint packed and sealed under ``tmp_path``, its source inventory written and a site file pinning
     both; the command's geometry is the tiny one (verify_checkpoint's keyword default: the pinned GLM-5.3 one)."""
     with installed_site(example_site(tmp_path / "pack")):  # the packer admits the fixture's example source URI
-        _, inventory, config = _fixture(tmp_path)
-        manifest = pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)
-    success = _seal(config.output_dir, manifest, topology_hash=TOPOLOGY)
+        _, inventory, config = tiny_checkpoint.fixture(tmp_path)
+        manifest = pack_runtime_checkpoint(config, inventory, tiny_checkpoint.geometry(), chunk_bytes=16)
+    success = tiny_checkpoint.seal(config.output_dir, manifest, topology_hash=TOPOLOGY)
     inventory_path = tmp_path / "inventories" / "tiny" / "source_inventory.json"
     write_source_inventory(inventory, inventory_path)
     mapping = example_mapping(
@@ -84,7 +84,7 @@ def packed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Packed:
         ),
         topology=dict(mesh_sha256=MESH, topology_sha256=TOPOLOGY),
     )
-    monkeypatch.setitem(verify_checkpoint.__kwdefaults__, "geometry", _geometry())
+    monkeypatch.setitem(verify_checkpoint.__kwdefaults__, "geometry", tiny_checkpoint.geometry())
     return Packed(config.output_dir, mapping, write_example_site(tmp_path / "site.toml", mapping))
 
 
@@ -101,7 +101,7 @@ def library(mapping: dict[str, Any], root: Path | None = None, geometry: Any = N
             expected_mesh_hash=topology["mesh_sha256"],
             expected_topology_hash=topology["topology_sha256"],
             inventory=inventory,
-            geometry=_geometry() if geometry is None else geometry,
+            geometry=tiny_checkpoint.geometry() if geometry is None else geometry,
             verify_file_hashes=True,
             **options,
         )
@@ -245,7 +245,7 @@ def test_verify_refuses_a_missing_site_file_as_the_site_loader(
 
 
 def test_verify_in_a_fresh_process_loads_no_model_library(packed: Packed):
-    geometry = _geometry().to_dict()
+    geometry = tiny_checkpoint.geometry().to_dict()
     code = f"""
 import json, sys
 from glm_tpu.config.model import ModelGeometry
@@ -268,7 +268,7 @@ print(json.dumps([name for name in {UNLOADED!r} if name in sys.modules]))
 def source(tmp_path: Path) -> Path:
     """The G4 tiny checkpoint's source directory (index and one shard) with a config.json."""
     with installed_site(example_site(tmp_path / "pack")):
-        _, _, config = _fixture(tmp_path)
+        _, _, config = tiny_checkpoint.fixture(tmp_path)
     (config.source_root / "config.json").write_text(json.dumps({"model_type": "glm_moe_dsa"}))
     return config.source_root
 
@@ -343,13 +343,36 @@ def test_inventory_refuses_exactly_as_the_library(
     assert (output.read_bytes() if output.exists() else None) == before  # nothing written, nothing overwritten
 
 
+def test_inventory_refuses_a_file_that_does_not_read_back_as_written(
+    source: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    from glm_tpu.model_loader import source_inventory
+
+    real, read = source_inventory.inspect_source_inventory, []
+
+    def other(path: Path):  # the written file parses as another inventory
+        read.append(path)
+        return replace(real(path), source_revision="other")
+
+    output = tmp_path / "source_inventory.json"
+    monkeypatch.setattr(source_inventory, "inspect_source_inventory", other)
+    code, out, err = run(capsys, inventory_argv(source, output))
+    assert (code, out) == (1, "") and read == [output]
+    assert json.loads(err) == dict(
+        error="CheckpointValidationError",
+        message=f"source inventory {output} does not read back as written",
+        status="checkpoint inventory refused",
+    )
+
+
 def test_inventory_in_a_fresh_process_loads_no_model_library(source: Path, tmp_path: Path):
+    # the inventory reads headers only: not even numpy (verify hashes tensors with it)
     output = tmp_path / "source_inventory.json"
     code = f"""
 import json, sys
 from glm_tpu.entrypoints.cli.main import main
 assert main({inventory_argv(source, output)!r}) == 0
-print(json.dumps([name for name in {UNLOADED!r} if name in sys.modules]))
+print(json.dumps([name for name in {(*UNLOADED, "numpy")!r} if name in sys.modules]))
 """
     environment = dict(os.environ, JAX_PLATFORMS="cpu", PYTHONDONTWRITEBYTECODE="1")
     result = subprocess.run([sys.executable, "-c", code], cwd=REPO, env=environment, capture_output=True, text=True)

@@ -175,6 +175,14 @@ OVER_128_MIB = (
     "  %big = f32[33554433]{0} all-reduce(f32[33554433]{0} %c), channel_id=5, "
     f"replica_groups={FEATURE}, use_global_device_ids=true, to_apply=%add\n"
 )
+# 33,554,432 f32 values: exactly 128 MiB, admitted.
+AT_128_MIB = OVER_128_MIB.replace("33554433", "33554432")
+
+
+def test_a_collective_of_exactly_128_mib_is_admitted():
+    report = check_hlo_collectives(optimized_hlo(extra=AT_128_MIB))
+    assert report["passed"] and report["maximum_collective_payload_bytes"] == 128 * 1024**2 == 134217728
+    assert report["collectives"] == {"all-reduce": 3, "all-gather": 1}
 
 
 @pytest.mark.parametrize(

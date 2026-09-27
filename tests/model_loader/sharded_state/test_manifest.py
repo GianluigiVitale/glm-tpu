@@ -10,7 +10,7 @@ from glm_tpu.model_loader.sharded_state.manifest import assemble_owner_manifest
 from glm_tpu.model_loader.sharded_state import format as retained
 from glm_tpu.model_loader.sharded_state import writer
 from glm_tpu.model_loader.sharded_state import verify
-from tests.model_loader.sharded_state.test_format import _fixture, _geometry, _seal
+from tests.fixtures import tiny_checkpoint
 from tests.fixtures.site import example_site, installed_site
 
 
@@ -23,8 +23,8 @@ def _example_site(tmp_path_factory):
 
 @pytest.fixture
 def owners(tmp_path):
-    _, inventory, config = _fixture(tmp_path)
-    geometry = _geometry()
+    _, inventory, config = tiny_checkpoint.fixture(tmp_path)
+    geometry = tiny_checkpoint.geometry()
     slots = {str(rank): list(range(rank * 4, rank * 4 + 4)) for rank in range(8)}
     records = [
         writer.pack_runtime_slots(
@@ -56,7 +56,7 @@ def test_distributed_manifest_matches_original_and_loads_owned_files(owners, tmp
     for rank in range(8):
         root = tmp_path / f"host{rank}"
         (root / "manifest.json").write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n")
-        success = _seal(root, actual)
+        success = tiny_checkpoint.seal(root, actual)
         verified = verify.verify_runtime_checkpoint(
             root,
             expected_manifest_sha256=actual["manifest_sha256"],

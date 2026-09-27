@@ -19,7 +19,7 @@ the checkout.
 | `tests/golden/` | the pytest wrappers of the equivalence gates; `tests/golden/data/*.json` are the records they compare with (digests and small summaries, written only by the harness) |
 | `tests/reference/` | an unsharded single-device reference model of GLM-5.3 and its consistency tests; [VALIDATION](../../tests/reference/VALIDATION.md) is its acceptance record |
 | `tests/models/glm_moe_dsa/test_against_reference.py` | the production composition against the reference model on the frozen fixture (with `floors.json`) |
-| `tests/fixtures/` | a tiny model, example site files and the 78-layer prefill layer schema |
+| `tests/fixtures/` | a tiny model, a tiny checkpoint, example site files, a synthetic resident for the serving tests and the 78-layer prefill layer schema |
 | `tests/test_import_boundaries.py`, `tests/test_envs.py`, `tests/test_error_messages.py`, `tests/test_documentation.py` | package-wide rules: import layering (production loads only this package's modules), the environment-variable registry, error-message wording, and that the documentation's links and documented test files exist |
 
 Markers: `cpu32` (runs a child process on 32 forced CPU devices; slow),

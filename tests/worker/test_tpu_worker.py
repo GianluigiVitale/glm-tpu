@@ -1,6 +1,7 @@
 """Tests of :mod:`glm_tpu.worker.tpu_worker`."""
 
 import json
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -43,9 +44,11 @@ def test_worker_uses_one_batch_and_separate_deliveries(monkeypatch, tmp_path):
     assert len(reports) == 8 and aggregate["batch_size"] == 8
     assert all(r["stop_cause"] == "eos" and r["output_budget_tokens"] == 3 for r in reports)
     for lane in range(8):
-        rows = [json.loads(line) for line in (tmp_path / f"item{lane:03d}" / "tokens.jsonl").read_text().splitlines()]
-        assert len(rows) == 2 and [row["batch_round"] for row in rows] == [0, 1]
-        assert all(row["request_id"] == f"lane{lane}" for row in rows)
+        records = [
+            json.loads(line) for line in (tmp_path / f"item{lane:03d}" / "tokens.jsonl").read_text().splitlines()
+        ]
+        assert len(records) == 2 and [record["batch_round"] for record in records] == [0, 1]
+        assert all(record["request_id"] == f"lane{lane}" for record in records)
         assert (tmp_path / f"item{lane:03d}" / "answer.txt").read_text() == str([10 + lane] * 2)
 
 
@@ -93,3 +96,43 @@ def test_worker_default_off_before_model_import(monkeypatch, tmp_path):
     monkeypatch.delenv(protocol.WORKER_ENV_FLAG, raising=False)
     with pytest.raises(ValueError, match="protected"):
         worker.preflight(SimpleNamespace(output=tmp_path, code_hash="a" * 40, wall_seconds=100))
+
+
+# `python -m glm_tpu.worker.tpu_worker --help`, byte for byte: argparse wraps to the terminal width (pinned:
+# COLUMNS=100) and its layout differs between Python versions (the literal is Python 3.12's). The description is
+# the module docstring.
+HELP = """\
+usage: tpu_worker.py [-h] --output OUTPUT --code-hash CODE_HASH --source-manifest-sha256
+                     SOURCE_MANIFEST_SHA256 --request-file-sha256 REQUEST_FILE_SHA256
+                     --site-sha256 SITE_SHA256 --topology-rebinding-sha256
+                     TOPOLOGY_REBINDING_SHA256 --coordinator-address COORDINATOR_ADDRESS
+                     --wall-seconds WALL_SECONDS [--preflight-only] [--keep-loaded]
+
+The per-host ordinary-inference worker; source staging and fleet leases belong to its controller.
+
+options:
+  -h, --help            show this help message and exit
+  --output OUTPUT
+  --code-hash CODE_HASH
+  --source-manifest-sha256 SOURCE_MANIFEST_SHA256
+  --request-file-sha256 REQUEST_FILE_SHA256
+  --site-sha256 SITE_SHA256
+  --topology-rebinding-sha256 TOPOLOGY_REBINDING_SHA256
+  --coordinator-address COORDINATOR_ADDRESS
+  --wall-seconds WALL_SECONDS
+  --preflight-only
+  --keep-loaded
+"""
+
+
+def test_help_text_is_unchanged(monkeypatch, capsys):
+    # In this process, as `python -m` runs it (sys.argv[0] is the module's file): a child process whose argv names
+    # the worker would make a concurrent cpu32 test or heavy gate see a live TPU run (tools.equivalence budget).
+    # `python -m glm_tpu.worker.tpu_worker --help` itself: tests/engine/test_resident_protocol.py.
+    assert sys.version_info[:2] == (3, 12), "the literal is Python 3.12 argparse output"
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setattr(sys, "argv", [worker.__file__, "--help"])
+    with pytest.raises(SystemExit) as exited:
+        worker.main()
+    assert exited.value.code == 0
+    assert capsys.readouterr().out == HELP

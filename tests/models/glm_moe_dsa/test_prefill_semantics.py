@@ -290,6 +290,173 @@ def b114_tail_near_capacity():
     same(actual, chain(IDS[:33], state, ((128, 32), (128, 1))), 'static 33')
 
 
+# The production B114 block with every layer's boundary recorded: prefill.prefill_layer_window is wrapped while
+# the program traces, and each layer's inputs and outputs, the incoming state and the committed state become extra
+# outputs, every owner's own values (the 32 owners stacked in mesh order). The block's own result is unchanged.
+LAYER = ('kv', 'unrepaired', 'repaired', 'selected', 'counts', 'scores', 'wk',
+         'kv_out', 'unrepaired_out', 'repaired_out', 'selected_out', 'counts_out', 'scores_out', 'health')
+WK_GIVEN = []  # per layer, as traced: whether the layer received a repair wk
+
+
+@functools.cache
+def recording_program():
+    original = prefill.prefill_layer_window
+
+    def body(t, c, s, w, k, r):
+        seen = []
+
+        def record(*args, **kwargs):
+            result = original(*args, **kwargs)
+            WK_GIVEN.append(args[14] is not None)
+            wk_in = jnp.zeros((1,), jnp.float32) if args[14] is None else args[14]
+            seen.append(dict(zip(LAYER, (*args[2:8], wk_in, result.cache_local, result.unrepaired_index_cache,
+                                         result.repaired_index_cache, result.selected_positions,
+                                         result.selected_valid_counts, result.selected_scores,
+                                         result.contract_valid))))
+            return result
+
+        prefill.prefill_layer_window = record
+        try:
+            out = prefill.batched_prefill(t, c, s, w, k, r, config=config, sparse_attention_interpret=True,
+                                          linear_interpret=True)
+        finally:
+            prefill.prefill_layer_window = original
+        d, n = s.decoder, out.state.decoder
+        local = dict(
+            before=dict(kv=d.kv_cache_local, index=d.index_cache_local, repaired=s.repaired_index_local),
+            after=dict(kv=n.kv_cache_local, index=n.index_cache_local, repaired=out.state.repaired_index_local,
+                       selected=n.selected_positions, counts=n.selected_valid_counts, scores=n.selected_scores),
+            layers=seen,
+        )
+        return out, jax.tree.map(lambda v: v[None], local)
+
+    return jax.jit(jax.shard_map(
+        body, mesh=mesh,
+        in_specs=(P(), P(), SPECS, bf16_weight_specs(config), tuple(P() for _ in wk), P()),
+        out_specs=(BatchedPrefillResult(SPECS, P()), P(('expert', 'feature'))), check_vma=False))
+
+
+def recorded(ids, state):
+    out, local = jax.block_until_ready(recording_program()(tokens(ids, 114), put(np.int32(len(ids))), state, weights,
+                                                           wk, rope))
+    return out, jax.tree.map(np.asarray, local)
+
+
+def equal(actual, expected, what):
+    assert actual.dtype == expected.dtype and actual.shape == expected.shape, what
+    assert actual.tobytes() == expected.tobytes(), what
+
+
+def wired(local, final):
+    # the composition's wiring, on every owner: which buffers and which IndexShare metadata each layer gets, and
+    # what the block commits
+    before, after, layers = local['before'], local['after'], local['layers']
+    slots, producers = config.full_index_slot_by_layer, config.full_index_slots
+    assert len(layers) == len(slots) == 8 and slots == (0, 1, 2, None, None, None, 3, None), slots
+    assert WK_GIVEN[:8] == [slot is not None for slot in slots], WK_GIVEN
+    for layer, (slot, x) in enumerate(zip(slots, layers)):
+        if layer == 0:  # nothing selected yet
+            assert (x['selected'] == -1).all() and (x['counts'] == 0).all() and np.isneginf(x['scores']).all()
+        else:  # the metadata a layer receives is the previous layer's
+            for name in ('selected', 'counts', 'scores'):
+                equal(x[name], layers[layer - 1][name + '_out'], (layer, name))
+        equal(x['kv'], before['kv'][:, layer], (layer, 'kv in'))  # its own KV layer
+        equal(after['kv'][:, layer], x['kv_out'], (layer, 'kv out'))
+        if slot is None:  # a shared layer keeps the selection it received
+            for name in ('selected', 'counts', 'scores'):
+                equal(x[name + '_out'], x[name], (layer, name, 'shared'))
+        else:  # a full producer reads its own index slot and repair wk, and selects anew
+            equal(x['unrepaired'], before['index'][:, slot], (layer, 'unrepaired in'))
+            equal(x['repaired'], before['repaired'][:, slot], (layer, 'repaired in'))
+            equal(x['wk'], np.broadcast_to(np.asarray(wk[slot]), x['wk'].shape), (layer, 'wk'))
+            assert not np.array_equal(x['selected_out'], x['selected']), (layer, 'selection replaced')
+    # the witnesses: shared layers 3, 4, 5 carry producer 2's selection, shared layer 7 producer 6's
+    for shared, producer in ((3, 2), (4, 2), (5, 2), (7, 6)):
+        equal(layers[shared]['selected_out'], layers[producer]['selected_out'], (shared, producer))
+        equal(layers[shared]['scores_out'], layers[producer]['scores_out'], (shared, producer))
+    # the block writes back exactly each producer's slot: the repaired keys always, the active index the unrepaired
+    # keys (an intermediate block) or the repaired ones (the final block)
+    for slot, layer in enumerate(producers):
+        equal(after['repaired'][:, slot], layers[layer]['repaired_out'], (slot, 'repaired'))
+        active = layers[layer]['repaired_out' if final else 'unrepaired_out']
+        equal(after['index'][:, slot], active, (slot, 'index'))
+    assert not np.array_equal(layers[1]['unrepaired_out'], layers[1]['repaired_out'])
+    # the committed IndexShare metadata is the last layer's at the last live row
+    return layers
+
+
+def shared_layers_carry_their_producers_selection():
+    # an intermediate block (114 of the 200 prompt rows after BASE's 505) and the final block of two_blocks()
+    out, local = recorded(IDS[:114], BASE)
+    same(out, run(114, IDS[:114], BASE), 'recording program, intermediate block')
+    assert healthy(out) and not bool(out.state.finished)
+    layers = wired(local, final=False)
+    for name in ('selected', 'counts', 'scores'):
+        equal(local['after'][name][:, 0], layers[-1][name + '_out'][:, 113], ('committed', name))
+    first, second = two_blocks()
+    out, local = recorded(IDS[128:200], first.state)
+    same(out, second, 'recording program, final block')
+    layers = wired(local, final=True)
+    for name in ('selected', 'counts', 'scores'):
+        equal(local['after'][name][:, 0], layers[-1][name + '_out'][:, 71], ('committed', name))
+
+
+def zero_live_tiles_stay_in_capacity():
+    # 33 live rows of a B114 block from capacity - 36: the third and fourth 32-row tiles start past the cache and
+    # hold no live row; they run at the last in-capacity offset, so every row of every layer, dead rows included,
+    # reports healthy (an offset past capacity would make their write invalid)
+    start = CAPACITY - 36
+    state = fresh(start + 33, start)
+    out, local = recorded(IDS[:33], state)
+    same(out, run(114, IDS[:33], state), 'recording program near capacity')
+    assert healthy(out) and bool(out.state.finished)
+    for layer, x in enumerate(local['layers']):
+        assert x['health'].all(), (layer, np.argwhere(~x['health']).tolist()[:8])
+
+
+def reversed_device_order():
+    # the fixture bound on a mesh over the devices in reverse order (the research tail tests' mesh), its own B114
+    # program: 33 live rows from capacity - 36 equal the 32 + 1 chain on that mesh and the natural mesh's block
+    from jax.sharding import Mesh
+    from glm_tpu.models.glm_moe_dsa.state import finish_batched_prefill as finish
+
+    from glm_tpu.layers import fp8
+
+    rmesh = Mesh(np.asarray(jax.devices(), object)[::-1].reshape(8, 4), ('expert', 'feature'))
+    assert [d.id for d in rmesh.devices.flat] == list(range(31, -1, -1))
+    # the per-table weight decode programs are cached by table shape and spec, not by mesh (a process has one mesh):
+    # this second mesh binds with an empty cache, and the natural mesh's programs are restored after
+    cached = dict(fp8._DECODERS)
+    fp8._DECODERS.clear()
+    try:
+        rinputs = engine_inputs(rmesh, panel_geometry=True)
+    finally:
+        fp8._DECODERS.clear()
+        fp8._DECODERS.update(cached)
+    rprograms = build_program_set(rmesh, config, interpret=True)
+
+    def rput(value):
+        return jax.device_put(value, NamedSharding(rmesh, P()))
+
+    def rrun(ids, state, block=None):
+        block = rput(np.asarray(list(ids) + [-1] * (114 - len(ids)), np.int32)) if block is None else block
+        return jax.block_until_ready(rprograms.prefill[114].fn(
+            block, rput(np.int32(len(ids))), state, rinputs.weights, rinputs.wk, rinputs.rope))
+
+    start = CAPACITY - 36
+    state = rprograms.cache_init.fn(rput(np.int32(start + 33)))
+    state = state._replace(decoder=state.decoder._replace(
+        position=rput(np.asarray([start], np.int32)), context_lengths=rput(np.asarray([start + 1], np.int32))))
+    actual = rrun(IDS[:33], state)
+    assert healthy(actual) and bool(actual.state.finished) and actual.state.decoder.position.tolist() == [start + 33]
+    finish(actual)
+    first = rrun(IDS[:32], state)
+    same(actual, rrun(IDS[32:33], first.state), 'reversed: 32 + 1')
+    same(actual, run(114, IDS[:33], fresh(start + 33, start)), 'reversed = natural')
+    bad = rput(np.asarray(IDS[:33] + [-1] * 81, np.int32)).at[32].set(-1)
+    refused(rrun(IDS[:33], state, block=bad), state, 'reversed: row 32')
+
+
 CASES = (
     two_blocks_hand_off_to_decode,
     refusals_are_atomic,
@@ -297,6 +464,9 @@ CASES = (
     window_equals_32_row_blocks,
     late_failure_rolls_back_every_write,
     b114_tail_near_capacity,
+    shared_layers_carry_their_producers_selection,
+    zero_live_tiles_stay_in_capacity,
+    reversed_device_order,
 )
 outcome, seconds = {}, {}
 for case in CASES:
@@ -363,3 +533,27 @@ def test_b114_tail_near_capacity_cpu32(outcome):
     """91 live rows in B114 at the end of the cache (poisoned padding, a 32/32/27 control, row-90 rollback), windows
     that extend past capacity, and 33 live rows one row past the first tile."""
     check(outcome, "b114_tail_near_capacity")
+
+
+@pytest.mark.cpu32
+def test_shared_layers_carry_their_producers_selection_cpu32(outcome):
+    """Every layer boundary of an intermediate and a final B114 block, recorded inside the production composition:
+    each layer receives the previous layer's IndexShare metadata and its own KV layer; the full producers (layers 0,
+    1, 2, 6) read their own index slot and repair ``wk`` and select anew, the shared layers (3, 4, 5, 7) keep what
+    they receive (3-5 producer 2's selection, 7 producer 6's); the block commits exactly the producers' slots and the
+    last layer's metadata, and equals the production program bitwise."""
+    check(outcome, "shared_layers_carry_their_producers_selection")
+
+
+@pytest.mark.cpu32
+def test_zero_live_tiles_past_capacity_stay_healthy_cpu32(outcome):
+    """A block whose last two 32-row tiles start past the cache and hold no live row: those tiles run at an
+    in-capacity offset, so every row of every layer reports healthy, dead rows included."""
+    check(outcome, "zero_live_tiles_stay_in_capacity")
+
+
+@pytest.mark.cpu32
+def test_reversed_device_order_cpu32(outcome):
+    """On a mesh over the devices in reverse order, 33 live rows near the end of the cache equal a 32 + 1 chain and
+    the natural mesh's block bitwise; a bad last live row rolls the whole state back."""
+    check(outcome, "reversed_device_order")

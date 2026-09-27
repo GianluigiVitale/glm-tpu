@@ -108,12 +108,15 @@ class FakeFleet:
         collect_failures: dict[int, tuple[int, bytes]] | None = None,
         stalled_rank: int | None = None,
         edit_package: Path | None = None,
+        directory_entry: str | None = None,
     ):
         self.runs, self.pin = runs, pin
         self.fail_rank, self.rewrite_equal_rank = fail_rank, rewrite_equal_rank
         # rank -> (exit code, output) of that host's *final* fetch; a stalled rank's SSH client
         # outlives its (cleaned-up) worker until the controller ends it
         self.collect_failures, self.stalled_rank = collect_failures or {}, stalled_rank
+        # "inbox" or "stop": the operator publishes an owner-only directory where that file belongs
+        self.directory_entry = directory_entry
         self.files: dict[int, dict[str, bytes]] = {rank: {} for rank in range(8)}  # ranks 1..7
         self.processes: list[FakeProcess] = []
         self.helpers = {remote.helper_text(name): name for name in HELPERS}
@@ -244,6 +247,13 @@ class FakeFleet:
         if self.fail_rank is None:
             io_utils.persist(self.root / protocol.READY_FILE, dict(sequence=sequence))
 
+    def publish(self, path: Path, data: bytes, kind: str) -> None:
+        if self.directory_entry == kind:
+            path.mkdir(mode=0o700)  # owner-only: io_utils.private admits it; read_bounded must refuse it
+        else:
+            path.write_bytes(data)
+            path.chmod(0o600)
+
     def sleep(self, seconds: float) -> None:
         """The controller's supervision sleep: publishes inbox 0001, then stop, like an operator."""
         self.ticks += 1
@@ -257,14 +267,11 @@ class FakeFleet:
         root = self.root
         inbox = root / protocol.INBOX_DIR
         if self.inbox_step == 0 and (root / protocol.MEASUREMENT_FILE).exists():
-            path = inbox / protocol.inbox_name(1)
-            path.write_bytes(canonical(request.from_token_ids([8, 9], request_id="fixture-r1", max_new_tokens=2)))
-            path.chmod(0o600)
+            value = request.from_token_ids([8, 9], request_id="fixture-r1", max_new_tokens=2)
+            self.publish(inbox / protocol.inbox_name(1), canonical(value), "inbox")
             self.inbox_step = 1
         elif self.inbox_step == 1 and (root / "resident-0001" / protocol.MEASUREMENT_FILE).exists():
-            path = inbox / protocol.STOP_FILE
-            path.write_text('{"stop":true}')
-            path.chmod(0o600)
+            self.publish(inbox / protocol.STOP_FILE, b'{"stop":true}', "stop")
             self.inbox_step = 2
 
 
@@ -487,6 +494,25 @@ def test_a_stalled_local_ssh_client_is_ended_after_the_bounded_wait(resident):
     assert terminal["stalled_ssh_clients"] == [5] and terminal["codes"][5] == -9
     assert [p.rank for p in fleet.processes if p.killed] == [5]
     assert terminal["collected"] is True and terminal["divergent_records"] == ["runner.rank3.json"]
+    assert "Cleanup unresolved" not in printed
+
+
+@pytest.mark.parametrize("entry", ["inbox", "stop"])
+def test_an_owner_only_directory_as_inbox_entry_or_stop_file_is_the_recorded_failure(resident, entry):
+    # io_utils.private admits an owner-only directory; read_bounded refuses it like every other non-regular input,
+    # and that refusal is the resident failure the terminal record keeps, after cleanup and collection.
+    fleet, outcome, printed = resident(directory_entry=entry)
+    root = fleet.root
+    message = "request input is not a bounded regular file"
+    assert isinstance(outcome, ValueError) and str(outcome) == message, repr(outcome)
+    terminal = _terminal(root)
+    assert terminal["failure"] == dict(type="ValueError", message=message)
+    assert terminal["collected"] is True and terminal["uncollected_ranks"] == [] and terminal["collect_error"] is None
+    assert terminal["divergent_records"] == [] and terminal["stalled_ssh_clients"] == []
+    assert terminal["codes"] == [-9] * 8
+    assert sorted(rank for helper, rank, _ in fleet.calls if helper == "cleanup") == list(range(8))
+    assert (root / "resident-0001").is_dir() == (entry == "stop")  # the directory inbox entry ran nothing
+    assert not (root / protocol.SUMMARY_FILE).exists()
     assert "Cleanup unresolved" not in printed
 
 
@@ -724,15 +750,14 @@ options:
 """
 
 
-def test_help_text_is_unchanged():
+def test_help_text_is_unchanged(monkeypatch, capsys):
+    # In this process, as `python -m` runs it (sys.argv[0] is the module's file): a child process whose argv names
+    # the controller would make a concurrent cpu32 test or heavy gate see a live TPU run (tools.equivalence budget).
+    # `python -m glm_tpu.executor.multihost_executor --help` itself: tests/engine/test_resident_protocol.py.
     assert sys.version_info[:2] == (3, 12), "the literal is Python 3.12 argparse output"
-    result = subprocess.run(
-        [sys.executable, "-m", "glm_tpu.executor.multihost_executor", "--help"],
-        cwd=Path(__file__).resolve().parents[2],
-        env=dict(os.environ, COLUMNS="100"),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout == HELP
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setattr(sys, "argv", [launch.__file__, "--help"])
+    with pytest.raises(SystemExit) as exited:
+        launch.main()
+    assert exited.value.code == 0
+    assert capsys.readouterr().out == HELP

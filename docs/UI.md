@@ -84,7 +84,7 @@ else of `as-pt` is licensed by it ([notices](../THIRD_PARTY_NOTICES.md)).
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q -p no:cacheprovider tests/entrypoints/serve/test_http_handler.py tests/entrypoints/ui/test_conversations.py
+JAX_PLATFORMS=cpu python -m pytest -q -p no:cacheprovider tests/entrypoints/serve/test_http_handler.py tests/entrypoints/serve/test_job_queue.py tests/entrypoints/ui/test_conversations.py
 ```
 
 The CPU checks use a synthetic resident adapter to verify queue ordering, history

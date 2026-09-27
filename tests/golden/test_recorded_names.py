@@ -147,6 +147,8 @@ def test_the_hlo_admission_fake_follows_a_closure_map_entry(cleared, monkeypatch
     # The table cleared and the row stale: the real parser stays in place (and refuses the stand-in text).
     with compiler.patches():
         assert all(getattr(module, new) is real for module in homes)
+    with pytest.raises(ValueError):
+        real(driver.STANDIN_HLO.format(name="decode"))
 
 
 @pytest.mark.parametrize("stub", sorted(driver.HOMES))

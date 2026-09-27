@@ -14,7 +14,7 @@ import pytest
 def test_ws32_io_matches_forced_32_reference_without_vocab_gather() -> None:
     program = r"""
 import json
-from typing import Any
+import math
 
 import jax
 import jax.numpy as jnp
@@ -24,41 +24,10 @@ from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from tests.reference.norm import fused_add_rms_norm
-from glm_tpu.layers.norm import sharded_fused_add_rms_norm, sharded_rms_norm
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm
 from glm_tpu.layers.embed import EmbeddingResult, embed_tokens
-from glm_tpu.layers.sampler import (
-    GreedySampleResult, SplitGreedySampleResult, compute_logits, greedy_sample, split_final_sample)
+from glm_tpu.layers.sampler import SplitGreedySampleResult, compute_logits, split_final_sample
 from glm_tpu.runner.hlo_utils import parse_hlo_module
-
-# The unfused final sample (production fuses the residual add: split_final_sample), composed of the
-# production norm, logits and greedy sampler.
-def final_sample(
-    hidden_local: Any,
-    final_norm_weight_local: Any,
-    lm_head_local: Any,
-    *,
-    hidden_size: int,
-    vocab_size: int,
-    feature_axis: str = "feature",
-    expert_axis: str = "expert",
-    rms_norm_epsilon: float = 1e-5,
-) -> GreedySampleResult:
-    '''Normalize, project, and sample without returning full vocabulary.'''
-
-    normalized = sharded_rms_norm(
-        hidden_local,
-        final_norm_weight_local,
-        global_hidden_size=hidden_size,
-        feature_axis=feature_axis,
-        epsilon=rms_norm_epsilon,
-    )
-    logits = compute_logits(
-        normalized,
-        lm_head_local,
-        vocab_size=vocab_size,
-        feature_axis=feature_axis,
-    )
-    return greedy_sample(logits, vocab_size=vocab_size, expert_axis=expert_axis)
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
 mesh = Mesh(devices, ("expert", "feature"))
@@ -105,21 +74,6 @@ logits_program = jax.shard_map(
     out_specs=P(None, "expert"),
     check_vma=False,
 )
-sample_program = jax.shard_map(
-    lambda value, weight, table: final_sample(
-        value,
-        weight,
-        table,
-        hidden_size=hidden_size,
-        vocab_size=vocab_size,
-    ),
-    mesh=mesh,
-    in_specs=(
-        P(None, "feature"), P("feature"), P("expert", "feature")
-    ),
-    out_specs=GreedySampleResult(P(), P()),
-    check_vma=False,
-)
 split_norm_program = jax.shard_map(
     lambda update, residual, weight: sharded_fused_add_rms_norm(
         update,
@@ -155,9 +109,6 @@ logits_args = (
     put(hidden, P(None, "feature")),
     put(lm_head, P("expert", "feature")),
 )
-sample_args = logits_args[:1] + (
-    put(norm, P("feature")), logits_args[1]
-)
 split_args = (
     put(hidden, P(None, "feature")),
     put(carried, P(None, "feature")),
@@ -166,39 +117,21 @@ split_args = (
 split_sample_args = split_args + (logits_args[1],)
 embedding_compiled = jax.jit(embedding_program).lower(*embedding_args).compile()
 logits_compiled = jax.jit(logits_program).lower(*logits_args).compile()
-sample_compiled = jax.jit(sample_program).lower(*sample_args).compile()
 split_norm_compiled = jax.jit(split_norm_program).lower(*split_args).compile()
 split_sample_compiled = jax.jit(split_sample_program).lower(
     *split_sample_args
 ).compile()
 embedded = embedding_compiled(*embedding_args)
 logits = logits_compiled(*logits_args)
-sample = sample_compiled(*sample_args)
 split_normalized, split_carried = split_norm_compiled(*split_args)
 split_sample = split_sample_compiled(*split_sample_args)
 
-hidden_f32 = jnp.asarray(hidden).astype(jnp.float32)
-inverse = lax.rsqrt(
-    jnp.sum(lax.square(hidden_f32), axis=-1, keepdims=True)
-    / jnp.float32(hidden_size)
-    + jnp.float32(1e-5)
-)
-normalized = (
-    (hidden_f32 * inverse).astype(jnp.bfloat16) * jnp.asarray(norm)
-).astype(jnp.bfloat16)
 expected_logits = lax.dot_general(
     jnp.asarray(hidden).astype(jnp.float32),
     jnp.asarray(lm_head).astype(jnp.float32),
     dimension_numbers=(((1,), (1,)), ((), ())),
     preferred_element_type=jnp.float32,
 ).astype(jnp.bfloat16)
-expected_sample_logits = lax.dot_general(
-    normalized.astype(jnp.float32),
-    jnp.asarray(lm_head).astype(jnp.float32),
-    dimension_numbers=(((1,), (1,)), ((), ())),
-    preferred_element_type=jnp.float32,
-).astype(jnp.bfloat16)
-expected_token = int(jnp.argmax(expected_sample_logits[0]))
 expected_split_normalized, expected_split_carried = fused_add_rms_norm(
     jnp.asarray(hidden),
     jnp.asarray(carried),
@@ -216,7 +149,7 @@ expected_split_token = int(jnp.argmax(expected_split_logits[0]))
 zero_head = put(
     np.zeros_like(lm_head), P("expert", "feature")
 )
-tied = sample_compiled(sample_args[0], sample_args[1], zero_head)
+tied = split_sample_compiled(*split_args, zero_head)
 
 def collectives(compiled):
     module = parse_hlo_module(compiled.as_text())
@@ -240,9 +173,6 @@ print(json.dumps({
         logits.astype(jnp.float32) - expected_logits.astype(jnp.float32)
     ))),
     "logits_sharding": str(logits.sharding.spec),
-    "sample_token": np.asarray(sample.token_id).tolist(),
-    "expected_token": expected_token,
-    "sample_valid": np.asarray(sample.contract_valid).tolist(),
     "split_normalized_bitwise": bool(np.array_equal(
         np.asarray(split_normalized).view(np.uint16),
         np.asarray(expected_split_normalized).view(np.uint16),
@@ -260,14 +190,15 @@ print(json.dumps({
     "split_sample_valid": np.asarray(split_sample.contract_valid).tolist(),
     "split_collectives": collectives(split_sample_compiled),
     "tie_token": np.asarray(tied.token_id).tolist(),
+    "tie_valid": np.asarray(tied.contract_valid).tolist(),
     "embedding_collectives": collectives(embedding_compiled),
     "logits_collectives": collectives(logits_compiled),
-    "sample_collectives": collectives(sample_compiled),
-    "sample_has_full_vocab_gather": any(
-        item.raw_opcode == "all-gather"
-        and any(shape.dimensions == (8,) for shape in item.operand_shapes)
-        for item in parse_hlo_module(sample_compiled.as_text()).collectives
-    ),
+    "split_sample_gathered_values": [
+        math.prod(shape.dimensions)
+        for item in parse_hlo_module(split_sample_compiled.as_text()).collectives
+        if item.raw_opcode == "all-gather"
+        for shape in item.result_shapes
+    ],
 }, sort_keys=True))
 """
     environment = dict(os.environ)
@@ -289,16 +220,14 @@ print(json.dumps({
     assert result["embedding_sharding"] == "P(None, 'feature')"
     assert result["logits_max_abs"] <= 0.015625
     assert result["logits_sharding"] == "P(None, 'expert')"
-    assert result["sample_token"] == [result["expected_token"]]
-    assert result["sample_valid"] == [True]
     assert result["split_normalized_bitwise"]
     assert result["split_carried_bitwise"]
     assert result["split_sample_carried_bitwise"]
     assert result["split_sample_token"] == [result["expected_split_token"]]
     assert result["split_sample_valid"] == [True]
     assert max(item["group"] for item in result["split_collectives"]) <= 8
-    assert result["tie_token"] == [0]
+    assert result["tie_token"] == [0] and result["tie_valid"] == [True]  # all logits equal: the lowest id
     assert [item["group"] for item in result["embedding_collectives"]] == [8]
     assert [item["group"] for item in result["logits_collectives"]] == [4]
-    assert max(item["group"] for item in result["sample_collectives"]) <= 8
-    assert not result["sample_has_full_vocab_gather"]
+    # no full-vocabulary gather: the owners exchange one candidate each, no all-gather assembles 64 logits
+    assert result["split_sample_gathered_values"] and max(result["split_sample_gathered_values"]) < 64

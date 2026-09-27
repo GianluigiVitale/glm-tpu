@@ -3,15 +3,17 @@
 The sequential ``RequestSession`` (one greedy token per step) and the concurrent ``BatchedSession``. Until S5 WU-E2
 the first tests below ran the sampled base session and its seeded policy (``Ws32RequestSession``,
 ``SampledRequestPolicy``): production never instantiated them or ran the sampled step (it ran the base class's shared
-code through ``PackedRequestSession``). They now run the greedy session with this module's fakes, whose decode step
-returns a ``PackedDecodeResult``. The packed-status tests after them came from
-``tests/models/glm_moe_dsa/test_decode_program.py`` at S5 WU-E2. Until S2f those also ran the frozen sampled session
+code through ``PackedRequestSession``). They now run the greedy session over this module's fake (``setup``), whose
+decode step returns a ``PackedDecodeResult``. The packed-status tests after them came from
+``tests/models/glm_moe_dsa/test_decode_program.py`` at S5 WU-E2 with a fake of their own, now the same ``setup``
+(the sampled scaffolding it kept is gone). Until S2f those also ran the frozen sampled session
 and policy they replaced (same events and timing, one fewer vote per decode, identical refusals at seed 0). That
 oracle is archived at ``archive/research-20260922``; its final green run is recorded in the S2f commit message, and
 the frozen policy's refusals at seed 0 are pinned below as data (``POLICY_CASES``).
 """
 
 from dataclasses import replace
+from typing import NamedTuple
 
 import numpy as np
 import pytest
@@ -43,38 +45,54 @@ def prefill(token=7, healthy=True):
     )
 
 
-def setup(*, max_new=4, deliver=None, vote=None, outputs=(9, 10)):
+class Fake(NamedTuple):
+    session: RequestSession
+    calls: list  # the token each decode step received, in order
+    events: list  # every event handed to the sink, in order
+    votes: list  # every value put to the fleet vote, in order
+    clock: list  # [now]
+
+
+def setup(*, max_new=4, outputs=(9, 10), mutate=None, vote=None, deliver=None):
+    """A greedy ``RequestSession`` over fake math: the n-th decode step returns ``outputs[n - 1]`` with the packed
+    status row ``[token, 1, 3 + n, 4 + n]`` (``mutate`` may replace the row); ``vote(value, n)`` answers the n-th
+    fleet vote (default: the value itself); ``deliver(event)`` runs after the sink has recorded each event. The
+    clock starts at 10 and advances 0.25 per decode step and 0.5 per delivery."""
     clock = [10.0]
-    calls, emitted = [], []
-    policy = RequestPolicy("request-a", 3, max_new, 20, 256, (10,))
+    calls, events, votes = [], [], []
 
     def decode(token, previous):
-        calls.append((token.copy(), previous))
+        calls.append(token.copy())
+        n = len(calls)
         clock[0] += 0.25
-        output = outputs[len(calls) - 1]
-        result = DecodeStepResult(state(3 + len(calls)), np.array([output], np.int32), np.zeros((1, 1)))
-        return PackedDecodeResult(result, np.array([output, 1, 3 + len(calls), 4 + len(calls)], np.int32))
+        result = DecodeStepResult(state(3 + n), np.array([outputs[n - 1]], np.int32), np.zeros((1, 1)))
+        status = np.array([outputs[n - 1], 1, 3 + n, 4 + n], np.int32)
+        return PackedDecodeResult(result, mutate(status) if mutate else status)
 
     def sink(event):
-        emitted.append(event)
+        events.append(event)
         clock[0] += 0.5
         if deliver is not None:
             deliver(event)
 
+    def fleet(value):
+        votes.append(value)
+        return vote(value, len(votes)) if vote else value
+
     session = RequestSession(
-        policy,
+        RequestPolicy("request-a", 3, max_new, 20, 256, (10,)),
         decode_step=decode,
-        fleet_all=vote or (lambda x: x),
+        fleet_all=fleet,
         deliver=sink,
-        delivery_boundary="fake unit-test sink",
+        delivery_boundary="fake sink",
         request_started=1.0,
         clock=lambda: clock[0],
     )
-    return session, calls, emitted
+    return Fake(session, calls, events, votes, clock)
 
 
 def test_first_token_delivery_eos_live_resume_and_frontier():
-    session, calls, emitted = setup()
+    session, calls, emitted, *_ = setup()
     session.accept_prefill(prefill())
     assert session.ttft_seconds == 9.5 and calls == []
     assert session.events[0].token_id == 7
@@ -83,7 +101,7 @@ def test_first_token_delivery_eos_live_resume_and_frontier():
     paused_session.step()
     assert [e.token_id for e in emitted] == [7, 9, 10]
     assert emitted[-1].finish_reason == "eos" and session.finished
-    assert [int(x[0][0]) for x in calls] == [7, 9]
+    assert [int(token[0]) for token in calls] == [7, 9]
     assert session.decode_seconds == (0.25, 0.25)
     assert session.delivered_request_seconds == 11.0
     with pytest.raises(RuntimeError):
@@ -93,7 +111,7 @@ def test_first_token_delivery_eos_live_resume_and_frontier():
 
 @pytest.mark.parametrize("token,reason", [(7, "length"), (10, "eos")])
 def test_first_token_can_finish_without_decode(token, reason):
-    session, calls, emitted = setup(max_new=1)
+    session, calls, emitted, *_ = setup(max_new=1)
     session.accept_prefill(prefill(token))
     assert emitted[0].finish_reason == reason and not calls
     with pytest.raises(RuntimeError):
@@ -102,7 +120,7 @@ def test_first_token_can_finish_without_decode(token, reason):
 
 
 def test_unhealthy_prefill_is_never_emitted_and_cannot_retry():
-    session, calls, emitted = setup()
+    session, calls, emitted, *_ = setup()
     with pytest.raises(RuntimeError):
         session.accept_prefill(prefill(healthy=False))
     assert session.failed and not emitted and not calls
@@ -114,7 +132,7 @@ def test_sink_failure_preserves_generated_token_but_no_false_delivery_or_retry()
     def fail(event):
         raise OSError("sink disconnected after possibly writing bytes")
 
-    session, calls, emitted = setup(deliver=fail)
+    session, calls, emitted, *_ = setup(deliver=fail)
     with pytest.raises(RuntimeError) as refused:
         session.accept_prefill(prefill())
     assert isinstance(refused.value.__cause__, OSError)
@@ -126,21 +144,21 @@ def test_sink_failure_preserves_generated_token_but_no_false_delivery_or_retry()
 
 
 def test_remote_refusal_never_emits_local_healthy_token():
-    session, _, emitted = setup(vote=lambda _: False)
+    session, _, emitted, *_ = setup(vote=lambda value, n: False)
     with pytest.raises(RuntimeError):
         session.accept_prefill(prefill())
     assert session.failed and emitted == []
 
 
 def test_nonboolean_vote_cannot_admit_execution():
-    session, calls, emitted = setup(vote=lambda _: "yes")
+    session, calls, emitted, *_ = setup(vote=lambda value, n: "yes")
     with pytest.raises(RuntimeError):
         session.accept_prefill(prefill())
     assert session.failed and not calls and not emitted
 
 
 def test_dispatch_exception_poisoned_without_duplicate_first_token():
-    session, calls, emitted = setup(outputs=())
+    session, calls, emitted, *_ = setup(outputs=())
     session.accept_prefill(prefill())
     with pytest.raises(IndexError):
         session.step()
@@ -155,18 +173,18 @@ def test_wrong_frontier_or_token_cannot_be_delivered():
         prefill()._replace(next_token=np.array([-1], np.int32)),
         prefill()._replace(state=prefill().state._replace(decoder=state(4))),
     ):
-        session, _, emitted = setup()
+        session, _, emitted, *_ = setup()
         with pytest.raises(RuntimeError):
             session.accept_prefill(result)
         assert not emitted and session.failed
 
 
 def test_no_decode_before_prefill_and_no_second_prefill():
-    session, calls, _ = setup()
+    session, calls, *_ = setup()
     with pytest.raises(RuntimeError):
         session.step()
     assert session.failed and not calls
-    session, _, emitted = setup()
+    session, _, emitted, *_ = setup()
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError):
         session.accept_prefill(prefill())
@@ -203,44 +221,8 @@ def test_constructor_refuses_a_foreign_policy_before_reading_the_clock():
     assert len(reads) == 1
 
 
-def packed_setup(packed=True, *, mutate=None, vote=None, sink_error=False, outputs=(9, 10), max_new=4):
-    assert packed  # the greedy release session is the only session
-    clock = [10.0]
-    calls, draws, events, votes = [], [], [], []
-
-    def decode(token, previous, *uniform):
-        i = len(calls) + 1
-        calls.append(token)
-        draws.extend(float(u) for u in uniform)
-        clock[0] += 0.25
-        out = DecodeStepResult(state(3 + i), np.array([outputs[i - 1]], np.int32), np.zeros((1, 1)))
-        status = np.array([outputs[i - 1], 1, 3 + i, 4 + i], np.int32)
-        return PackedDecodeResult(out, mutate(status) if mutate else status)
-
-    def sink(event):
-        events.append(event)
-        clock[0] += 0.5
-        if sink_error and event.index > 0:
-            raise OSError("sink failed after possible emission")
-
-    def fleet(valid):
-        votes.append(valid)
-        return vote(valid, len(votes)) if vote else valid
-
-    session = RequestSession(
-        RequestPolicy("request-a", 3, max_new, 20, 256, (10,)),
-        decode_step=decode,
-        fleet_all=fleet,
-        deliver=sink,
-        delivery_boundary="fake sink",
-        request_started=1.0,
-        clock=lambda: clock[0],
-    )
-    return session, calls, draws, events, votes, [], clock
-
-
 def test_packed_loop_events_pause_eos_and_boundary_work():
-    session, calls, draws, events, votes, _, _ = packed_setup()
+    session, calls, events, votes, _ = setup()
     session.accept_prefill(prefill())
     session.step()
     paused = session
@@ -253,8 +235,7 @@ def test_packed_loop_events_pause_eos_and_boundary_work():
     session.release()
     assert session._state is None
     assert [(e.index, e.token_id, e.finish_reason) for e in events] == [(0, 7, None), (1, 9, None), (2, 10, "eos")]
-    assert draws == []  # the greedy session never draws a uniform
-    assert [int(v[0]) for v in calls] == [7, 9]
+    assert [int(token[0]) for token in calls] == [7, 9]
     assert len(votes) == 7  # prefill: 3 votes, then 2 per decode
 
 
@@ -314,7 +295,7 @@ def test_greedy_policy_refuses_exactly_like_the_frozen_policy_at_seed_zero(args,
     ],
 )
 def test_invalid_compact_status_never_emits_or_retries(mutate):
-    session, calls, _, events, *_ = packed_setup(True, mutate=mutate)
+    session, calls, events, *_ = setup(mutate=mutate)
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError):
         session.step()
@@ -326,7 +307,7 @@ def test_invalid_compact_status_never_emits_or_retries(mutate):
 
 @pytest.mark.parametrize("answer", [False, "yes"])
 def test_remote_or_nonboolean_refusal_prevents_delivery(answer):
-    session, _, _, events, *_ = packed_setup(True, vote=lambda v, n: answer if n == 4 else v)
+    session, _, events, *_ = setup(vote=lambda value, n: answer if n == 4 else value)
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError):
         session.step()
@@ -334,7 +315,11 @@ def test_remote_or_nonboolean_refusal_prevents_delivery(answer):
 
 
 def test_sink_failure_commits_once_then_poisoned():
-    session, calls, _, events, *_ = packed_setup(True, sink_error=True)
+    def fail_after_the_first_token(event):
+        if event.index > 0:
+            raise OSError("sink failed after possible emission")
+
+    session, calls, events, *_ = setup(deliver=fail_after_the_first_token)
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError) as error:
         session.step()
@@ -348,7 +333,7 @@ def test_sink_failure_commits_once_then_poisoned():
 
 def test_length_stop_without_extra_decode_and_first_token_stop():
     for maximum in (1, 2):
-        session, calls, *_ = packed_setup(True, max_new=maximum)
+        session, calls, *_ = setup(max_new=maximum)
         session.accept_prefill(prefill())
         if maximum == 2:
             session.step()
@@ -362,7 +347,7 @@ def test_invalid_step_clock_never_emits(invalid_time):
         clock[0] = invalid_time
         return status
 
-    session, _, _, events, _, _, clock = packed_setup(True, mutate=corrupt)
+    session, _, events, _, clock = setup(mutate=corrupt)
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError):
         session.step()
@@ -370,7 +355,7 @@ def test_invalid_step_clock_never_emits(invalid_time):
 
 
 def test_remote_delivery_failure_is_terminal_after_commit():
-    session, _, _, events, *_ = packed_setup(True, vote=lambda v, n: False if n == 5 else v)
+    session, _, events, *_ = setup(vote=lambda value, n: False if n == 5 else value)
     session.accept_prefill(prefill())
     with pytest.raises(RuntimeError):
         session.step()

@@ -12,7 +12,6 @@ import sys
 
 import pytest
 
-from glm_tpu.model_loader.sharded_state.format import RuntimePackConfig
 from glm_tpu.model_loader.sharded_state.writer import (
     finalize_runtime_checkpoint,
     pack_runtime_checkpoint,
@@ -20,13 +19,9 @@ from glm_tpu.model_loader.sharded_state.writer import (
 )
 from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint
 from glm_tpu.exceptions import CheckpointValidationError
-from glm_tpu.model_loader.source_inventory import read_source_inventory
-from glm_tpu.config.model import ModelGeometry
 from glm_tpu.distributed.mesh import PhysicalMesh
-from tests.fixtures.site import EXAMPLE_BUCKET, example_site, installed_site
-
-# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (tests/config/test_model.py).
-from tools.equivalence.fixture import config_json
+from tests.fixtures import tiny_checkpoint
+from tests.fixtures.site import example_site, installed_site
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -39,120 +34,14 @@ def _example_site(tmp_path_factory):
         yield site
 
 
-def _geometry() -> ModelGeometry:
-    full = ModelGeometry.from_hf_config(config_json())
-    return replace(
-        full,
-        num_layers=1,
-        first_dense_layers=1,
-        hidden_size=8,
-        dense_intermediate_size=16,
-        num_routed_experts=8,
-        routed_top_k=2,
-        moe_intermediate_size=4,
-        dsa_top_k=8,
-        dsa_indexer_heads=8,
-        dsa_indexer_head_dim=2,
-        index_share_group_size=1,
-        attention_heads=8,
-        kv_heads=8,
-        kv_lora_rank=4,
-        q_lora_rank=8,
-        qk_nope_head_dim=2,
-        qk_rope_head_dim=2,
-        v_head_dim=2,
-        max_position_embeddings=64,
-        vocab_size=16,
-        fp8_block_shape=(2, 2),
-        mlp_layer_types=("dense",),
-        indexer_types=("full",),
-    )
-
-
-def _fixture(tmp_path: Path):
-    import torch
-    from safetensors.torch import save_file
-
-    source = tmp_path / "source"
-    source.mkdir()
-    filename = "model.safetensors"
-    embedding = torch.arange(16 * 8, dtype=torch.float32).reshape(16, 8).to(torch.bfloat16)
-    save_file({"model.embed_tokens.weight": embedding}, source / filename)
-    (source / "model.safetensors.index.json").write_text(
-        json.dumps(
-            {
-                "metadata": {"total_size": embedding.numel() * embedding.element_size()},
-                "weight_map": {"model.embed_tokens.weight": filename},
-            }
-        )
-    )
-    inventory = read_source_inventory(
-        source,
-        model_id="zai-org/GLM-5.2-FP8",
-        source_revision="unit-fixture",
-        config_filename=None,
-    )
-    output = tmp_path / "packed"
-    config = RuntimePackConfig(
-        source_root=source,
-        source_uri=EXAMPLE_BUCKET + "models/unit-fixture",
-        output_dir=output,
-        code_hash="a" * 40,
-        mesh_hash="b" * 64,
-    )
-    return embedding, inventory, config
-
-
-def _seal(
-    root: Path,
-    manifest: dict[str, object],
-    *,
-    topology_hash: str = "c" * 64,
-) -> dict[str, object]:
-    source = manifest["source"]
-    assert isinstance(source, dict)
-    source_files = source["files"]
-    assert isinstance(source_files, list)
-    value: dict[str, object] = {
-        "artifact_kind": "greenfield_ws32_runtime_checkpoint_success",
-        "code_hash": manifest["code_hash"],
-        "file_count": 32,
-        "format_version": 1,
-        "manifest_file_sha256": sha256((root / "manifest.json").read_bytes()).hexdigest(),
-        "manifest_sha256": manifest["manifest_sha256"],
-        "mesh_hash": manifest["mesh_hash"],
-        "packed_payload_bytes": manifest["packed_payload_bytes"],
-        "performance_claim": False,
-        "post_census_sha256": "d" * 64,
-        "remote_preflight_sha256": "e" * 64,
-        "remote_terminal_sha256": "f" * 64,
-        "source_file_count": len(source_files),
-        "source_inventory_sha256": source["inventory_sha256"],
-        "tag": "greenfield_ws32_runtime_pack_20260815T010203123456789Z",
-        "topology_hash": topology_hash,
-        "tpu_initialized": False,
-    }
-    value["success_sha256"] = sha256(
-        json.dumps(
-            value,
-            allow_nan=False,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-    ).hexdigest()
-    (root / "SUCCESS").write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
-    return value
-
-
 def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
     tmp_path: Path,
 ) -> None:
     import torch
     from safetensors import safe_open
 
-    embedding, inventory, config = _fixture(tmp_path)
-    manifest = pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)
+    embedding, inventory, config = tiny_checkpoint.fixture(tmp_path)
+    manifest = pack_runtime_checkpoint(config, inventory, tiny_checkpoint.geometry(), chunk_bytes=16)
     assert manifest["packed_payload_bytes"] == embedding.numel() * 2
     assert len(manifest["files"]) == 32
     assert len(manifest["tensor_schema"]) == 1
@@ -180,9 +69,9 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             expected_mesh_hash="b" * 64,
             expected_topology_hash="c" * 64,
             inventory=inventory,
-            geometry=_geometry(),
+            geometry=tiny_checkpoint.geometry(),
         )
-    success = _seal(config.output_dir, manifest)
+    success = tiny_checkpoint.seal(config.output_dir, manifest)
     verified = verify_runtime_checkpoint(
         config.output_dir,
         expected_manifest_sha256=manifest["manifest_sha256"],
@@ -190,7 +79,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
         expected_mesh_hash="b" * 64,
         expected_topology_hash="c" * 64,
         inventory=inventory,
-        geometry=_geometry(),
+        geometry=tiny_checkpoint.geometry(),
     )
     assert len(verified.plans) == 32
     assert verified.records_by_slot[31]["feature_coordinate"] == 3
@@ -211,7 +100,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
         expected_mesh_hash="b" * 64,
         expected_topology_hash="c" * 64,
         inventory=inventory,
-        geometry=_geometry(),
+        geometry=tiny_checkpoint.geometry(),
         verify_file_hash_slots=(0, 1, 2, 3),
     )
     with pytest.raises(CheckpointValidationError, match="checksum drifted"):
@@ -222,7 +111,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             expected_mesh_hash="b" * 64,
             expected_topology_hash="c" * 64,
             inventory=inventory,
-            geometry=_geometry(),
+            geometry=tiny_checkpoint.geometry(),
             verify_file_hash_slots=(31,),
         )
     with pytest.raises(ValueError, match="slot subset"):
@@ -233,7 +122,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             expected_mesh_hash="b" * 64,
             expected_topology_hash="c" * 64,
             inventory=inventory,
-            geometry=_geometry(),
+            geometry=tiny_checkpoint.geometry(),
             verify_file_hash_slots=(0, 0),
         )
 
@@ -243,7 +132,7 @@ def test_ws32_runtime_validation_failure_never_commits_manifest(
 ) -> None:
     from glm_tpu.model_loader.sharded_state import writer as module
 
-    _, inventory, config = _fixture(tmp_path)
+    _, inventory, config = tiny_checkpoint.fixture(tmp_path)
 
     def fail(*args: object, **kwargs: object) -> object:
         del args, kwargs
@@ -251,18 +140,18 @@ def test_ws32_runtime_validation_failure_never_commits_manifest(
 
     monkeypatch.setattr(module, "verify_runtime_value", fail)
     with pytest.raises(CheckpointValidationError, match="injected"):
-        pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)
+        pack_runtime_checkpoint(config, inventory, tiny_checkpoint.geometry(), chunk_bytes=16)
     assert not (config.output_dir / "manifest.json").exists()
 
 
 def test_ws32_runtime_slot_pack_is_disjoint_and_nonterminal(
     tmp_path: Path,
 ) -> None:
-    _, inventory, config = _fixture(tmp_path)
+    _, inventory, config = tiny_checkpoint.fixture(tmp_path)
     records = pack_runtime_slots(
         config,
         inventory,
-        _geometry(),
+        tiny_checkpoint.geometry(),
         device_slots=(0, 5, 31),
         chunk_bytes=16,
     )
@@ -278,11 +167,11 @@ def test_ws32_runtime_slot_pack_is_disjoint_and_nonterminal(
 
 
 def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
-    _, inventory, config = _fixture(tmp_path)
+    _, inventory, config = tiny_checkpoint.fixture(tmp_path)
     records = pack_runtime_slots(
         config,
         inventory,
-        _geometry(),
+        tiny_checkpoint.geometry(),
         device_slots=tuple(range(32)),
         chunk_bytes=16,
     )
@@ -293,7 +182,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
     manifest = finalize_runtime_checkpoint(
         config,
         inventory,
-        _geometry(),
+        tiny_checkpoint.geometry(),
         file_records=records["files"],
         source_file_sha256=source_sha256,
     )
@@ -304,7 +193,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
         finalize_runtime_checkpoint(
             config,
             inventory,
-            _geometry(),
+            tiny_checkpoint.geometry(),
             file_records=records["files"],
             source_file_sha256=source_sha256,
         )
@@ -314,7 +203,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
 def test_ws32_runtime_loader_uses_only_exact_final_owner_shards(
     tmp_path: Path,
 ) -> None:
-    _, inventory, config = _fixture(tmp_path)
+    _, inventory, config = tiny_checkpoint.fixture(tmp_path)
     rows = tuple(tuple(range(row * 4, row * 4 + 4)) for row in range(8))
     physical = PhysicalMesh(
         device_ids=rows,
@@ -322,8 +211,8 @@ def test_ws32_runtime_loader_uses_only_exact_final_owner_shards(
         expert_groups=tuple(tuple(row * 4 + column for row in range(8)) for column in range(4)),
     )
     config = replace(config, mesh_hash=physical.mesh_hash)
-    manifest = pack_runtime_checkpoint(config, inventory, _geometry(), chunk_bytes=16)
-    success = _seal(config.output_dir, manifest)
+    manifest = pack_runtime_checkpoint(config, inventory, tiny_checkpoint.geometry(), chunk_bytes=16)
+    success = tiny_checkpoint.seal(config.output_dir, manifest)
     program = f"""\
 import json
 from pathlib import Path
@@ -378,9 +267,9 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
     """Streaming tmpfs layout (spec §21.5 route): a host root holds only its four slots."""
     import shutil
 
-    _embedding, inventory, config = _fixture(tmp_path)
-    manifest = pack_runtime_checkpoint(config, inventory, _geometry())
-    success = _seal(config.output_dir, manifest)
+    _embedding, inventory, config = tiny_checkpoint.fixture(tmp_path)
+    manifest = pack_runtime_checkpoint(config, inventory, tiny_checkpoint.geometry())
+    success = tiny_checkpoint.seal(config.output_dir, manifest)
     owned = (8, 12, 24, 28)
     local_root = tmp_path / "shm-root"
     local_root.mkdir()
@@ -397,7 +286,7 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
         expected_mesh_hash="b" * 64,
         expected_topology_hash="c" * 64,
         inventory=inventory,
-        geometry=_geometry(),
+        geometry=tiny_checkpoint.geometry(),
     )
     # The default (full) layout refuses a four-slot root.
     with pytest.raises(CheckpointValidationError, match="missing or truncated"):

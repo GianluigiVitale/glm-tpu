@@ -94,6 +94,8 @@ def test_config_imports_only_leaf_modules_and_no_jax() -> None:
         timeout=120,
         check=True,
     )
+    # Five on purpose (the package, cache, model, parallel, site): a new config module fails this count, the prompt
+    # to extend it (the leaf and no-JAX checks above then cover the new module too); it is not a regression.
     assert len(modules) == 5 and result.stdout == "[]\n", (modules, result.stdout)
 
 

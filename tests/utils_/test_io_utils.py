@@ -145,22 +145,37 @@ def test_read_bounded_refuses_symlinks_oversize_and_non_regular_files(tmp_path):
         read_bounded(fifo, PAYLOAD_CAP)
 
 
+def _descriptors_under(root):
+    """This process's open descriptors on ``root`` or a path below it (``/proc/self/fd`` link targets): only the
+    descriptors the test opens count, not those other tests, the garbage collector or other threads open or close."""
+    found = []
+    for name in os.listdir("/proc/self/fd"):
+        try:
+            target = os.readlink(f"/proc/self/fd/{name}")
+        except OSError:  # closed after the listing (the listing's own descriptor, among others)
+            continue
+        if target == str(root) or target.startswith(str(root) + os.sep):
+            found.append(target)
+    return found
+
+
 @pytest.mark.skipif(not os.path.isdir("/proc/self/fd"), reason="counts this process's open descriptors")
 def test_read_bounded_closes_its_descriptor_on_every_path(tmp_path):
     """A read and every refusal, a directory's included, leave no descriptor open."""
-    path = tmp_path / "request.json"
+    root = tmp_path.resolve()
+    path = root / "request.json"
     path.write_bytes(b'{"a":1}')
-    (tmp_path / "empty").write_bytes(b"")
-    fifo = tmp_path / "fifo"
+    (root / "empty").write_bytes(b"")
+    fifo = root / "fifo"
     os.mkfifo(fifo)
-    refused = [(tmp_path, PAYLOAD_CAP), (fifo, PAYLOAD_CAP), (tmp_path / "empty", PAYLOAD_CAP), (path, 1)]
-    before = len(os.listdir("/proc/self/fd"))
+    refused = [(root, PAYLOAD_CAP), (fifo, PAYLOAD_CAP), (root / "empty", PAYLOAD_CAP), (path, 1)]
+    assert _descriptors_under(root) == []
     for _ in range(20):
         assert read_bounded(path, PAYLOAD_CAP) == b'{"a":1}'
         for refused_path, cap in refused:
             with pytest.raises(ValueError, match="bounded regular file"):
                 read_bounded(refused_path, cap)
-    assert len(os.listdir("/proc/self/fd")) == before
+    assert _descriptors_under(root) == []
 
 
 def test_private_input_rejects_public_permissions_and_symlink(tmp_path):

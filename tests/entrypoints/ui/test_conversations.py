@@ -1,12 +1,12 @@
 """Tests of :mod:`glm_tpu.entrypoints.ui.conversations`: the saved conversations of the chat UI.
 
-CPU only, with the synthetic resident of ``tests/entrypoints/serve/test_http_handler.py``; no tokenizer,
-checkpoint, cloud or TPU.
+CPU only, with the synthetic resident of ``tests/fixtures/serving.py``; no tokenizer, checkpoint, cloud or
+TPU.
 """
 
 import pytest
 
-from tests.entrypoints.serve.test_http_handler import FakeResident, chat, open_store, send
+from tests.fixtures.serving import FakeResident, chat, open_store, send
 
 
 def test_history_isolation_and_full_allowance(tmp_path):
