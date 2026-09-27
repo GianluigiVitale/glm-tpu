@@ -12,6 +12,8 @@ Harness-only patches, active only inside ``location_free()``; production lowerin
   the chip description see the production chip.
 * Kernel-name patch-back from ``kernel_renames.toml`` (D5, since S4.2b): the public values of
   ``glm_tpu.kernels.names.KERNEL_NAMES`` are set to their 181c013e spellings for the duration.
+  Inside ``kernel_names("public")`` the table is empty and the public names stay (``authenticity
+  --kernel-names public``, for TPU originals compiled from this tree).
 * ``jax.clear_caches()`` on entry and exit, so no lowering cached outside the context is reused.
 """
 
@@ -25,7 +27,9 @@ import tomllib
 from typing import Any
 
 KERNEL_RENAMES = Path(__file__).with_name("kernel_renames.toml")
+KERNEL_NAME_MODES = ("recorded", "public")
 _MISSING = object()
+_mode_table: dict[str, Any] | None = None  # the table of the active kernel_names() mode; None: the toml
 
 
 @contextmanager
@@ -58,8 +62,27 @@ def kernel_renames() -> dict[str, Any]:
 
 
 @contextmanager
+def kernel_names(mode: str) -> Iterator[None]:
+    """The kernel names every ``location_free()`` inside this context lowers with (unless it is given
+    ``renames``). ``recorded`` (the default outside any context): the ``kernel_renames.toml``
+    patch-back, i.e. the 181c013e names of the records and of TPU originals compiled at 181c013e.
+    ``public``: an empty ``[names]`` table, i.e. the names production lowers
+    (``glm_tpu.kernels.names.KERNEL_NAMES``), which TPU originals compiled from this tree carry."""
+    global _mode_table
+    if mode not in KERNEL_NAME_MODES:
+        raise ValueError(f"kernel-name mode must be one of {', '.join(KERNEL_NAME_MODES)}; got {mode!r}")
+    previous = _mode_table
+    _mode_table = dict(names={}) if mode == "public" else None
+    try:
+        yield
+    finally:
+        _mode_table = previous
+
+
+@contextmanager
 def _kernel_name_patch_back(table: dict[str, Any] | None = None) -> Iterator[None]:
-    table = kernel_renames() if table is None else table
+    if table is None:
+        table = kernel_renames() if _mode_table is None else _mode_table
     if not table["names"]:
         yield
         return
@@ -79,7 +102,8 @@ def _kernel_name_patch_back(table: dict[str, Any] | None = None) -> Iterator[Non
 
 @contextmanager
 def location_free(renames: dict[str, Any] | None = None) -> Iterator[None]:
-    """N1. ``renames`` overrides ``kernel_renames.toml`` (self-test only)."""
+    """N1. ``renames`` overrides the kernel-name table (self-test only); without it the table of the
+    enclosing ``kernel_names`` mode applies, ``kernel_renames.toml`` by default."""
     import jax
     from jax._src import config as jax_config
     from jax._src.interpreters import mlir

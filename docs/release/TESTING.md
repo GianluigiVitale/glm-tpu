@@ -51,7 +51,7 @@ The first includes the `cpu32` tests (layers, the decode and prefill programs an
 the checkpoint format on 32 CPU devices, and the production composition against
 the reference model) and takes about 20 minutes on a large host; one `site` test
 skips. The second (the checkpoint identities, the static
-import closure, the wire formats and the data contracts) takes about a minute.
+import closure, the wire formats, the harness command line and the data contracts) takes about a minute.
 
 The heavy equivalence gates build the real runtime and compare with the records
 ([harness README](../../tools/equivalence/README.md)):
@@ -64,9 +64,9 @@ JAX_PLATFORMS=cpu python -m tools.equivalence check --gates G4,G6-static,G9
 JAX_PLATFORMS=cpu GLM_EQUIVALENCE_PRODUCTION=1 GLM_EQUIVALENCE_STRICT=1 python -m pytest -p no:cacheprovider -rs tests/golden -m cpu32
 ```
 
-Measured on a 240-core host at the last full run: `check` 19 minutes,
-`check --tier production` 12 minutes, `selftest` 3 minutes, the light gates
-under a minute, the `cpu32` golden wrappers 29 minutes. Expect several times more
+Measured on a 240-core host at the last full run: `check` 20 minutes,
+`check --tier production` 12 minutes, `selftest` 4 minutes, the light gates
+under a minute, the `cpu32` golden wrappers 30 minutes. Expect several times more
 on a small machine. `GLM_EQUIVALENCE_STRICT=1` turns a version-mismatch skip into
 a failure; without `GLM_EQUIVALENCE_PRODUCTION=1` the production-tier wrappers skip.
 

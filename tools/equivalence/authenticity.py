@@ -19,6 +19,14 @@ production-tier program (built by the real runtime) on the CPU host and compares
   (``tpu_custom_call.get_ir_version`` -> ``_FWD_COMPAT_VERSION``, 11 in jax 0.10.1), while the fleet
   serializes at the current one (13); the deserialized IR is compared in full.
 
+``--kernel-names`` chooses the Pallas kernel names the harness lowers with (``lowering.kernel_names``):
+``recorded`` (default) patches them back to their 181c013e spellings through ``kernel_renames.toml``,
+as in the records, for originals compiled at 181c013e (the B1/B2 baseline runs); ``public`` keeps the
+names production lowers since S4.2b, for originals compiled from this tree. The mode applies to the
+production build itself (the kept ``Lowered`` objects are built under it), and the report states it.
+A kernel's name is both its custom call's ``kernel_name`` and the function symbol inside its Mosaic
+body, so under the other mode every program with a Pallas kernel differs, masked and decoded.
+
 ``--out FILE`` writes the per-kernel table (program, index, kernel name, decoded equality, digest
 prefixes) to a small JSON report outside Git. Never writes next to the originals and never
 deletes them. Prints hashes and verdicts only.
@@ -34,6 +42,7 @@ from pathlib import Path
 from typing import Any
 
 from .common import emit, environment, require_cpu, source_record
+from .lowering import KERNEL_NAME_MODES
 
 # Original file name -> production-tier record key: the sequential 32K session (B1, donated) and,
 # for the batch programs, the concurrent n=4 session (B2). The first directory holding a name wins.
@@ -112,7 +121,7 @@ def decoded_bodies(text: str) -> tuple[str, list[list[str]], list[str]]:
     return "\n".join(lines), kernels, sorted(versions)
 
 
-def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
+def compare(directories: list[Path], out: Path | None = None, kernel_names: str = "recorded") -> dict[str, Any]:
     from . import fixture, lowering, normalize, programs
 
     require_cpu()
@@ -124,13 +133,14 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
                 originals.setdefault(name, path)
     wanted = {KEYS[name] for name in originals}
     mesh = fixture.cpu_mesh()
-    with lowering.tpu_v4_info():
+    with lowering.kernel_names(kernel_names), lowering.tpu_v4_info():  # the build lowers under the mode
         specs = programs.program_specs("production", mesh, only=wanted, keep_lowered=True)
     rows: dict[str, Any] = {}
     table: list[list[Any]] = []
     for name, path in sorted(originals.items()):
         spec = specs[KEYS[name]]
-        with lowering.location_free():  # production's own Lowered (built location-free by compile_program)
+        # production's own Lowered (built location-free by compile_program)
+        with lowering.kernel_names(kernel_names), lowering.location_free():
             lowered = spec.lowered if spec.lowered is not None else lowering.lower_for_tpu(spec.fn, spec.args)
             text = normalize.stablehlo_text(lowered)
         original = path.read_text()
@@ -165,6 +175,7 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
             json.dumps(
                 dict(
                     columns=["program", "index", "kernel", "decoded_equal", "harness_sha16", "original_sha16"],
+                    kernel_names=kernel_names,
                     kernels=table,
                 ),
                 indent=0,
@@ -174,6 +185,7 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
     return dict(
         gate="adapter-authenticity",
         status="pass" if verdict else ("fail" if rows else "no-originals"),
+        kernel_names=kernel_names,
         environment=environment(),
         source=source_record(),
         programs=rows,
@@ -182,10 +194,17 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="compare the real runtime's programs with TPU StableHLO originals")
-    parser.add_argument("directories", nargs="+", type=Path, help="native.rank0 directories of golden runs (read-only)")
+    parser.add_argument("directories", nargs="+", type=Path, help="native.rank0 directories of TPU runs (read-only)")
     parser.add_argument("--out", type=Path, help="write the per-kernel table here (outside Git)")
+    parser.add_argument(
+        "--kernel-names",
+        choices=KERNEL_NAME_MODES,
+        default="recorded",
+        help="recorded: the 181c013e names (originals compiled at 181c013e); public: the names production "
+        "lowers (originals compiled from this tree)",
+    )
     args = parser.parse_args(argv)
-    emit(compare(args.directories, args.out))
+    emit(compare(args.directories, args.out, kernel_names=args.kernel_names))
     return 0
 
 

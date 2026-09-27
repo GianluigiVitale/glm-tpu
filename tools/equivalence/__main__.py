@@ -10,7 +10,8 @@ Commands:
   site-check   [--record] [--requests DIR]            G5 on rank 0 (read-only, fleet idle)
   compare-run  RUN --golden DIR [--golden DIR] [--out FILE]   TPU token equivalence (hash-only)
   diff         --program KEY [--against REV] [--tier fixture|production]   normalized text diff
-  authenticity DIR [DIR ...] [--out FILE]            harness programs vs TPU StableHLO originals
+  authenticity DIR [DIR ...] [--kernel-names recorded|public] [--out FILE]
+               harness programs vs TPU StableHLO originals (public: originals compiled from this tree)
   budget                                               is a TPU run live on this host?
 
 Every report is JSON on stdout; exit status 0 only when every requested gate passes.
@@ -24,6 +25,8 @@ import os
 import sys
 import time
 from pathlib import Path
+
+from .lowering import KERNEL_NAME_MODES
 
 GATES = ("G1", "G1-protocol", "G2", "G2-protocol", "G3", "G4", "G6", "G6-static", "G7", "G9", "fixture")
 DEFAULT_CHECK = ("G1", "G1-protocol", "G3", "G4", "G6", "G7", "G9")
@@ -80,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     auth = commands.add_parser("authenticity")
     auth.add_argument("directories", nargs="+", type=Path)
     auth.add_argument("--out", type=Path, help="per-kernel report (outside Git)")
+    auth.add_argument(
+        "--kernel-names",
+        choices=KERNEL_NAME_MODES,
+        default="recorded",
+        help="recorded: lower with the 181c013e kernel names (originals compiled at 181c013e); "
+        "public: with the names production lowers (originals compiled from this tree)",
+    )
     commands.add_parser("budget")
     args = parser.parse_args(argv)
 
@@ -107,8 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "site-check":
         from .identities import site_check
 
-        print(g.dumps(site_check(record=args.record, requests_dir=args.requests)))
-        return 0
+        result = site_check(record=args.record, requests_dir=args.requests)
+        print(g.dumps(result))
+        return 0 if result["status"] in ("pass", "recorded") else 1
     if args.command == "compare-run":
         from .compare_run import main as compare_main
 
@@ -127,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
         from .common import run_child
 
         g.refuse_if_live(["G2"])
-        extra = ["--out", str(args.out.resolve())] if args.out else []
+        extra = ["--kernel-names", args.kernel_names] + (["--out", str(args.out.resolve())] if args.out else [])
         result = run_child("tools.equivalence.authenticity", *map(str, args.directories), *extra, timeout=4 * 3600)
         print(g.dumps({k: v for k, v in result.items() if k != "environment"}))
         return 0 if result["status"] == "pass" else 1

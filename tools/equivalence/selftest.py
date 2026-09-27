@@ -14,6 +14,11 @@ Case ids follow DESIGN.md section 7.5.3. Findings recorded at S0 (jax 0.10.1):
   and may not be renamed in a pure refactor. Plain-JAX scopes (``iv``) are invariant.
 * ``vi``/``vii``/``j`` run on synthetic Pallas kernels now (the D5 procedure itself is exercised
   through a temporary names module and an explicit rename table).
+
+``j-public`` (S8) builds the fixture ``decode`` and ``prefill_128`` with the real runtime under
+``lowering.kernel_names("public")`` (``authenticity --kernel-names public``): the mode must reach the
+program build, and the programs must differ from the recorded-names build by the
+``kernel_renames.toml`` names only.
 """
 
 from __future__ import annotations
@@ -445,15 +450,59 @@ def kernel_rename_cases() -> list[dict[str, Any]]:
 
 
 # ----------------------------------------------------------------------------- real programs (CPU32 child)
+def _names_only(recorded: str, public: str) -> dict[str, Any]:
+    """``public`` (built under ``kernel_names("public")``) against ``recorded`` (the same program built
+    with the recorded names): every kernel is renamed exactly as ``kernel_renames.toml`` maps it (the
+    longest table name that prefixes it, parameter suffix kept), and the two programs are equal once
+    the names are mapped back, in the ``kernel_name`` attribute and in every decoded Mosaic body
+    (the kernel's function symbol)."""
+    import base64
+
+    from . import lowering, normalize
+    from .authenticity import decode_mosaic
+
+    table = lowering.kernel_renames()["names"]
+
+    def recorded_name(name: str) -> str | None:
+        keys = [key for key in table if name.startswith(key)]
+        key = max(keys, key=len) if keys else None
+        return None if key is None else table[key] + name[len(key) :]
+
+    def calls(text: str) -> list[tuple[str, str]]:
+        found = []
+        for line in text.split("\n"):
+            if "@tpu_custom_call" in line:
+                (body,), (name,) = normalize._BODY.findall(line), normalize._KERNEL_NAME.findall(line)
+                found.append((name[1:-1], decode_mosaic(base64.b64decode(body[1], validate=True))))
+        return found
+
+    mine, theirs = calls(public), calls(recorded)
+    renamed = 0 < len(mine) == len(theirs) and [recorded_name(p) for p, _ in mine] == [r for r, _ in theirs]
+    decoded = renamed and all(pb.replace(p, r) == rb for (p, pb), (r, rb) in zip(mine, theirs, strict=True))
+    mapped = normalize._KERNEL_NAME.sub(
+        lambda m: f'kernel_name = "{recorded_name(m.group(1)[1:-1])}"',
+        normalize.mosaic_bodies(public, full_mask=True)[0],
+    )
+    masked = renamed and mapped == normalize.mosaic_bodies(recorded, full_mask=True)[0]
+    return dict(
+        kernels=[len(mine), len(theirs)],
+        renamed=renamed,
+        masked_equal_mapped=masked,
+        decoded_equal_mapped=decoded,
+        passed=renamed and masked and decoded,
+    )
+
+
 def fixture_cases() -> dict[str, Any]:
     from dataclasses import replace
 
-    from . import fixture, lowering, programs
+    from . import fixture, lowering, normalize, programs
 
     mesh = fixture.cpu_mesh()
     out: dict[str, Any] = {}
+    named = ("decode@1536", "prefill_128@1536")  # (j-public): all four renamed kernels
     with lowering.tpu_v4_info():
-        specs = programs.program_specs("fixture", mesh, only={"decode@1536", "batch_decode@1536#n4"})
+        specs = programs.program_specs("fixture", mesh, only={"batch_decode@1536#n4", *named}, keep_lowered=True)
         base_decode = programs.fingerprint_specs({"decode": specs["decode@1536"]}, summary=False)["decode"]
         base_batch = programs.fingerprint_specs({"batch": specs["batch_decode@1536#n4"]}, summary=False)["batch"]
         out["decode"] = base_decode
@@ -493,6 +542,18 @@ def fixture_cases() -> dict[str, Any]:
             model.build_decoder_program = original
             sys.modules.pop(module.__name__, None)
         out["batch"] = base_batch
+
+    # (j-public) the same programs built by the real runtime under the public kernel names
+    # (authenticity --kernel-names public), after the recorded build above: a name bound at import
+    # or a cache that survives jax.clear_caches() would carry the recorded names here
+    with lowering.kernel_names("public"), lowering.tpu_v4_info():
+        public = programs.program_specs("fixture", mesh, only=set(named), keep_lowered=True)
+    decode = public["decode@1536"]  # read outside the mode: only the build can have applied it
+    out["decode_public"] = normalize.fingerprint(decode.lowered, decode.args, summary=False)
+    out["public_names"] = {
+        key: _names_only(normalize.stablehlo_text(specs[key].lowered), normalize.stablehlo_text(public[key].lowered))
+        for key in named
+    }
     return out
 
 
@@ -526,6 +587,18 @@ def run() -> dict[str, Any]:
             real["unmasked"],
         )
     )
+    public = _case(
+        "j-public",
+        "sensitivity",
+        "kernel names public (lowering.kernel_names; authenticity --kernel-names public): the fixture decode "
+        "built by the real runtime differs from the recorded-names build, and decode and prefill_128 differ "
+        "only by the kernel_renames.toml names",
+        real["decode"],
+        real["decode_public"],
+    )
+    public["names"] = real["public_names"]
+    public["passed"] = public["passed"] and all(row["passed"] for row in real["public_names"].values())
+    results.append(public)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-selftest-") as scratch:
         moved = relocated_decode(Path(scratch))
     results.append(

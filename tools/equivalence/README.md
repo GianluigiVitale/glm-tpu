@@ -18,7 +18,7 @@ python -m tools.equivalence selftest                   # G14 (run on every commi
 python -m tools.equivalence site-check [--record] [--requests DIR]   # G5, rank 0 only, fleet idle
 python -m tools.equivalence compare-run RUN --golden DIR [--golden DIR] [--out FILE]
 python -m tools.equivalence diff --program decode@1536 [--against REV] [--tier fixture|production]
-python -m tools.equivalence authenticity DIR [DIR ...] [--out FILE]  # programs vs TPU StableHLO originals
+python -m tools.equivalence authenticity DIR [DIR ...] [--kernel-names recorded|public] [--out FILE]  # vs TPU originals
 python -m tools.equivalence record --gates G1,...      # integrator only; see "Re-baselining"
 python -m tools.equivalence budget                     # is a TPU run live on this host?
 ```
@@ -28,11 +28,13 @@ or a missing/unusable data file, `error` when its child crashed or timed out (th
 still run and reported), and `skip` when an installed package bound to the gate's data differs from
 the recorded version (jax/jaxlib for every gate, plus numpy/ml_dtypes for G3 and torch/safetensors
 for G4, whose tiny pack writes its source with them). A skip is a failure unless `--allow-skip` is
-given (local convenience only, never in CI).
+given (local convenience only, never in CI). `site-check` exits 0 when it records the baseline
+(`recorded`) or matches it (`pass`) and 1 on `fail` (a fact differs); `selftest` and `authenticity`
+exit 0 only on `pass`.
 
 Pytest: `pytest tests/golden -p no:cacheprovider` (markers `golden`, `cpu32`, `slow`; the production
 tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`; `-m "not cpu32"` is the light selection: G4,
-G6-static, G9 and the data contracts). A missing data file fails; a version mismatch
+G6-static, G9, the harness command line (`test_equivalence_cli.py`) and the data contracts). A missing data file fails; a version mismatch
 skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured on a quiet 240-core host at S0 round 4 (4-vCPU CI roughly 3-6x) |
@@ -48,7 +50,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | 3 s |
 | G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` at every stage (a move or rename is explained by the table and re-recorded `--rename-only` with its token) | `trace_closure.py`, `closure_map.py` | 464 s |
 | G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py`, `controller.py` | 11 s |
-| G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs) |
+| G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs; about 230 s since S8, which builds them again under the public kernel names) |
 
 Totals from the same runs: `check` (G1 G1-protocol G3 G4 G6 G7 G9) 1,113 s; `check --tier production`
 381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s.
@@ -202,7 +204,9 @@ Mosaic IR version 13 while the CPU host serializes at jax's forward-compatible v
 backend: `tpu_custom_call.get_ir_version` returns `_FWD_COMPAT_VERSION`). The per-kernel table
 goes to a small report outside Git (`authenticity --out FILE`). So the CPU-hosted TPU lowering of
 the real runtime's programs reproduces what production compiled, kernel IR included, with no
-platform-attribute differences.
+platform-attribute differences. Those originals carry the 181c013e kernel names; originals compiled
+from a tree with the public names (since S4.2b) are compared with `--kernel-names public` (N1 below,
+and "Known weaknesses").
 
 ### Lowering and normalization (`lowering.py`, `normalize.py`; nothing else is rewritten)
 
@@ -215,7 +219,13 @@ platform-attribute differences.
   when they build their `pallas_call`, and the table maps each base name to its research spelling,
   e.g. `sparse_mla` -> `greenfield_pregathered_sparse_mla`). The frozen G1/G2 records, the
   authenticity comparison with the B1/B2 TPU originals and every lowering here therefore see the
-  181c013e kernel names; production lowers the public ones.
+  181c013e kernel names; production lowers the public ones. Inside `lowering.kernel_names("public")`
+  (`authenticity --kernel-names public`, G14 `j-public`) the table is empty, so every lowering in it,
+  the real runtime's program build included, keeps the public names. "public" means no patch-back,
+  not a forced rewrite: a `location_free()` entered while an outer one already patches (nested
+  under another mode) keeps the outer names, so enter the mode before the build, as `authenticity`
+  and G14 do. G14 `j-public` maps each public name through the table, so every fixture kernel
+  needs a `[names]` row; a kernel without one fails that case.
 * **N2** `lowered.as_text(debug_info=False)`. **N3** strip residual `loc(...)`/`#loc` (defensive).
   **N4** delete `jax.result_info`/`jax.arg_info` strings. **N5** `module @jit_main`; private
   functions `@f0, @f1, ...` in definition order. **N6** each `tpu_custom_call` body becomes
@@ -261,6 +271,7 @@ platform-attribute differences.
 | i one finished-lane `jnp.where` removed from the batched decode body | sensitivity | fixture `batch_decode` (mutated module copy) | pass |
 | j kernel `name=` changed without a rename entry | sensitivity | synthetic Pallas + temporary names module | pass |
 | j-mapped the same with a `kernel_renames` entry (patched back) | invariance | same | pass |
+| j-public kernel names public (`kernel_names("public")`): differs from the recorded-names build, and only by the `kernel_renames.toml` names (the `kernel_name` attribute and the Mosaic function symbol) | sensitivity + names-only check | fixture `decode` and `prefill_128` built by the real runtime | pass (case added at S8) |
 
 ### CPU32 execution goldens (G3, `golden_run.py`, `fixture.py`)
 
@@ -538,6 +549,12 @@ to 4 CPUs also reproduced every G3 group.
   stable across repeated runs but depend on the server's polling structure.
 * G5 is only as strong as the rank-0 assets; the other seven hosts are covered by the worker's
   own load-time verification during a TPU run.
+* `authenticity` compares under one kernel-name mode, chosen by the operator: `recorded` (default)
+  for originals compiled at 181c013e, `public` for originals compiled since S4.2b. A kernel's name is
+  both its custom call's `kernel_name` and the function symbol inside its Mosaic body, so under the
+  other mode every program with a Pallas kernel fails masked and decoded on the names alone, while
+  the programs without one (`cache_init`, `wk_decode`, `wk_promote`, `batch_cache_init`,
+  `batch_insert`) compare equal in either mode. The report states the mode it ran under.
 * Kernel components `fp8_grouped_matmul`, `sparse_mla_partial` + merge, `sparse_mla_decode` and
   `fp8_panel_matmul` have no stand-alone G3 entries yet; they are covered end to end by the prefill
   and decode goldens (interpret mode) and by G1/G2 body hashes.
