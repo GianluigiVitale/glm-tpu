@@ -462,8 +462,23 @@ timestamps normalized by regex).
 ### TPU comparison (`compare_run.py`)
 
 Port of the proven private comparator (including its resident `output_directory` fix), with the
-golden runs as arguments and hash/id-only output. On today's baselines: B1 10/10 and B2 4/4
-identical to the goldens.
+golden runs as arguments and hash/id-only output. At S0: B1 10/10 and B2 4/4 identical to the
+goldens.
+
+At S8 (tip `ab4c6582`) the S0 goldens were gone with the old pod, so new golden runs were produced
+at `181c013e` (its staged source unchanged; a private controller-side wrapper supplied the new site
+values) on the recreated pod, from a re-derived checkpoint whose 32 slot records equal the sealed
+manifest, and the same prepared request objects were replayed at the tip. All runs used 32,768
+slots, greedy decoding and GSM8K test questions: B1 (sequential, 10 requests), B2 (concurrent,
+n = 4) and R3 (resident: the first request, two inbox rounds, then stop). `compare-run`: **B1 10/10,
+B2 4/4 and R3 3/3 identical**, every check true (tokens, receipt, ranks, stop, answer, speed; the
+slowest-host decode ratio was 0.994-1.024). At the tip the resident stop exits 0 with every record
+kept, where `181c013e` ends in `FileExistsError` (the S1d fix, on the fleet). `authenticity` on the
+new originals: the golden runs give 9/9 programs and 1,062/1,062 kernels decoded-equal (default
+`recorded` names), the tip runs 9/9 and 1,062/1,062 with `--kernel-names public`, and the tip
+originals under the recorded names fail only on the four renamed kernels (their `kernel_name`
+attribute and Mosaic symbol). G5 `site-check` passed before and after the runs, and a baseline with
+one edited fact makes it exit 1.
 
 ## D27: TPU lowering without libtpu (CI capability)
 
@@ -497,8 +512,8 @@ to 4 CPUs also reproduced every G3 group.
   frozen safety record -- it has no unit tests at 181c013e -- and covered by the TPU runs).
 * The production tier is abstract: its inputs are derived, not loaded. This is licensed by the
   fixture adapter-consistency check and by the authenticity result above, but the authenticity
-  check depends on volatile `/dev/shm` originals (run at S0 and again when the programs moved to
-  the real runtime).
+  check depends on volatile `/dev/shm` originals (run at S0, again when the programs moved to the
+  real runtime, and at S8 on new originals of both `181c013e` and the tip).
 * Mosaic kernel bodies are hashed as serialized on the CPU host, i.e. at jax's forward-compatible
   Mosaic IR version (11 in jax 0.10.1), not the fleet's (13); the serialization is deterministic
   and the decoded IR equals the fleet's, but a jax upgrade that moves the forward-compatible
