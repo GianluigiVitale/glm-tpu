@@ -65,8 +65,8 @@ class RequestSession:
     """Consume one prefill result, then decode/emit one greedy token per step.
 
     All hosts follow the same schedule. ``fleet_all`` must implement the
-    authenticated worker's all-host boolean vote (identity in CPU-only tests);
-    each call performs one real all-host vote.
+    authenticated worker's all-host boolean vote: in production each call is one
+    real all-host vote (CPU-only tests pass an identity).
     ``deliver`` runs at the actual output boundary (e.g. rank0 write+flush);
     it must be bounded. Its completion time is recorded, never prefill-ready
     time mislabeled as delivery. Non-output ranks use a no-op delivery callback

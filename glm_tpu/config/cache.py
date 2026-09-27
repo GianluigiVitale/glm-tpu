@@ -278,7 +278,7 @@ class CacheConfig:
 
     @property
     def main_rope_table_shape(self) -> tuple[int, int]:
-        """Replicated host BF16 ``cos|sin`` table, one row per position (§23.8)."""
+        """Replicated host BF16 ``cos|sin`` table, one row per position."""
         return (self.context_capacity, self.geometry.qk_rope_head_dim)
 
     @property

@@ -5,8 +5,8 @@ source safetensors leaf is memory-mapped, sliced by the declarative
 placement ledger (:mod:`glm_tpu.model_loader.placement`), and written directly into one of 32 final-owner files.
 The manifest is the structural commit marker and is published only after every
 source, destination file, and destination tensor checksum has been verified.
-Protected direct load additionally requires its separately published,
-self-hashed ``SUCCESS`` seal.
+Direct load additionally requires its separately published, self-hashed
+``SUCCESS`` seal.
 """
 
 from __future__ import annotations

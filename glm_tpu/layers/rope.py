@@ -151,16 +151,16 @@ def apply_rotary_fp32_final_round(
 ) -> jax.Array:
     """Rotate in FP32 and round only the completed result.
 
-    The accepted main-MLA path consumes a BF16 rotary-table row, evaluates the
+    The main-MLA path consumes a BF16 rotary-table row, evaluates the
     multiply/add expression in FP32, and stores one final BF16 result.  This is
-    intentionally a separate, default-off primitive: the established DSA
-    rotary path keeps :func:`apply_rotary` and its existing numerical contract.
+    intentionally a separate primitive: the DSA indexer rotary keeps
+    :func:`apply_rotary` and its existing numerical contract.
 
     An FP32 optimization barrier prevents an early graph rewrite from moving a
     downstream BF16 conversion into the products.  The barrier itself may be
-    eliminated after it has served that purpose, so protected TPU callers must
-    still lint the FP32 products and final conversion before treating the result
-    as exactness evidence.
+    eliminated after it has served that purpose, so a TPU caller must still lint
+    the FP32 products and final conversion before treating the result as
+    exactness evidence.
     """
 
     if value.ndim < 1 or value.shape[-1] <= 0 or value.shape[-1] % 2:
@@ -217,13 +217,13 @@ def rotary_cos_sin_from_rows(
 
 
 def build_main_rope_table(config: CacheConfig) -> Any:
-    """Host BF16 ``cos|sin`` table for the main-attention rotary (spec §23.8).
+    """Host BF16 ``cos|sin`` table for the main-attention rotary.
 
     Built with the accepted GLM runtime's own construction
     (:func:`build_rotary_table_host`: positive FP32 powers, reciprocal, NumPy
-    FP32 trigonometry, stored BF16), which DB531 proved reproduces the legacy
-    64-wide rotary suffix bitwise when applied with FP32 products and one final
-    BF16 round.
+    FP32 trigonometry, stored BF16), which a recorded TPU check reproduced
+    bitwise against the legacy 64-wide rotary suffix when applied with FP32
+    products and one final BF16 round.
     """
     from glm_tpu.layers.rope import build_rotary_table_host
 

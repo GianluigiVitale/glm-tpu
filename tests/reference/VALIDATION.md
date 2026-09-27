@@ -25,11 +25,48 @@ evidence and what each can and cannot show:
 > `reference`, `reference-one-block` and `production` only;
 > `test_reference_matches_production_composition` reads its floors (how far production was
 > from the oracle, per prompt) from `floors.json`, recorded from the oracle's final run and
-> equal to the S2e runs below field for field. The oracle functions this file names under
-> `glm_tpu/greenfield/kernels/reference/` now live in `glm_tpu/optimized/reference/`
-> (moved verbatim at S2f); the transitive-import notes of the last sections describe the
-> pre-S2f layout (importing the reference now loads only `glm_tpu.optimized.reference` and its
-> dependencies).
+> equal to the S2e runs below field for field. Everything below names the tree it validated;
+> the next section maps it to the current tree.
+
+## On the current tree
+
+The reference model is `tests/reference/` (`model.py` composing `linear.py`, `norm.py`,
+`attention.py`, `dsa.py`, `moe.py`; `independent.py` is the FP64 restatement). Its fast and
+`slow` tests are `tests/reference/test_reference_consistency.py`. The cross-validation against
+production, `test_reference_matches_production_composition` (`cpu32`, `slow`), is
+`tests/models/glm_moe_dsa/test_against_reference.py`, with its floors in
+`tests/models/glm_moe_dsa/floors.json`; its module docstring states the semantic choices below
+for production. Commands (the receipt's own commands, run on the S2e tree, are kept in section 2):
+
+```bash
+JAX_PLATFORMS=cpu python -m pytest -p no:cacheprovider -m "not slow" tests/reference   # fast tier
+JAX_PLATFORMS=cpu python -m pytest -p no:cacheprovider tests/reference                 # every reference test
+JAX_PLATFORMS=cpu python -m pytest -p no:cacheprovider tests/models/glm_moe_dsa/test_against_reference.py   # the cross-validation (cpu32)
+```
+
+The oracle functions this receipt names by their research-package module (under
+`glm_tpu/greenfield/kernels/reference/`) are now production definitions or reference-only
+definitions; `ORACLE_DEFINITIONS` in `tests/reference/test_reference_consistency.py` lists every
+production definition the reference executes. The names used below map as follows:
+
+| Name in this receipt | Definition now |
+|---|---|
+| `fp8.dequantize_fp8_bits_block_weight`, `fp8.fp8_e4m3fn_lookup` | `glm_tpu/layers/fp8.py` (same names) |
+| `rmsnorm.rms_norm`, `rmsnorm.fused_add_rms_norm` | `glm_tpu/layers/norm.py:rms_norm`; the reference's `tests/reference/norm.py:rms_norm`, `fused_add_rms_norm` |
+| `rotary.build_rotary_table_host`, `rotary.apply_rotary_fp32_final_round`, `rotary.rotary_cos_sin`, `rotary.apply_rotary` | `glm_tpu/layers/rope.py` (same names) |
+| `dsa._affine_layer_norm` | `glm_tpu/layers/norm.py:affine_layer_norm` |
+| `dsa.dsa_index_keys_from_projection`, `dsa.dsa_scores` | `glm_tpu/layers/attention/dsa_indexer.py` (same names) |
+| `dsa.dsa_index_keys`, `dsa.dsa_query_and_head_weights`, `dsa.exact_topk` | `tests/reference/dsa.py` (reference only) |
+| `moe.route_glm_noaux_tc_logits` | `glm_tpu/layers/moe/router.py` |
+| `attention.canonicalize_selected_positions` | `glm_tpu/layers/attention/kv_cache.py` |
+| `attention.gather_paged_selected_kv` | `tests/reference/attention.py` (reference only) |
+| `attention.sparse_mla_attention` | `glm_tpu/kernels/sparse_mla/kernel.py` |
+| `attention.MlaNumericalContract`, `dsa.DsaNumericalContract`, `dsa.SelectedPositions` | `glm_tpu/config/cache.py` (the contracts), `glm_tpu/layers/contracts.py` (`SelectedPositions`) |
+| `_require_shape`, `_require_int32` | `glm_tpu/layers/contracts.py:require_shape`, `require_int32` |
+| `linear.linear` | `tests/reference/linear.py` (reference only) |
+
+Importing the reference now loads only production modules of `glm_tpu` and `tests/reference/`;
+the transitive-import notes of the last sections describe the research layout.
 
 ## 1. Independent check: the FP64 restatement (fast tier)
 
@@ -156,6 +193,11 @@ JAX_PLATFORMS=cpu pytest -p no:cacheprovider -m "not slow and not cpu32" tests/r
 JAX_PLATFORMS=cpu pytest -p no:cacheprovider -m cpu32 tests/reference        # the cross-validation
 ```
 
+(These are the S2e commands. On the current tree `oracle_run.py` runs the pairs of `reference`,
+`reference-one-block` and `production`, `-m cpu32 tests/reference` selects nothing, and the
+cross-validation is `tests/models/glm_moe_dsa/test_against_reference.py`: see "On the current
+tree" above.)
+
 ### The DESIGN 7.6 criteria, per pair
 
 `ref:fp8` = reference vs FP8 oracle, `ref:prod` = reference vs production, `prod:fp8` = the
@@ -250,6 +292,9 @@ three steps (`test_optimized_bf16`) or one three-token block (`test_optimized_pr
 
 ### Acceptance as implemented (`test_reference_consistency.py`, `cpu32`, `slow`)
 
+(The production half is now `test_reference_matches_production_composition` in
+`tests/models/glm_moe_dsa/test_against_reference.py`; the FP8-oracle half is archived.)
+
 Tolerances are unchanged. Every DESIGN 7.6 criterion the two engines meet against each other
 is asserted exactly for the reference against each engine:
 
@@ -307,6 +352,9 @@ Known limits of the `cpu32` criteria (why section 1 carries the semantic burden)
 * Both engines and the reference execute the common oracle functions of section 1.
 
 ## Semantic choices (for later stages)
+
+(Stated for production since S5 in the module docstring of
+`tests/models/glm_moe_dsa/test_against_reference.py`.)
 
 The reference follows the engine's numerical contract, which differs from the vendored Hugging
 Face eager modeling (`reference/modeling_glm_moe_dsa.py`) in these documented places:
@@ -376,7 +424,7 @@ whatever `-n` is. Per test (`--durations=0`):
 | Tests | Time |
 |---|---|
 | `test_reference_matches_frozen_fp8_oracle` (`cpu32`; children ref:fp8 and prod:fp8, both prompts) | 471.3 s |
-| `test_reference_matches_production_composition` (`cpu32`; children ref:prod, both prompts; the engine floor is reused) | 180.3 s |
+| `test_reference_matches_production_composition` (`cpu32`; children ref:prod, both prompts; the engine floor is reused; now in `tests/models/glm_moe_dsa/test_against_reference.py`) | 180.3 s |
 | the two `slow` non-`cpu32` tests (`test_prefill_block_partition_and_decode_agree`, `test_reference_reads_exactly_the_fixture_checkpoint`) | 20.0 s, 12.5 s |
 | the 11 fast-tier tests (`-m "not slow and not cpu32"`), largest `test_forward_is_causal` | 41.6 s together, none above 10 s (9.1 s) |
 

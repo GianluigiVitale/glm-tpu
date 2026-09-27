@@ -34,8 +34,9 @@ class InfoSubcommand(CLISubcommand):
                     engine="native JAX",
                     hardware="8 hosts / 32 TPU v4 chips",
                     ordinary_profile=(
-                        "greedy; 8K combined, concurrent 32K per conversation, 128K prompt / 166912 combined slots, "
-                        "or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)"
+                        "greedy; 8K combined, 32K combined (the ask default; per conversation when concurrent), "
+                        "128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused "
+                        "by HBM admission on 32 TPU v4 chips)"
                     ),
                     concurrent_requests=4,
                     model="zai-org/GLM-5.3",
@@ -52,8 +53,8 @@ class InfoSubcommand(CLISubcommand):
                         "attached to a resident controller (python -m glm_tpu.entrypoints.serve.server)"
                     ),
                     installation=(
-                        "wheel contains Python components only; full deployment requires source checkout and external "
-                        "assets"
+                        "the wheel holds the Python package with its UI assets and model configuration files, no "
+                        "weights; deployment requires the source checkout, a site file and external assets"
                     ),
                     quality="full benchmark/model-card parity not established",
                 ),

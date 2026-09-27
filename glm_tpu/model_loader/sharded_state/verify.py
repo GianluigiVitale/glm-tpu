@@ -166,7 +166,7 @@ def verify_runtime_checkpoint(
     verify_file_hash_slots: Sequence[int] | None = None,
     local_slot_layout: bool = False,
 ) -> VerifiedRuntimeCheckpoint:
-    """Re-derive every layout field and verify a protected sealed artifact."""
+    """Re-derive every layout field and verify a sealed runtime checkpoint."""
 
     require_digest(expected_manifest_sha256, field="expected_manifest_sha256")
     require_digest(expected_success_sha256, field="expected_success_sha256")

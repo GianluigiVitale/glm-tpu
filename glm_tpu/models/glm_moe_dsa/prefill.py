@@ -8,7 +8,7 @@ the repaired index keys. The program takes the resident BF16 weight tree
 (``weights.bf16_weight_specs``).
 
 The admitted profile is the only one (S2d fold): MLP window with rolled prefixes, routed-expert
-panels, the canonical dense placement and the one-pass DSA selector. The research-era original
+panels, the canonical dense placement and the one-pass DSA selector. The original
 (``greenfield/runtime/ws32_batched_prefill.py``) is archived at ``archive/research-20260922``.
 """
 

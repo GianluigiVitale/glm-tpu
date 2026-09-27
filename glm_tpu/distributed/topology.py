@@ -1,11 +1,11 @@
-"""Authenticated topology identity of the fleet and retained host reassignment.
+"""Authenticated topology identity of the fleet and the topology binding (a host reassignment).
 
 ``validate_topology_fleet`` authenticates the eight launch-host topology captures (sealed
 topology, launch-host to JAX-process permutation, fleet digest); ``device_record`` is the device
 description ``initialize_runtime`` compares with each live device (both moved verbatim in S2a).
-``apply_topology_binding`` authenticates a retained host reassignment on the unchanged physical
-mesh before the initializer checks live devices. Nothing here initializes JAX or admits
-checkpoint bytes or model graphs.
+``apply_topology_binding`` authenticates the site's topology binding, a recorded reassignment of
+hosts on the unchanged physical mesh, before the initializer checks live devices. Nothing here
+initializes JAX or admits checkpoint bytes or model graphs.
 """
 
 from __future__ import annotations

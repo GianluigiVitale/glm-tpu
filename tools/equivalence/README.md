@@ -143,10 +143,10 @@ full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, 
 refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
 or not); the full reports and messages, whose wording S5 changed (WU-R reworded three HLO
 refusals, H11 renamed the HLO profile string), are in `G1-protocol` / `G2-protocol` (`verdicts`).
-The two functions are found under their 181c013e names, their row in
-the permanent table `driver.RECORDED_NAMES` (recorded name -> current name) or a
-`closure_map.toml` `[functions]` entry; a missing or ambiguous one is recorded (`<absent>`,
-`<ambiguous: n definitions>`), so a rename the table does not follow fails G1/G2.
+The two functions are found under their 181c013e names, their row in the permanent table
+`driver.RECORDED_NAMES` (recorded name -> current name) or a `closure_map.toml` `[functions]`
+entry; a missing or ambiguous one is recorded (`<absent>`, `<ambiguous: n definitions>`), so a
+rename the table does not follow fails G1/G2.
 
 * Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). The one config
   construction in `__init__` is adjusted at the class (`driver._config_injection` wraps
@@ -278,8 +278,8 @@ produced (`load_by_run`: RoPE table, promoted WK tables, resident BF16 weights, 
 `cache_init` executed at 157), so a value confined to one run cannot hide behind another run's
 goldens.
 
-Frozen fixture v1 reproduces the RNG call order of the historical
-`tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture` exactly but returns
+Frozen fixture v1 reproduces the RNG call order of the historical research-test fixture
+(`ws32_prefill_cpu_fixture.fixture`, archived at `archive/research-20260922`) exactly but returns
 `{checkpoint tensor name: array}` bound through the production name-based binder;
 `fixture.json` records that all 235 leaves equal the historical fixture's, for panel and
 non-panel geometry, and that the geometries are equal (the GLM-5.2 -> GLM-5.3 config swap is
@@ -360,9 +360,9 @@ source tree, whatever its top-level package (`glm_tpu`, `scripts`, but also `ben
 `tests`, ...; only this harness is excluded), the third-party top-level packages and whether JAX
 was imported. Stages: controller (no JAX), worker preflight and worker main (the record lists each
 stage's modules) import their entry modules and the lazy imports those processes perform, and the
-controller stage also runs the real launcher `main` (G9's `controller.launcher_record`), so a lazy import anywhere
-on the launch path -- staging, preflight, dispatch, supervision, collection, cleanup -- is recorded
-and must keep the controller JAX-free; `graph` drives the real
+controller stage also runs the real launcher `main` (G9's `controller.launcher_record`), so a
+lazy import anywhere on the launch path -- staging, preflight, dispatch, supervision, collection,
+cleanup -- is recorded and must keep the controller JAX-free; `graph` drives the real
 `TPUModelRunner.__init__`/`_load` (and the real compile path) for every fixture run and traces
 every program, so a lazy import inside `_load`, `compile` or graph construction is recorded;
 `serving` runs the G9 exercise (the real `run_queued`/`generate`, `run_concurrent`/`generate_concurrent`,
@@ -501,7 +501,7 @@ to 4 CPUs also reproduced every G3 group.
   that commit in the clone (CI: fetch the history, not a depth-1 checkout); without it G4 errors
   loudly, never passes silently.
 * G6's stage entry lists and G9's worker exercise name the modules production imports (updated at
-  S2a, when the worker's helpers left `scripts/greenfield`: `glm_tpu.distributed.parallel_state`,
+  S2a, when the worker's helpers left the research scripts: `glm_tpu.distributed.parallel_state`,
   `glm_tpu.runner.*`), and the driver patches the loader functions in their 181c013e homes plus
   the S2a destinations; a later move fails closed (the real loader runs on placeholder arguments)
   until the integrator updates them. Renames are handled by `closure_map.toml` and the rename-only

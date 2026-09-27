@@ -1,8 +1,8 @@
-"""Assemble distributed owner receipts using the retained checkpoint contract.
+"""Assemble the manifest of a packed checkpoint from the eight hosts' owner receipts (the ``format`` contract).
 
 Each host hashes its actual owner files during packing. This metadata assembly
-does not claim to read remote payloads; the protected workflow authenticates the
-eight receipts and the runtime verifies local payloads again before loading.
+does not read remote payloads; the packing driver authenticates the eight
+receipts, and the runtime verifies its local payloads again before loading.
 """
 
 from pathlib import Path

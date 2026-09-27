@@ -72,12 +72,12 @@ def pregathered_sparse_mla_pallas(
 ) -> Any:
     """Attend one live row over an already ordered, topology-local segment.
 
-    This default-off path is the arithmetic half of a prospective LP4 selected-row
-    exchange.  It accepts no global cache or position table: callers must provide the
+    This is the arithmetic half of the selected-row exchange.  It accepts no
+    global cache or position table: callers must provide the
     exact ascending 2,048-row BF16 segment already resident on the local stage.  The
     finite mask, online update, BF16 probability boundary and final BF16 round mirror
     the accepted flash association while remaining independent of legacy execution.
-    prefill=True enables up to32 independent causal query rows in one call.
+    prefill=True enables up to 32 independent causal query rows in one call.
     Caller validates counts/ascending causal selection and sanitizes cache tails;
     a masked score alone cannot protect the value dot from nonfinite padding.
     """

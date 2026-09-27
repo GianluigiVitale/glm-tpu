@@ -674,7 +674,7 @@ def site_args(args, site):
 
 
 def topology_args(args, site):
-    """Retained physical site identity shared by packing and inference admission."""
+    """The site's physical topology identity, shared by packing and inference admission."""
     topology = site.topology
     args.topology_capture_root = topology.capture_root
     args.topology_sha256 = topology.topology_sha256

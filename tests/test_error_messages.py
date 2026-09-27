@@ -1,10 +1,10 @@
-"""The research-era labels are gone from the error messages (S5 WU-Docs; owner decision DN-23(d)).
+"""Error messages carry no development-phase labels.
 
 Every ``raise`` statement of the ``glm_tpu`` package is scanned: a string constant in it (a literal or an f-string
-part) may carry a campaign label (``WS32``, ``D8``, ``challenger``, ``greenfield``, ``research``) only when the
-equivalence records hold the message, so it must not change: five checkpoint refusals of G4 (frozen) and one
-host-mapping refusal of G9 (changed only by an H-numbered host change). The checkpoint-format identifiers that carry
-a label (``greenfield_ws32_runtime_*``, ``WS32_2D``) are data, not messages, and are not scanned.
+part) may carry a label (``WS32``, ``D8``, ``challenger``, ``greenfield``, ``research``) only when the equivalence
+records hold the message, so it must not change: five checkpoint refusals of G4 (frozen) and one host-mapping refusal
+of G9 (changed only by an H-numbered host change). The checkpoint-format identifiers that carry a label
+(``greenfield_ws32_runtime_*``, ``WS32_2D``) are data, not messages, and are not scanned.
 """
 
 from __future__ import annotations

@@ -5,8 +5,8 @@ owner-local LSE) and the decode layer's attention on the resident BF16 tables.
 ``prefill_index_share_lse`` is the index-share attention with the documented owner-local softmax
 boundary and calls the resident BF16 matmuls explicitly (S2d fold of the former function
 rebinding). Cache writes, causal bounds, padded-row handling and finite operand admission remain
-explicit. No checkpoint format is changed. The research-era FP8 bodies they came from are
-archived at ``archive/research-20260922``.
+explicit. No checkpoint format is changed. The FP8 bodies they came from are archived at
+``archive/research-20260922``.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def prefill_prepare_attention(
     """Multirow q/kv-a preparation, not the legacy-association convolution.
 
     Accept fused-add RMSNorm output to preserve split-residual normalization.
-    Changed association needs its own real-layer and §21 decoder admission.
+    A changed association needs its own real-layer and decoder admission.
     """
     _require_block(residual_local)
     hidden = residual_local.shape[1]

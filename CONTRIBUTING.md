@@ -15,8 +15,10 @@ branches and reaches `main` only after review. The layout is described in the
   databases out of Git; cite compact receipts and pins instead of private
   payloads. Preserve third-party copyright and license headers
   ([notices](THIRD_PARTY_NOTICES.md)).
-- Never change a check to relabel a historical failure as a pass, and never
-  rewrite published history.
+- Review the actual diff, tests, dependencies, claims, failures and retention
+  before merge; self-review is not independent review.
+- Never change a check to relabel a historical failure as a pass. Do not publish
+  the repository or rewrite history during cleanup.
 - Cosmetic cleanup needs no new TPU run; an execution change needs its own
   hardware validation, recorded like the release receipts.
 

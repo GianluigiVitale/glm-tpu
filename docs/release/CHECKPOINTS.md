@@ -11,9 +11,11 @@ acquired, and a completion marker, `SOURCE_COMPLETE.json`, binds the completed
 acquisition. The site file names where the source lives (`storage.source_uri`,
 under one of `storage.allowed_source_uri_prefixes`) and where the tokenizer
 files and the completion marker are on each host (`paths.model_path`). The
-configuration, tokenizer metadata, chat template and license identities are
-pinned separately in `glm_tpu/models/glm_moe_dsa/hf_config/` and checked against
-the model path before a request is prepared.
+chat template, `config.json` and `generation_config.json` ship in
+`glm_tpu/models/glm_moe_dsa/hf_config/` and are checked against pinned SHA-256
+digests, and `tokenizer.json` and `tokenizer_config.json` at the model path are
+checked against pinned digests, before a request is prepared. The `LICENSE` in
+`hf_config/` is shipped as is; it is neither pinned nor checked.
 
 ## The packed runtime checkpoint
 

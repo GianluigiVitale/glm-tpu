@@ -514,7 +514,7 @@ def merge_topk_candidates_with_scores(
 
     This is an observer surface, not a second selector: the scores are the
     values emitted by the same ``lax.top_k`` that chose ``positions``.
-    ``paired_position_sort`` is a default-off prefill experiment; it changes
+    ``paired_position_sort`` (set by the shortlist merge of ``two_stage_topk``) changes
     only how the stable position permutation is applied, not score arithmetic.
     """
 

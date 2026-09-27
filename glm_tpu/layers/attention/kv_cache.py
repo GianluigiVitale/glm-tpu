@@ -212,7 +212,7 @@ class CanonicalSelectedPositions(NamedTuple):
 
 
 class SelectedKvSegment(NamedTuple):
-    """Gathered fixed-width selected segment and its protected metadata."""
+    """Gathered fixed-width selected segment and its validity metadata."""
 
     values: jax.Array
     positions: jax.Array

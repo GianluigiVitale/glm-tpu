@@ -16,8 +16,8 @@ and a ``jax.named_scope`` name S4.4 renamed as the name it replaced (``helper_na
 A definition an S5 work unit changes is declared in ``S5_DECLARED``: compared under its new name or at its
 new home when renamed or moved, not compared when rewritten, removed or given a new docstring; a reference to a
 definition an S5 unit renamed is compared as renamed where the current module defines or imports it by its new name.
-A definition whose docstrings or raise messages an S5 unit reworded (WU-Docs) is declared in ``S5_TEXT`` and compared
-with that text aside.
+A definition whose docstrings or raise messages an S5 unit or the S6 documentation pass reworded (both under the text
+unit's token, WU-Docs) is declared in ``S5_TEXT`` and compared with that text aside.
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -226,9 +226,10 @@ S5_NOT_COMPARED = ("rewritten", "docstring", "removed")
 # gives it, with what its value names set aside on both sides (``_text_aside``): every docstring in it removed
 # ("docstring"), the string constants of its raise statements' message arguments blanked ("messages"); the unit's
 # table proves the text change at the commit that made it (tools/migration/splits.toml for docstrings,
-# work_units.toml [messages] for messages).
+# work_units.toml [messages] for messages). The S6 documentation pass declares the docstrings it reworded here too,
+# under the same token (its splits.toml proves them).
 S5_TEXT: dict[tuple[str, str], str] = {
-    ("glm_tpu/config/cache.py", "CacheConfig"): "WU-Docs: messages",
+    ("glm_tpu/config/cache.py", "CacheConfig"): "WU-Docs: docstring, messages",
     ("glm_tpu/config/model.py", "ModelGeometry"): "WU-Docs: messages",
     ("glm_tpu/distributed/mesh.py", "MeshContract"): "WU-Docs: docstring, messages",
     ("glm_tpu/distributed/mesh.py", "PhysicalMesh"): "WU-Docs: messages",
@@ -237,6 +238,9 @@ S5_TEXT: dict[tuple[str, str], str] = {
     ("glm_tpu/distributed/parallel_state.py", "initialize_runtime"): "WU-Docs: messages",
     ("glm_tpu/distributed/topology.py", "validate_topology_fleet"): "WU-Docs: messages",
     ("glm_tpu/exceptions.py", "ConfigValidationError"): "WU-Docs: docstring",
+    ("glm_tpu/kernels/sparse_mla/kernel.py", "pregathered_sparse_mla_pallas"): "WU-Docs: docstring",
+    ("glm_tpu/layers/attention/dsa_indexer.py", "merge_topk_candidates_with_scores"): "WU-Docs: docstring",
+    ("glm_tpu/layers/attention/kv_cache.py", "SelectedKvSegment"): "WU-Docs: docstring",
     ("glm_tpu/layers/attention/mla.py", "_require_block"): "WU-Docs: messages",
     ("glm_tpu/layers/embed.py", "embed_tokens"): "WU-Docs: messages",
     ("glm_tpu/layers/embed.py", "require_vocabulary_geometry"): "WU-Docs: messages",
@@ -245,7 +249,8 @@ S5_TEXT: dict[tuple[str, str], str] = {
     ("glm_tpu/layers/moe/router.py", "router_from_shards"): "WU-Docs: messages",
     ("glm_tpu/layers/norm.py", "sharded_fused_add_rms_norm"): "WU-Docs: messages",
     ("glm_tpu/layers/norm.py", "sharded_rms_norm"): "WU-Docs: messages",
-    ("glm_tpu/layers/rope.py", "build_main_rope_table"): "WU-Docs: messages",
+    ("glm_tpu/layers/rope.py", "apply_rotary_fp32_final_round"): "WU-Docs: docstring",
+    ("glm_tpu/layers/rope.py", "build_main_rope_table"): "WU-Docs: docstring, messages",
     ("glm_tpu/layers/sampler.py", "compute_logits"): "WU-Docs: messages",
     ("glm_tpu/layers/sampler.py", "greedy_sample"): "WU-Docs: messages",
     ("glm_tpu/model_loader/placement.py", "RuntimePlacementReport"): "WU-Docs: messages",
@@ -264,7 +269,7 @@ S5_TEXT: dict[tuple[str, str], str] = {
     ("glm_tpu/model_loader/sharded_state/verify.py", "_read_runtime_metadata"): "WU-Docs: messages",
     ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_files"): "WU-Docs: messages",
     ("glm_tpu/model_loader/sharded_state/verify.py", "_verify_runtime_value"): "WU-Docs: messages",
-    ("glm_tpu/model_loader/sharded_state/verify.py", "verify_runtime_checkpoint"): "WU-Docs: messages",
+    ("glm_tpu/model_loader/sharded_state/verify.py", "verify_runtime_checkpoint"): "WU-Docs: docstring, messages",
     ("glm_tpu/model_loader/sharded_state/writer.py", "_build_runtime_manifest"): "WU-Docs: messages",
     ("glm_tpu/model_loader/sharded_state/writer.py", "_commit_runtime_manifest"): "WU-Docs: messages",
     ("glm_tpu/model_loader/sharded_state/writer.py", "_flat_contiguous_offset"): "WU-Docs: messages",
