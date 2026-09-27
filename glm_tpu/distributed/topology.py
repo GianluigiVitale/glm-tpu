@@ -273,7 +273,7 @@ class PhysicalDevice:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalDevice":
+    def from_dict(cls, value: Mapping[str, Any]) -> PhysicalDevice:
         return cls(**dict(value))
 
 
@@ -346,7 +346,7 @@ class PhysicalTopology:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalTopology":
+    def from_dict(cls, value: Mapping[str, Any]) -> PhysicalTopology:
         return cls(
             slice_name=value["slice_name"],
             topology_shape=tuple(value["topology_shape"]),

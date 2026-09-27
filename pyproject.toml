@@ -85,16 +85,6 @@ ignore = ["C408", "RUF005"]
 # A helper refuses an older interpreter at run time: its version check is not dead code. The helper
 # texts are sent to the hosts byte for byte (G9 records their SHA-256), so their %-formatting stays.
 "glm_tpu/executor/remote/*.py" = ["UP031", "UP036"]
-# The worker's phase closures and token callbacks run within the loop iteration that defines them.
-"glm_tpu/worker/tpu_worker.py" = ["B023"]
-# The S2f provenance test (tests/test_production_helper_homes.py) compares these files' moved
-# definitions by AST with their originals; their findings stay until S7 retires that test.
-"glm_tpu/config/model.py" = ["UP037"]
-"glm_tpu/distributed/topology.py" = ["UP037"]
-"glm_tpu/model_loader/placement.py" = ["SIM102"]
-"glm_tpu/model_loader/sharded_state/loader.py" = ["F841"]
-"glm_tpu/model_loader/sharded_state/writer.py" = ["C413", "C420"]
-"glm_tpu/model_loader/source_inventory.py" = ["C420", "UP037"]
 
 [tool.ruff.lint.flake8-bugbear]
 # Frozen dataclasses used as argument defaults (numerical contracts, kernel configurations): each is

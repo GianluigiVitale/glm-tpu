@@ -183,9 +183,12 @@ def _require_source_contract(
                 break
     if expected is None:
         raise PlanValidationError(f"no source geometry contract for {source.name!r}")
-    if source.layer_id is not None and ".self_attn.indexer." in source.name:
-        if geometry.indexer_types[source.layer_id] != "full":
-            raise PlanValidationError("full indexer tensor appears in a shared layer")
+    if (
+        source.layer_id is not None
+        and ".self_attn.indexer." in source.name
+        and geometry.indexer_types[source.layer_id] != "full"
+    ):
+        raise PlanValidationError("full indexer tensor appears in a shared layer")
     if (source.dtype, source.shape) != expected:
         raise PlanValidationError(
             f"source geometry drifted for {source.name!r}: "

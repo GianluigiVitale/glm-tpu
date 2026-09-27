@@ -16,7 +16,7 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from glm_tpu.layers.norm import sharded_fused_add_rms_norm, sharded_rms_norm
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm
 from glm_tpu.layers.embed import require_vocabulary_geometry
 
 
@@ -97,35 +97,6 @@ def greedy_sample(
     ).astype(jnp.int32)
     valid = jnp.all(indices < jnp.int32(vocab_size), axis=0)
     return GreedySampleResult(chosen, valid)
-
-
-def final_sample(
-    hidden_local: Any,
-    final_norm_weight_local: Any,
-    lm_head_local: Any,
-    *,
-    hidden_size: int,
-    vocab_size: int,
-    feature_axis: str = "feature",
-    expert_axis: str = "expert",
-    rms_norm_epsilon: float = 1e-5,
-) -> GreedySampleResult:
-    """Normalize, project, and sample without returning full vocabulary."""
-
-    normalized = sharded_rms_norm(
-        hidden_local,
-        final_norm_weight_local,
-        global_hidden_size=hidden_size,
-        feature_axis=feature_axis,
-        epsilon=rms_norm_epsilon,
-    )
-    logits = compute_logits(
-        normalized,
-        lm_head_local,
-        vocab_size=vocab_size,
-        feature_axis=feature_axis,
-    )
-    return greedy_sample(logits, vocab_size=vocab_size, expert_axis=expert_axis)
 
 
 def split_final_sample(

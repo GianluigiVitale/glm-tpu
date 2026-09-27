@@ -228,12 +228,12 @@ def resident_loop(engine, record, root, rank, wall_seconds, *, stream=None):
         line = stream.readline(request.PAYLOAD_CAP + 1024)
 
         def decode_command():
-            if not line or len(line) > request.PAYLOAD_CAP + 512:
+            if not line or len(line) > request.PAYLOAD_CAP + 512:  # noqa: B023 (phase() calls this closure in this iteration)
                 raise ValueError("resident controller disconnected or oversized command")
-            command = json.loads(line)
+            command = json.loads(line)  # noqa: B023 (phase() calls this closure in this iteration)
             if command == {"stop": True}:
                 return None
-            if set(command) != {"sequence", "request"} or command["sequence"] != sequence + 1:
+            if set(command) != {"sequence", "request"} or command["sequence"] != sequence + 1:  # noqa: B023 (phase() calls this closure in this iteration)
                 raise ValueError("resident sequence differs")
             value = command["request"]
             request.validate_payload(value)
@@ -246,7 +246,7 @@ def resident_loop(engine, record, root, rank, wall_seconds, *, stream=None):
             return
         sequence += 1
         job = root / f"resident-{sequence:04d}"
-        engine.runner.phase("resident_directory", lambda: job.mkdir(mode=0o700))
+        engine.runner.phase("resident_directory", lambda: job.mkdir(mode=0o700))  # noqa: B023 (phase() calls this closure in this iteration)
         deadline = time.perf_counter() + wall_seconds
         reports = run_queued(
             engine, request.requests(value), value, job, rank, deadline, save=lambda reports: None, warmup=False
@@ -288,15 +288,16 @@ def run_queued(engine, pending, value, root, rank, deadline, *, save, warmup=Tru
     for index, item in enumerate(pending):
         item_root = root / f"item{index:03d}" if value.get("schema") == request.BATCH_SCHEMA else root
         if item_root != root:
-            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
+            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))  # noqa: B023 (phase() calls this closure in this iteration)
         stream = engine.runner.phase(
-            "open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None
+            "open_tokens",
+            lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None,  # noqa: B023 (phase() calls this closure in this iteration)
         )
 
         def deliver(event):
-            if stream is not None:
-                stream.write(json.dumps(asdict(event), sort_keys=True) + "\n")
-                stream.flush()
+            if stream is not None:  # noqa: B023 (generate() calls deliver in this iteration)
+                stream.write(json.dumps(asdict(event), sort_keys=True) + "\n")  # noqa: B023 (generate() calls deliver in this iteration)
+                stream.flush()  # noqa: B023 (generate() calls deliver in this iteration)
 
         try:
             tokens, report = engine.generate(item, deliver=deliver, deadline=deadline)
@@ -309,8 +310,8 @@ def run_queued(engine, pending, value, root, rank, deadline, *, save, warmup=Tru
                 tokenizer = AutoTokenizer.from_pretrained(
                     get_current_site().paths.model_path, local_files_only=True, trust_remote_code=False
                 )
-                with (item_root / "answer.txt").open("x") as stream:
-                    stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))
+                with (item_root / "answer.txt").open("x") as stream:  # noqa: B023 (phase() calls this closure in this iteration)
+                    stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))  # noqa: B023 (phase() calls this closure in this iteration)
 
         engine.runner.phase("write_answer", write_answer)
         report.update(
@@ -343,10 +344,11 @@ def run_concurrent(engine, pending, root, rank, deadline):
         streams = []
         for index in range(len(pending)):
             item_root = root / f"item{index:03d}"
-            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))
+            engine.runner.phase("request_directory", lambda: item_root.mkdir(mode=0o700))  # noqa: B023 (phase() calls this closure in this iteration)
             directories.append(item_root)
             stream = engine.runner.phase(
-                "open_tokens", lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None
+                "open_tokens",
+                lambda: (item_root / "tokens.jsonl").open("x") if rank == 0 else None,  # noqa: B023 (phase() calls this closure in this iteration)
             )
             streams.append(stack.enter_context(stream) if stream is not None else None)
 
@@ -365,8 +367,8 @@ def run_concurrent(engine, pending, root, rank, deadline):
                 tokenizer = AutoTokenizer.from_pretrained(
                     get_current_site().paths.model_path, local_files_only=True, trust_remote_code=False
                 )
-                with (item_root / "answer.txt").open("x") as stream:
-                    stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))
+                with (item_root / "answer.txt").open("x") as stream:  # noqa: B023 (phase() calls this closure in this iteration)
+                    stream.write(tokenizer.decode(tokens.tolist(), skip_special_tokens=False))  # noqa: B023 (phase() calls this closure in this iteration)
 
         engine.runner.phase("write_answer", write_answer)
         report.update(

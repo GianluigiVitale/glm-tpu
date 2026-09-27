@@ -99,7 +99,7 @@ def _write_slot_files(
             handle.write(plan.header)
             handle.truncate(plan.file_bytes)
         tensor_by_slot_name = {(plan.device_slot, tensor.name): tensor for plan in plans for tensor in plan.tensors}
-        bytes_written = {key: 0 for key in tensor_by_slot_name}
+        bytes_written = dict.fromkeys(tensor_by_slot_name, 0)
         for source in inventory.tensors:
             if source.layer_id is not None and source.layer_id >= geometry.num_layers:
                 continue
@@ -216,7 +216,7 @@ def pack_runtime_slots(
         "mesh_hash": config.mesh_hash,
         "placement_sha256": report.placement_sha256,
         "plan_id": RUNTIME_PLAN_ID,
-        "slots": list(sorted(slots)),
+        "slots": sorted(slots),
         "source_inventory_sha256": inventory.inventory_sha256,
     }
     result["record_sha256"] = mapping_hash(result, field="record_sha256")

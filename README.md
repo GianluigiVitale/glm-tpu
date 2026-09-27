@@ -88,7 +88,6 @@ was 9.27 tokens/s, distinct from each chat's speed.
 | `glm_tpu/model_loader/`, `glm_tpu/distributed/`, `glm_tpu/config/` | The checkpoint pipeline, the multi-host runtime and mesh, the model and site configuration. |
 | `tests/` | CPU tests, laid out like `glm_tpu/`; `tests/golden/` holds the equivalence records, `tests/reference/` an unsharded reference model. |
 | `tools/equivalence/` | The graph-equivalence harness ([README](tools/equivalence/README.md)). |
-| `tools/migration/` | The tables and checkers that prove the package-restructuring commits; not used at run time. |
 | `examples/site.example.toml` | The template of the untracked site file that names the fleet, paths and checkpoint pins. |
 | `docs/` | The documentation listed below. |
 

@@ -18,7 +18,9 @@
 5. Run the offline subset of [TESTING](TESTING.md); it needs no model weights or
    cloud access. The equivalence harness ([README](../../tools/equivalence/README.md))
    shows how restructuring commits were proved to leave the device programs
-   unchanged.
+   unchanged. The tables and checkers that proved the restructuring commits'
+   moves, renames, splits and text edits are in the history, last at commit
+   `a6f1b0e0` (`git show a6f1b0e0:tools/migration/move_map.toml`).
 6. Read the [migration history](GLM53_MIGRATION.md) for failures, superseded work
    and recovery. The research history and the curation ledger are at the tag
    `archive/research-20260922`

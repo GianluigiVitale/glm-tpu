@@ -5,10 +5,10 @@
 Copyright 2026 Gianluigi Vitale.
 
 The project's own work in this repository (the `glm_tpu` package, its tests, the
-equivalence harness and migration tools, the documentation and the compact result
-receipts) is licensed under the [Apache License, Version 2.0](LICENSE). The
-material listed below keeps its own license; the Apache License does not relicense
-it. The package metadata states the combination as the SPDX expression
+equivalence harness, the documentation and the compact result receipts) is
+licensed under the [Apache License, Version 2.0](LICENSE). The material listed
+below keeps its own license; the Apache License does not relicense it. The package
+metadata states the combination as the SPDX expression
 `Apache-2.0 AND LicenseRef-GLM-5.3` (`pyproject.toml`).
 
 ## Material in this tree with its own license

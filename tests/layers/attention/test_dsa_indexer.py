@@ -429,8 +429,7 @@ def test_contract_can_change_static_fixture_sizes_without_changing_semantics() -
 
 # ---------------------------------------------------------------------------------------------- prefill (cpu32)
 # Ported from the research package's kernels/test_ws32_prefill_dsa.py, test_ws32_prefill_dsa_producer.py and the DSA
-# part of test_prefill_index.py (archive/research-20260922; tools/migration/archive_list.txt) onto the production
-# prefill indexer.
+# part of test_prefill_index.py (at the tag archive/research-20260922) onto the production prefill indexer.
 SELECTOR = r"""
 import json
 import jax, jax.numpy as jnp, numpy as np

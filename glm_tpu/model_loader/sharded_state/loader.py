@@ -40,17 +40,14 @@ def _host_tensor(tensor: Any, *, dtype: str, name: str) -> tuple[Any, str]:
     raw = contiguous.view(torch.uint8).numpy()
     if dtype == "U8" and contiguous.dtype == torch.uint8:
         host = np.asarray(contiguous.numpy())
-        storage_dtype = "U8"
     elif dtype == "F32" and contiguous.dtype == torch.float32:
         if not bool(torch.isfinite(contiguous).all()):
             raise CheckpointValidationError(f"loader found non-finite {name!r}")
         host = np.asarray(contiguous.numpy())
-        storage_dtype = "F32"
     elif dtype == "BF16" and contiguous.dtype == torch.bfloat16:
         if not bool(torch.isfinite(contiguous).all()):
             raise CheckpointValidationError(f"loader found non-finite {name!r}")
         host = contiguous.view(torch.uint16).numpy().view(ml_dtypes.bfloat16)
-        storage_dtype = "BF16"
     else:
         raise CheckpointValidationError(f"loader dtype drifted for {name!r}: {contiguous.dtype}")
     if dtype == "U8" and bool(np.any((host == 0x7F) | (host == 0xFF))):

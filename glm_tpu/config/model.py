@@ -165,7 +165,7 @@ class ModelGeometry:
             raise GeometryValidationError("mlp_layer_types does not match first_dense_layers")
 
     @classmethod
-    def from_hf_config(cls, config: Mapping[str, Any]) -> "ModelGeometry":
+    def from_hf_config(cls, config: Mapping[str, Any]) -> ModelGeometry:
         """Build the exact geometry from the checked-in HF configuration."""
 
         if config.get("model_type") != "glm_moe_dsa":
@@ -244,7 +244,7 @@ class ModelGeometry:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "ModelGeometry":
+    def from_dict(cls, value: Mapping[str, Any]) -> ModelGeometry:
         return cls(**dict(value))
 
     @property

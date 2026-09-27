@@ -179,7 +179,7 @@ class SourceTensor:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SourceTensor":
+    def from_dict(cls, value: Mapping[str, Any]) -> SourceTensor:
         offsets = value.get("data_offsets")
         if not isinstance(offsets, list) or len(offsets) != 2:
             raise CheckpointValidationError("source tensor requires two data offsets")
@@ -231,7 +231,7 @@ class SourceFile:
         }
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SourceFile":
+    def from_dict(cls, value: Mapping[str, Any]) -> SourceFile:
         return cls(**dict(value))
 
 
@@ -284,7 +284,7 @@ class SourceInventory:
                 f"files={payload}, tensors={tensor_bytes}, "
                 f"declared={self.declared_payload_bytes}"
             )
-        counts: dict[str, int] = {filename: 0 for filename in known_files}
+        counts: dict[str, int] = dict.fromkeys(known_files, 0)
         for tensor in self.tensors:
             counts[tensor.filename] += 1
         if any(item.tensor_count != counts[item.filename] for item in self.files):
@@ -324,7 +324,7 @@ class SourceInventory:
         return value
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SourceInventory":
+    def from_dict(cls, value: Mapping[str, Any]) -> SourceInventory:
         inventory = cls(
             model_id=value.get("model_id"),
             source_revision=value.get("source_revision"),

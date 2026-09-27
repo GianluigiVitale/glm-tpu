@@ -14,6 +14,7 @@ import pytest
 def test_ws32_io_matches_forced_32_reference_without_vocab_gather() -> None:
     program = r"""
 import json
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -23,11 +24,41 @@ from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from tests.reference.norm import fused_add_rms_norm
-from glm_tpu.layers.norm import sharded_fused_add_rms_norm
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm, sharded_rms_norm
 from glm_tpu.layers.embed import EmbeddingResult, embed_tokens
 from glm_tpu.layers.sampler import (
-    GreedySampleResult, SplitGreedySampleResult, final_sample, compute_logits, split_final_sample)
+    GreedySampleResult, SplitGreedySampleResult, compute_logits, greedy_sample, split_final_sample)
 from glm_tpu.runner.hlo_utils import parse_hlo_module
+
+# The unfused final sample (production fuses the residual add: split_final_sample), composed of the
+# production norm, logits and greedy sampler.
+def final_sample(
+    hidden_local: Any,
+    final_norm_weight_local: Any,
+    lm_head_local: Any,
+    *,
+    hidden_size: int,
+    vocab_size: int,
+    feature_axis: str = "feature",
+    expert_axis: str = "expert",
+    rms_norm_epsilon: float = 1e-5,
+) -> GreedySampleResult:
+    '''Normalize, project, and sample without returning full vocabulary.'''
+
+    normalized = sharded_rms_norm(
+        hidden_local,
+        final_norm_weight_local,
+        global_hidden_size=hidden_size,
+        feature_axis=feature_axis,
+        epsilon=rms_norm_epsilon,
+    )
+    logits = compute_logits(
+        normalized,
+        lm_head_local,
+        vocab_size=vocab_size,
+        feature_axis=feature_axis,
+    )
+    return greedy_sample(logits, vocab_size=vocab_size, expert_axis=expert_axis)
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
 mesh = Mesh(devices, ("expert", "feature"))
