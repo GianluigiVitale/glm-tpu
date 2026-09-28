@@ -22,7 +22,9 @@ No CUDA and no vLLM installation is needed.
 
 ## Install
 
-With [uv](https://docs.astral.sh/uv/), from the repository root:
+With [uv](https://docs.astral.sh/uv/), from the repository root (on a fleet: on
+rank 0, which keeps the checkout; the other hosts need the same environment at the
+same absolute path, installed from a copy of the checkout or from the wheel):
 
 ```bash
 uv venv --python 3.12 .venv
@@ -103,6 +105,23 @@ Then fill in every `<...>` value. Commands that need it take `--site PATH`;
 precedence is command-line flag, then `GLM_TPU_*` variable, then site file, then
 built-in default. The fleet values and the launch policy come only from the site
 file.
+
+Some pins are printed by a later step of the
+[quickstart](../../README.md#quickstart-from-the-weights-to-an-answer): the
+`[topology]` values by `glm-tpu topology bind`, `checkpoint.manifest_sha256` and
+`success_sha256` by `glm-tpu checkpoint pack`. Until then write 64 zeros for
+each: the file validates, and nothing that needs the pin can pass with it.
+`topology.slice_name` is recorded by the topology capture, and the checkpoint root
+names the pack run, so set both first (`checkpoint.root` =
+`<namespace>/greenfield_ws32_runtime_pack_<YYYYMMDD>T<HHMMSS><9 digits>Z`,
+directly inside the namespace).
+
+The controller stages the resolved site to the hosts itself, but
+`checkpoint verify` and the site-tier test read the site file where they run: put
+the same file, and the source inventory it names, at the same paths on every
+host where you run them. The weights and `SOURCE_COMPLETE.json` must be at
+`paths.model_path` on every host, and the worker environment at
+`fleet.worker_python`.
 
 ## Environment variables
 

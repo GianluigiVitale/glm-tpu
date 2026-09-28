@@ -11,28 +11,53 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
   stage S9 (`62e4e615`) rewrote these governance files, and one later unit
   (H17: the chat UI shows the session's context capacity) followed, then three
   documentation and packaging commits (the repository map of AGENTS.md, the
-  README quickstart, the wheel's license files). It is not
+  README quickstart, the wheel's license files), then the public end-to-end
+  series: `checkpoint mark-source`, `topology capture`/`bind` and
+  `checkpoint pack` (WU-C4..WU-C6, with a G6 re-baseline), the chat UI and `/v1`
+  attaching to a session that `glm-tpu ask --keep-loaded` started (H18), one
+  wording for the 166,912-slot profile (H19) and the quickstart in which every
+  step is a command of this repository. It is not
   merged: `main` still holds the pre-refactor GLM-5.3 release (tag
   `pre-refactor-main-20260922`). Merging is the owner's decision after review.
-- **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), only
-  the chat UI's context display changed under `glm_tpu/` (H17: the workspace
-  state reports the resident session's capacity and the page footer shows it,
-  where both said 32K before). `pyproject.toml` changed only in its license
+- **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), the
+  device programs, the request path, the controller and the worker are
+  unchanged. Changed under `glm_tpu/`: the chat UI's context display (H17: the
+  workspace state reports the resident session's capacity and the page footer
+  shows it, where both said 32K before); the operator commands that make a site
+  from the Hugging Face weights (the completion marker, the topology capture and
+  binding, the pack and its seal: new modules, the pack worker's seal modes); the
+  chat server finding its controller from the run directory (H18); the `ask`
+  help and `info` wording (H19). `pyproject.toml` changed only in its license
   files: the wheel no longer carries the license texts of material kept only in
   the history ([notices](THIRD_PARTY_NOTICES.md)). The device programs and the
   request path are those the comparison ran.
-- **Records.** `tests/golden/data/` last changed at the H17 re-baseline
-  (`http.json`: the served page and script), before that at `e6fdd113`;
+- **Records.** `tests/golden/data/` last changed at the WU-C re-baseline of
+  the topology commands (`import_closure.json`: the command-line stage imports
+  the topology subcommand), before that at the H17 re-baseline (`http.json`);
   `tools/equivalence/closure_map.toml` is empty, as it must be between units;
   `tools/equivalence/kernel_renames.toml` keeps its four permanent rows (the
   public Pallas kernel names mapped back to their `181c013e` spelling).
-- **Fleet** (as found at the close of the TPU comparison on 2026-09-27; not
-  probed again since). The eight hosts were idle and no workload lock was held.
-  No resident session ran: the 166,912-slot session of 2026-09-22 ended when the
-  TPU slice was recreated on fresh disks on 2026-09-24. The verified packed
-  checkpoint made for the TPU comparison (32 owner files, `checkpoint verify`
-  passed) was kept in tmpfs on every host; a host restart loses it. The
-  operator's site file and its site-check baseline are on rank 0, outside Git.
+- **Fleet** (as left on 2026-09-28 after the fleet checks of the public
+  commands). The eight hosts were idle and no workload lock was held. The
+  verified packed checkpoint made for the TPU comparison (32 owner files,
+  `checkpoint verify` passed) is still in tmpfs on every host; a host restart
+  loses it. The operator's site file and its site-check baseline are on rank 0,
+  outside Git; the site still pins the binding of 2026-09-27.
+- **Fleet checks of the public commands** (2026-09-28, the pushed code commits):
+  `topology capture` on the eight hosts (a model-free TPU job, 39 s) recorded
+  the pinned topology and mesh and the same host-to-slot and host-to-JAX-process
+  mapping as the pinned binding, and `topology bind` accepted it (as a rebinding
+  of the site's fleet pin and as a first binding); `checkpoint pack
+  --compare-seal` re-derived 8 tensors of every one of the 32 slots from the
+  source and matched all 256 and the 32 file plans with the sealed manifest; a
+  `--preflight-only` against a fresh root passed on seven hosts and refused on
+  rank 0 for lack of tmpfs, as it must with the checkpoint in place; a resident
+  session started with `glm-tpu ask ... --keep-loaded`, using the new binding,
+  answered and the chat UI and `/v1` server attached to it without a receipt
+  (three rounds, every host agreeing; the stop left every host idle).
+  `checkpoint mark-source` checked the full source against the Hugging Face
+  listing (141 shards, the digests of the earlier marker). No full pack ran:
+  the tmpfs holds the checkpoint.
 - **Host setting.** systemd-logind on these hosts removes a user's `/dev/shm`
   files when that user's last session ends (RemoveIPC), which deleted a first
   pack on six hosts. Lingering was enabled for the operator account on all eight
@@ -61,6 +86,7 @@ the harness was finished, every change of a record is a separate commit titled
 | S8 | the TPU run comparison: harness preparation, then the results | `ab4c6582`, `60b68b4a` |
 | S9 | these governance files, the data-contract scan of them and of the release receipts | `62e4e615` |
 | H17 | after the release: the chat UI shows the resident session's context capacity instead of a fixed 32K | the H17 code commit and `[Equivalence] Re-baseline G9 for H17` |
+| Public path | the operator workflow as commands (`checkpoint mark-source`, `topology capture`/`bind`, `checkpoint pack`), the UI attaching to `ask` sessions (H18), the 166,912-slot wording (H19) | the WU-C4, WU-C5, WU-C6, H18 and H19 commits, `[Equivalence] Re-baseline G6 for WU-C` |
 
 ## Evidence
 
@@ -74,7 +100,7 @@ state).
 | `fingerprints_fixture.json`, `fingerprints_production.json`, `cpu_digests.json`, `checkpoint_identity.json` | G1, G2, G3, G4 | `d54572a3` | frozen: device programs, numerics, identities of `181c013e` |
 | `fixture.json` | fixture | `08826aa1` | frozen |
 | `load_protocol_fixture.json`, `load_protocol_production.json` | G1-protocol, G2-protocol | `cad90e6e` | reviewed, H11 (the HLO admission profile renamed) |
-| `import_closure.json` | G6 | `e6fdd113` | rename-only, WU-C |
+| `import_closure.json` | G6 | the WU-C re-baseline of the topology commands | rename-only, WU-C |
 | `trace_closure.json` | G7 | `93147c55` | rename-only, WU-E |
 | `wire.json` | G9 | `bfd4345c` | reviewed, S3 (module-derived fields only) |
 | `http.json` | G9-http | the H17 re-baseline | reviewed, H17 (the chat UI's context display) |
@@ -148,13 +174,14 @@ None of these blocks the release. Each is its own unit with its own gates.
   a recorded-names one keeps the recorded names (no path nests today), and a new
   Pallas kernel without a `kernel_renames.toml` row fails `j-public` with a cause
   that is not obvious.
-- **Behaviour.** The chat UI and `/v1` server attach only to a controller started
-  as `python -m glm_tpu.executor.multihost_executor`, identified by a dispatch
-  receipt that no command of the repository writes; a session started with
-  `glm-tpu ask --keep-loaded` cannot be attached. The operator workflows that
-  write the source completion marker, capture the topology binding and drive
-  packing are not in the repository
-  ([quickstart](README.md#quickstart-from-the-weights-to-an-answer)).
+- **Behaviour.** The fleet jobs (`topology capture`, `checkpoint pack`) repeat
+  the staging code of `executor/staging.py` and the controller's supervision
+  loop rather than sharing it, which would move the G7 record; unify them in a
+  unit that re-baselines G7. A full `checkpoint pack`, its seal and a recovery
+  have run only on the CPU fakes (the procedure they encode ran on the fleet
+  through private scripts on 2026-09-27); the first real pack with the command
+  is the proof. The chat server needs a SIGTERM after SIGINT to exit while its
+  queue thread waits.
   `collect-env` run from an uninstalled checkout can read stale
   in-tree build metadata. `checkpoint verify` should say
   in its help and report what it does not check, and a malformed manifest (a
@@ -177,8 +204,7 @@ None of these blocks the release. Each is its own unit with its own gates.
   few comments and one `info` value keep research wording; some docstrings and
   documentation sentences are stale in detail (a top-k merge docstring, the
   prefill-semantics test docstring, a side-by-side sentence in TESTING, the API
-  page's offline test list). OPERATIONS and CHECKPOINTS should state the
-  lingering requirement above.
+  page's offline test list).
 - **Publication (owner).** The history keeps private infrastructure literals in
   old trees and commit messages; a whole-tree private-literal scan should exist
   before any publication. The data-contract scan of the governance files and the

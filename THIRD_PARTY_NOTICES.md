@@ -41,7 +41,9 @@ Two of these files, `generation_config.json` and `tokenizer_config.json`, are
 byte-identical to their counterparts in the GLM-5.2-FP8 snapshot listed below.
 The copies here are those of the GLM-5.3 revision above (checked byte for byte
 against it) and are distributed under the GLM-5.3 license with that license's
-text; they do not rely on GLM-5.2's MIT license.
+text; they do not rely on GLM-5.2's MIT license. Zhipu AI, named in the GLM-5.2
+notice below, and Z.AI are the same organization, which publishes both
+repositories.
 
 ## Material in the repository history only
 

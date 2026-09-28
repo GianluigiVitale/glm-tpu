@@ -127,50 +127,72 @@ TPU accelerator type `v4-64`: the number counts TensorCores, two per chip; a
 shape but 8 x 4), the verified GLM-5.3
 owner checkpoint on every host, the topology binding assets, a clean published
 checkout on an allowed branch and the pinned Python 3.12 environment (JAX/jaxlib
-0.10.1, libtpu 0.0.41). An untracked site file names all of it
+0.10.1, libtpu 0.0.41); the quickstart below produces the checkpoint and the
+binding with this repository's commands. An untracked site file names all of it
 ([`examples/site.example.toml`](examples/site.example.toml)).
 [Installation](docs/release/INSTALLATION.md) · [Checkpoint](docs/release/CHECKPOINTS.md) ·
 [Operations](docs/release/OPERATIONS.md).
 
 ### Quickstart: from the weights to an answer
 
-The steps in order, each with the page that has the details. Four pieces need
-tooling that is **not in this repository**: the source completion marker (step
-3), the topology binding (step 5), the packing driver (step 7) and, for the UI
-and the API, the controller's dispatch receipt (step 10). This repository holds
-the engine and the checks that consume those files, not the operator workflows
-that produced them for the measured release. Commands run on rank 0 (host 0 of
-the slice) unless a step says every host.
+The steps in order, each with the page that has the details; every step is a
+command of this repository. Commands run on rank 0 (host 0 of the slice) unless a
+step says every host. The fleet commands (steps 7, 8 and 10) run only from a
+clean checkout on a branch the site's `[launch]` policy allows, pushed to its
+origin (by default `main` or `release/*`; [OPERATIONS](docs/release/OPERATIONS.md#before-a-launch)).
 
-1. **Install** the pinned environment on every host, at the path the site file
-   names as `fleet.worker_python`, and keep the checkout on rank 0
-   ([INSTALLATION](docs/release/INSTALLATION.md)); from the checkout:
+1. **Install** the pinned environment on every host at the same absolute path
+   (the site's `fleet.worker_python`); the checkout is needed on rank 0 only
+   ([INSTALLATION](docs/release/INSTALLATION.md)). On rank 0, from the checkout:
 
    ```bash
    uv venv --python 3.12 .venv
    uv pip install --python .venv/bin/python '.[runtime,tpu,dev]'
    ```
 
+   On the other hosts, create the same environment at the same path (the same
+   two commands in a copy of the checkout, or the [wheel](docs/release/INSTALLATION.md#the-wheel));
+   the controller stages the source it runs from to every host. The commands
+   below use this environment's `python`.
+
 2. **Download the weights** at the pinned revision (141 safetensors shards,
-   755,632,050,320 bytes, with the tokenizer and configuration files).
-   `hf` comes with the pinned `huggingface-hub` of the `runtime` extra:
+   755,632,050,320 bytes, with the tokenizer and configuration files) to the
+   directory the site file will name as `paths.model_path`, on every host (or on
+   a mount every host sees). `hf` comes with the pinned `huggingface-hub`:
 
    ```bash
    hf download zai-org/GLM-5.3 --revision aca966e4e02791568aa6a4ced368624b3d897f42 --local-dir /path/to/GLM-5.3-FP8
    ```
 
-   The site's `paths.model_path` names this directory on every host: the workers
-   read the tokenizer files there and the pack worker reads its source there
-   ([CHECKPOINTS](docs/release/CHECKPOINTS.md#the-source)).
-3. **Record the verified source** (not in this repository). Every worker and the
-   pack worker require `SOURCE_COMPLETE.json` in `paths.model_path`: a JSON
-   object with `"passed": true`, `"repository": "zai-org/GLM-5.3"`, the pinned
-   `"revision"`, `"verified_shards": 141` and `"verified_bytes": 755632050320`,
-   whose SHA-256 the site file pins (`glm_tpu/config/site.py`, `site_args`). The
-   acquisition workflow that checked every shard's upstream SHA-256 and wrote it
-   is not part of this repository.
-4. **Write the site file** from the example, owner-only, and fill in every
-   `<...>` value ([the site file](docs/release/INSTALLATION.md#the-site-file)):
+3. **Mark the verified source**: hash every file and compare it with the
+   Hugging Face repository ([CHECKPOINTS](docs/release/CHECKPOINTS.md#mark-the-source)).
+   The report's `marker_sha256` is the site's `checkpoint.source_complete_sha256`;
+   copy that same file into `paths.model_path` on every host (to check another
+   host's copy of the weights, run the command there with `--upstream-marker`
+   naming this marker and `--output` a scratch file; the copied file is the one
+   the site pins):
+
+   ```bash
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint mark-source /path/to/GLM-5.3-FP8
+   ```
+
+4. **Inventory the source**. Its report's `inventory_sha256` is the site's
+   `checkpoint.source_inventory_sha256`; the file must lie inside
+   `checkpoint.inventory_namespace`, at the same path on every host:
+
+   ```bash
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint inventory /path/to/GLM-5.3-FP8 \
+     --output /path/to/checkpoints/<inventory-tag>/source_inventory.json --model-id zai-org/GLM-5.3 \
+     --revision aca966e4e02791568aa6a4ced368624b3d897f42
+   ```
+
+5. **Write the site file** from the example, owner-only, and fill in every
+   `<...>` value ([the site file](docs/release/INSTALLATION.md#the-site-file)).
+   A pin that a later step prints (the `[topology]` values of step 7, the
+   manifest and SUCCESS digests of step 8) is 64 zeros until then. Name the
+   checkpoint root `greenfield_ws32_runtime_pack_<YYYYMMDD>T<HHMMSS><9 digits>Z`
+   directly inside `checkpoint.namespace` (the pack run takes its name), and set
+   `topology.slice_name` (the TPU name) before step 7, which records it:
 
    ```bash
    mkdir -p ~/.config/glm-tpu
@@ -178,50 +200,55 @@ the slice) unless a step says every host.
    chmod 600 ~/.config/glm-tpu/site.toml
    ```
 
-5. **Capture the topology binding** (not in this repository). The site's
-   `[topology]` table pins `topology_rebinding.json` and the eight hosts'
-   topology captures that `glm_tpu/distributed/topology.py` authenticates before
-   any device is used; the workflow that captures them on the fleet is not part
-   of this repository.
 6. **Check the environment** on every host
    ([INSTALLATION](docs/release/INSTALLATION.md#check-an-environment)):
 
    ```bash
-   JAX_PLATFORMS=cpu .venv/bin/python -m glm_tpu info
-   JAX_PLATFORMS=cpu .venv/bin/python -m glm_tpu collect-env --profile tpu
+   JAX_PLATFORMS=cpu python -m glm_tpu info
+   JAX_PLATFORMS=cpu python -m glm_tpu collect-env --profile tpu
    ```
 
-7. **Inventory and pack the checkpoint.** The inventory is public; its
-   `inventory_sha256` goes into the site's `[checkpoint]` table:
+7. **Capture the topology and bind it**, with the fleet idle: a model-free job of
+   about a minute on the TPUs, then the binding of its run
+   ([OPERATIONS](docs/release/OPERATIONS.md#the-topology-binding)). Copy the
+   printed `binding_dir`, `binding_sha256`, `capture_root`, `topology_sha256`,
+   `topology_fleet_sha256`, `mesh_sha256` and `slice_name` into the site's
+   `[topology]` table:
 
    ```bash
-   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint inventory /path/to/GLM-5.3-FP8 \
-     --output /path/to/new-inventory.json --model-id zai-org/GLM-5.3 \
-     --revision aca966e4e02791568aa6a4ced368624b3d897f42
+   JAX_PLATFORMS=cpu python -m glm_tpu topology capture --site ~/.config/glm-tpu/site.toml
+   JAX_PLATFORMS=cpu python -m glm_tpu topology bind /path/to/runs/<capture run> --output /path/to/binding
    ```
 
-   Packing is **not** a command of this repository: there is no
-   `checkpoint pack`. The fleet packing driver that stages the source and runs
-   `python -m glm_tpu.model_loader.pack_worker` on the eight hosts, then assembles
-   and seals the manifest, is private
-   ([CHECKPOINTS](docs/release/CHECKPOINTS.md#packing) describes the contract it
-   must follow). Its manifest and SUCCESS digests go into the site file.
-8. **Verify the packed checkpoint** on every host, which holds its four slots
-   (the topology binding's `host_to_slots` names them;
-   [CHECKPOINTS](docs/release/CHECKPOINTS.md#inventory-and-verify-on-local-files)),
-   then run the worker preflight against the real site file on rank 0 with the
-   fleet idle ([TESTING](docs/release/TESTING.md)):
+8. **Pack and seal the checkpoint** on the eight hosts (CPU, hours; about 107 GB
+   of free tmpfs per host, and lingering or `RemoveIPC=no` first;
+   [CHECKPOINTS](docs/release/CHECKPOINTS.md#packing)). `--preflight-only` runs
+   every host's checks first. Copy the printed `manifest_sha256` and
+   `success_sha256` into the site's `[checkpoint]` table:
+
+   ```bash
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --preflight-only
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml
+   ```
+
+9. **Verify the packed checkpoint** on every host, which holds its four slots
+   (the pack report's `installed` rows and the binding's `host_to_slots` name
+   them; the site file must then be on every host, at the same path), then run
+   the worker preflight against the real site file on rank 0 with the fleet idle
+   ([CHECKPOINTS](docs/release/CHECKPOINTS.md#inventory-and-verify-on-local-files),
+   [TESTING](docs/release/TESTING.md)):
 
    ```bash
    JAX_PLATFORMS=cpu python -m glm_tpu checkpoint verify --site ~/.config/glm-tpu/site.toml --slots <four slots> --local-slot-layout
    GLM_TPU_TEST_SITE=~/.config/glm-tpu/site.toml JAX_PLATFORMS=cpu python -m pytest -p no:cacheprovider tests/worker/test_local_preflight.py -m site
    ```
 
-9. **Start a resident session and ask** from rank 0 when the fleet is idle (next
-   section). It prints `RUN <run directory>`, answers, and keeps the model
-   loaded for the questions that follow
-   ([ordinary inference](docs/release/OPTIMIZED_INFERENCE.md)).
-10. **Open the chat UI or the `/v1` API** on that session (below).
+10. **Start a resident session and ask** from rank 0 when the fleet is idle (next
+    section). It prints `RUN <run directory>`, answers (`RESIDENT_RESULT ...`),
+    and keeps the model loaded for the questions that follow
+    ([ordinary inference](docs/release/OPTIMIZED_INFERENCE.md)).
+11. **Open the chat UI or the `/v1` API** on that session, once it has answered
+    (below).
 
 ### A resident session
 

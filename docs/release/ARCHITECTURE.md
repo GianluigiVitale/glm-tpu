@@ -11,17 +11,17 @@ as it is; the measured results are in [STATUS](STATUS.md).
 
 | Package | Modules | Role |
 |---|---|---|
-| `entrypoints/cli` | `main`, `ask`, `prepare`, `collect_env`, `checkpoint`, `types` | the `glm-tpu` command line |
+| `entrypoints/cli` | `main`, `ask`, `prepare`, `collect_env`, `checkpoint`, `topology`, `types` | the `glm-tpu` command line |
 | `entrypoints/serve`, `entrypoints/openai`, `entrypoints/ui` | `server`, `http_handler`, `job_queue`, `security`; `serving_chat`, `serving_models`, `chat_utils`, `protocol`, `tool_parser`; `conversations` and `static/` | the loopback server, the OpenAI-compatible `/v1` API and the browser chat UI, attached to a resident session |
-| `executor` | `multihost_executor`, `launch_policy`, `staging`, `fleet`, `remote/` | the rank-0 controller: launch policy, staging by `git archive`, the exact SSH command strings, and the standard-library helper programs it sends to the hosts |
+| `executor` | `multihost_executor`, `launch_policy`, `staging`, `fleet`, `remote/`; `jobs`, `topology_job`, `pack_job` | the rank-0 controller: launch policy, staging by `git archive`, the exact SSH command strings, and the standard-library helper programs it sends to the hosts; the model-free fleet jobs on the same machinery (the topology capture, the checkpoint pack) |
 | `worker` | `tpu_worker` | the per-host worker process |
 | `runner` | `tpu_runner`, `programs`, `compilation_manager`, `kv_cache_manager`, `admission`, `hlo_utils` | the model runner: checkpoint loading, the program set, compilation with preserved graph originals, the fresh cache, memory and collective admission |
 | `engine` | `llm_engine`, `request`, `request_session`, `outputs`, `resident_protocol`, `resident_client` | generation over a loaded runner, request schemas and preparation, the per-request host loop, the token event stream, the run-directory protocol and its inbox client |
 | `models/glm_moe_dsa` | `model`, `prefill`, `decoder_layer`, `state`, `weights`, `hf_config/` | GLM-5.3: the decode and prefill programs, the layer bodies, the device state, the weight trees, the pinned Hugging Face configuration |
 | `layers`, `layers/attention`, `layers/moe` | `norm`, `rope`, `linear`, `mlp`, `fp8`, `embed`, `sampler`, `contracts`; `mla`, `dsa_indexer`, `kv_cache`; `router`, `routed_experts` | per-shard layer bodies, run inside `shard_map` on the device mesh |
 | `kernels` | `sparse_mla/{kernel,partial_kernel}`, `fp8_grouped_matmul/{kernel,panel_kernel,panels}`, `names` | the Pallas TPU kernels and their `pallas_call` names |
-| `model_loader`, `model_loader/sharded_state` | `source_inventory`, `placement`, `pack_worker`; `format`, `writer`, `manifest`, `verify`, `loader` | the checkpoint pipeline: source inventory, per-device placement, packing, the packed format, verification and loading |
-| `distributed` | `mesh`, `topology`, `parallel_state` | the logical and physical mesh, the topology binding, JAX distributed initialization and the all-host vote |
+| `model_loader`, `model_loader/sharded_state` | `source_inventory`, `source_marker`, `placement`, `pack_worker`; `format`, `writer`, `manifest`, `seal`, `verify`, `loader` | the checkpoint pipeline: source inventory and completion marker, per-device placement, packing, the packed format, the seal, verification and loading |
+| `distributed` | `mesh`, `topology`, `topology_capture`, `parallel_state` | the logical and physical mesh, the topology capture and binding, JAX distributed initialization and the all-host vote |
 | `config` | `model`, `cache`, `site`, `parallel` | the pinned model geometry and identity, the cache configuration and numerical contracts, the site file, the mesh axis names |
 | top level | `envs`, `exceptions`, `utils/{io_utils,json_utils}` | environment variables, fail-closed errors, owner-only create-once writes, canonical JSON |
 

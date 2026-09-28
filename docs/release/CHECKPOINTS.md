@@ -150,7 +150,8 @@ python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --compare-s
   from the source, as the packer places them, comparing their SHA-256s with the
   manifest's. The choice covers the FP8 and BF16 weights, routed experts and each
   sharded axis. The report lists every difference and the command exits 1 when
-  there is one.
+  there is one. `--tensors 0` holds one whole slot's tensors in memory at a time
+  (about 25 GB) and reads the whole source once per host.
 - **Preflight** (`--preflight-only`): the pack's checks on every host (among them
   that `checkpoint.root` does not exist yet and that there is enough tmpfs for the
   host's slots plus an 8 GiB reserve), then each host's facts; nothing is packed.

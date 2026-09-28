@@ -1,12 +1,12 @@
 # Working in this repository
 
 This file is for anyone, person or agent, who explores or changes this
-repository. The working rules come first; then the
-[repository map](#repository-map) lists every directory and file with one line
-on what it does, and [where to start](#where-to-start) follows a request from the
-command line down to the TPU program. The current state is in the
-[handoff](HANDOFF.md), the [goal](goal.md) and the
-[release status](docs/release/STATUS.md); the development policy is in
+repository. Read the [handoff](HANDOFF.md), the [goal](goal.md) and the
+[release status](docs/release/STATUS.md) first: they hold the current state. The
+working rules come next; then the [repository map](#repository-map) lists every
+directory and file with one line on what it does, and
+[where to start](#where-to-start) follows a request from the command line down to
+the TPU program. The development policy is in
 [CONTRIBUTING](CONTRIBUTING.md) and the exact test commands in
 [TESTING](docs/release/TESTING.md). Instructions written for earlier campaigns
 (the GLM-5.2 and GLM-5.3 releases, the research tree) are history, not
@@ -263,7 +263,7 @@ glm_tpu/executor/            The rank-0 controller and its launch machinery; imp
 ```text
 glm_tpu/worker/              The per-host worker process
   __init__.py                Package docstring
-  tpu_worker.py              python -m glm_tpu.worker.tpu_worker: preflight, load, then one request, a resident loop or a batch
+  tpu_worker.py              python -m glm_tpu.worker.tpu_worker: preflight, load, the queued requests or one batch, then with --keep-loaded the resident loop
 ```
 
 ```text
@@ -361,7 +361,7 @@ glm_tpu/distributed/         Multi-host runtime state
 ```text
 glm_tpu/utils/               Shared utilities; standard library only
   __init__.py                Package docstring
-  io_utils.py                Owner-only, create-once writes, bounded reads, private-file checks
+  io_utils.py                Owner-only create-once writes, atomic replacing JSON writes, bounded reads, private-file checks
   json_utils.py              Canonical JSON: the hash contract and the wire bytes
 ```
 
@@ -575,7 +575,7 @@ docs/                        Documentation (not in the wheel)
   UI.md                      The browser chat workspace
   release/                   Release documentation and the compact result receipts
     ARCHITECTURE.md          Module map, request path, parallelism, the model, numerical conventions
-    CHECKPOINTS.md           The pinned source, the packed checkpoint, inventory and verify, packing, capacity
+    CHECKPOINTS.md           The pinned source and its marker, the packed checkpoint, inventory and verify, packing, capacity
     CONCURRENT.md            Four concurrent conversations
     GLM53_MIGRATION.md       How the GLM-5.3 release was reached
     INSTALLATION.md          Environments, extras, collect-env, the wheel, the site file, environment variables
@@ -622,10 +622,12 @@ licenses/                    License texts of material kept only in the reposito
    `models/glm_moe_dsa/model.py`), compiles each program
    (`runner/compilation_manager.py`) and admits it (`runner/admission.py`,
    `runner/hlo_utils.py`).
-5. The programs are `shard_map` bodies: `models/glm_moe_dsa/decoder_layer.py`
-   composes `layers/` (norms, `attention/mla.py`, `attention/dsa_indexer.py`,
-   `attention/kv_cache.py`, `moe/router.py`, `moe/routed_experts.py`, `mlp.py`,
-   `sampler.py`), which call the Pallas kernels in `kernels/sparse_mla/` and
+5. The programs are `shard_map` bodies: `models/glm_moe_dsa/model.py` and
+   `prefill.py` embed the tokens (`layers/embed.py`), run
+   `models/glm_moe_dsa/decoder_layer.py` for each layer (norms, `attention/mla.py`
+   with `attention/kv_cache.py`, `attention/dsa_indexer.py`, `moe/router.py`,
+   `moe/routed_experts.py`, `mlp.py`) and take the greedy head (`sampler.py`); the
+   layers call the Pallas kernels in `kernels/sparse_mla/` and
    `kernels/fp8_grouped_matmul/`.
 6. `engine/llm_engine.py` `LLMEngine.generate` drives the loaded programs through
    `engine/request_session.py`: prefill, then one decode step per token, with an
