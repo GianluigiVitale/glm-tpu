@@ -10,7 +10,7 @@ sparse attention, expert routing, cache ownership and concurrent decoding.
 
 [Results](#measured-results) · [Layout](#repository-layout) ·
 [Check without TPU hardware](#check-without-tpu-hardware) ·
-[Run inference](#run-inference) · [Documentation](#documentation) ·
+[Run inference](#run-inference) · [Quickstart](#quickstart-from-the-weights-to-an-answer) · [Documentation](#documentation) ·
 [License](#license)
 
 ## Engineering contribution
@@ -121,13 +121,109 @@ speed and answer evidence come from real weights on TPU.
 
 ## Run inference
 
-Hardware inference needs a TPU v4 slice of **eight hosts with 32 chips**, the
-verified GLM-5.3 owner checkpoint on every host, the topology binding assets, a
-clean published checkout on an allowed branch and the pinned Python 3.12
-environment (JAX/jaxlib 0.10.1, libtpu 0.0.41). An untracked site file names all
-of it ([`examples/site.example.toml`](examples/site.example.toml)).
+Hardware inference needs a TPU v4 slice of **eight hosts with 32 chips** (Cloud
+TPU accelerator type `v4-64`: the number counts TensorCores, two per chip; a
+`v4-32` has 16 chips on four hosts, and the site file's fleet check refuses any
+shape but 8 x 4), the verified GLM-5.3
+owner checkpoint on every host, the topology binding assets, a clean published
+checkout on an allowed branch and the pinned Python 3.12 environment (JAX/jaxlib
+0.10.1, libtpu 0.0.41). An untracked site file names all of it
+([`examples/site.example.toml`](examples/site.example.toml)).
 [Installation](docs/release/INSTALLATION.md) · [Checkpoint](docs/release/CHECKPOINTS.md) ·
 [Operations](docs/release/OPERATIONS.md).
+
+### Quickstart: from the weights to an answer
+
+The steps in order, each with the page that has the details. Four pieces need
+tooling that is **not in this repository**: the source completion marker (step
+3), the topology binding (step 5), the packing driver (step 7) and, for the UI
+and the API, the controller's dispatch receipt (step 10). This repository holds
+the engine and the checks that consume those files, not the operator workflows
+that produced them for the measured release. Commands run on rank 0 (host 0 of
+the slice) unless a step says every host.
+
+1. **Install** the pinned environment on every host, at the path the site file
+   names as `fleet.worker_python`, and keep the checkout on rank 0
+   ([INSTALLATION](docs/release/INSTALLATION.md)); from the checkout:
+
+   ```bash
+   uv venv --python 3.12 .venv
+   uv pip install --python .venv/bin/python '.[runtime,tpu,dev]'
+   ```
+
+2. **Download the weights** at the pinned revision (141 safetensors shards,
+   755,632,050,320 bytes, with the tokenizer and configuration files).
+   `hf` comes with the pinned `huggingface-hub` of the `runtime` extra:
+
+   ```bash
+   hf download zai-org/GLM-5.3 --revision aca966e4e02791568aa6a4ced368624b3d897f42 --local-dir /path/to/GLM-5.3-FP8
+   ```
+
+   The site's `paths.model_path` names this directory on every host: the workers
+   read the tokenizer files there and the pack worker reads its source there
+   ([CHECKPOINTS](docs/release/CHECKPOINTS.md#the-source)).
+3. **Record the verified source** (not in this repository). Every worker and the
+   pack worker require `SOURCE_COMPLETE.json` in `paths.model_path`: a JSON
+   object with `"passed": true`, `"repository": "zai-org/GLM-5.3"`, the pinned
+   `"revision"`, `"verified_shards": 141` and `"verified_bytes": 755632050320`,
+   whose SHA-256 the site file pins (`glm_tpu/config/site.py`, `site_args`). The
+   acquisition workflow that checked every shard's upstream SHA-256 and wrote it
+   is not part of this repository.
+4. **Write the site file** from the example, owner-only, and fill in every
+   `<...>` value ([the site file](docs/release/INSTALLATION.md#the-site-file)):
+
+   ```bash
+   mkdir -p ~/.config/glm-tpu
+   cp examples/site.example.toml ~/.config/glm-tpu/site.toml
+   chmod 600 ~/.config/glm-tpu/site.toml
+   ```
+
+5. **Capture the topology binding** (not in this repository). The site's
+   `[topology]` table pins `topology_rebinding.json` and the eight hosts'
+   topology captures that `glm_tpu/distributed/topology.py` authenticates before
+   any device is used; the workflow that captures them on the fleet is not part
+   of this repository.
+6. **Check the environment** on every host
+   ([INSTALLATION](docs/release/INSTALLATION.md#check-an-environment)):
+
+   ```bash
+   JAX_PLATFORMS=cpu .venv/bin/python -m glm_tpu info
+   JAX_PLATFORMS=cpu .venv/bin/python -m glm_tpu collect-env --profile tpu
+   ```
+
+7. **Inventory and pack the checkpoint.** The inventory is public; its
+   `inventory_sha256` goes into the site's `[checkpoint]` table:
+
+   ```bash
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint inventory /path/to/GLM-5.3-FP8 \
+     --output /path/to/new-inventory.json --model-id zai-org/GLM-5.3 \
+     --revision aca966e4e02791568aa6a4ced368624b3d897f42
+   ```
+
+   Packing is **not** a command of this repository: there is no
+   `checkpoint pack`. The fleet packing driver that stages the source and runs
+   `python -m glm_tpu.model_loader.pack_worker` on the eight hosts, then assembles
+   and seals the manifest, is private
+   ([CHECKPOINTS](docs/release/CHECKPOINTS.md#packing) describes the contract it
+   must follow). Its manifest and SUCCESS digests go into the site file.
+8. **Verify the packed checkpoint** on every host, which holds its four slots
+   (the topology binding's `host_to_slots` names them;
+   [CHECKPOINTS](docs/release/CHECKPOINTS.md#inventory-and-verify-on-local-files)),
+   then run the worker preflight against the real site file on rank 0 with the
+   fleet idle ([TESTING](docs/release/TESTING.md)):
+
+   ```bash
+   JAX_PLATFORMS=cpu python -m glm_tpu checkpoint verify --site ~/.config/glm-tpu/site.toml --slots <four slots> --local-slot-layout
+   GLM_TPU_TEST_SITE=~/.config/glm-tpu/site.toml JAX_PLATFORMS=cpu python -m pytest -p no:cacheprovider tests/worker/test_local_preflight.py -m site
+   ```
+
+9. **Start a resident session and ask** from rank 0 when the fleet is idle (next
+   section). It prints `RUN <run directory>`, answers, and keeps the model
+   loaded for the questions that follow
+   ([ordinary inference](docs/release/OPTIMIZED_INFERENCE.md)).
+10. **Open the chat UI or the `/v1` API** on that session (below).
+
+### A resident session
 
 To start a session from rank 0 when the fleet is idle:
 
@@ -146,12 +242,51 @@ answering. Later prepared requests go to that session's inbox; they do not start
 another model. Full history must be supplied to continue a conversation.
 [Submission, stopping and four-chat usage](docs/release/OPTIMIZED_INFERENCE.md).
 
+### The chat UI and the `/v1` API
+
 For a browser workspace, the [chat UI](docs/UI.md) attaches to an existing
 resident session: saved conversations, streamed answers, thinking, light/dark
 themes and a mobile layout. Forward its loopback port 8011 to open it locally.
 The model stays loaded when the UI closes. The same server also exposes a
 stateless [OpenAI-compatible `/v1` API](docs/API.md) with tool calling and
 streaming, for local development tools.
+
+The server attaches only to a controller process started as the controller
+module itself; a session started with `glm-tpu ask --keep-loaded` runs the
+controller inside the `ask` process, whose command line the server's check
+(`glm_tpu/engine/resident_client.py`) refuses. Prepare the first request, then
+start the controller with the printed `PRIVATE_INPUT` file:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --prepare-only
+JAX_PLATFORMS=cpu python -m glm_tpu.executor.multihost_executor --request /path/to/prepared/request.json --keep-loaded --wall-seconds 14400
+```
+
+The server also needs that controller's dispatch receipt (`--dispatch`): a JSON
+object with the controller's `pid`, its `start_ticks` (field 22 of
+`/proc/<pid>/stat`), its `command` (the argument list) and the `code_hash` of
+the staged commit, as the run's `resident-measurement.json` records it. No
+command of this repository writes that receipt. Then, on rank 0:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
+  --run /absolute/path/to/resident-run \
+  --dispatch /absolute/path/to/controller-dispatch.json \
+  --state /absolute/path/outside-the-repository/private-chats \
+  --port 8011
+```
+
+Open http://127.0.0.1:8011 through the forwarded port and ask, or call the API
+with the key the server created at `<state>/api-key`:
+
+```bash
+export GLM_API_KEY="$(cat /absolute/path/outside-the-repository/private-chats/api-key)"
+curl -s http://127.0.0.1:8011/v1/chat/completions \
+  -H "Authorization: Bearer $GLM_API_KEY" -H "Content-Type: application/json" \
+  -d '{"model": "glm-5.3", "messages": [{"role": "user", "content": "Your question"}]}'
+```
+
+### Scope
 
 This is a single-site engine with a private file queue, a local chat UI and a
 key-authenticated loopback API. There is no automatic recovery of live model or

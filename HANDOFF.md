@@ -144,7 +144,14 @@ None of these blocks the release. Each is its own unit with its own gates.
   a recorded-names one keeps the recorded names (no path nests today), and a new
   Pallas kernel without a `kernel_renames.toml` row fails `j-public` with a cause
   that is not obvious.
-- **Behaviour.** `collect-env` run from an uninstalled checkout can read stale
+- **Behaviour.** The chat UI and `/v1` server attach only to a controller started
+  as `python -m glm_tpu.executor.multihost_executor`, identified by a dispatch
+  receipt that no command of the repository writes; a session started with
+  `glm-tpu ask --keep-loaded` cannot be attached. The operator workflows that
+  write the source completion marker, capture the topology binding and drive
+  packing are not in the repository
+  ([quickstart](README.md#quickstart-from-the-weights-to-an-answer)).
+  `collect-env` run from an uninstalled checkout can read stale
   in-tree build metadata. `checkpoint verify` should say
   in its help and report what it does not check, and a malformed manifest (a
   JSON list) escapes it as a traceback. The site-file reader should check the
