@@ -228,7 +228,7 @@ glm_tpu/entrypoints/         What a user runs or connects to
   serve/                     The loopback HTTP server of the chat UI and /v1
     __init__.py              Package docstring
     server.py                python -m glm_tpu.entrypoints.serve.server: attach to a resident controller and serve
-    http_handler.py          The handler: the static page, /api/* behind Host, Origin and X-GLM-UI checks, /v1 behind a key
+    http_handler.py          The handler: the page, /api/* behind Host and Origin checks (and X-GLM-UI to post), /v1 behind a key
     job_queue.py             JobQueue: persistent chat jobs handed one at a time to the resident controller
     security.py              api_token: the owner-only API key file, created on first use
   ui/                        The browser chat workspace
@@ -282,7 +282,7 @@ glm_tpu/model_loader/        The checkpoint pipeline
   sharded_state/             The packed runtime checkpoint: one file per device slot
     __init__.py              Package docstring
     format.py                The packed format: file and tensor plans, headers, digests, RuntimePackConfig
-    writer.py                pack_runtime_slots and finalize_runtime_checkpoint: owner files, manifest, SUCCESS seal
+    writer.py                pack_runtime_slots and finalize_runtime_checkpoint: owner slot files, their records, the manifest
     manifest.py              assemble_owner_manifest: the manifest from the eight hosts' owner receipts
     verify.py                verify_runtime_checkpoint: metadata, manifest and SUCCESS seals, file hashes
     loader.py                load_runtime_checkpoint: place verified owner files on the device mesh
