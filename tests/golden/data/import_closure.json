@@ -43,20 +43,20 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "82ccbecab39228f359afcd13f9cef7300a3d6011b0647927d89662cae3d26840",
+  "closure_map": "8625135eb47d5a1e7e0841ce5a18069bd83dc06e82072b493b55c73db2a3c60b",
   "kind": "rename-only",
-  "previous_digest": "223feb299d203216a1f953f98a750913cd01eb0180b2ff839c0aabfada6e7ec1",
+  "previous_digest": "d2099bcad8d4f37ffa8d896cac6f78d5557c771ad58d8f83106a38d323d23e72",
   "reason": "WU-C"
  },
- "recorded_unix": 1790434261,
+ "recorded_unix": 1790622494,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "fd72f5a32246ccd36416aa7093fe5a6e1a297938",
+  "head": "acf4cb52aa2e022a6761260e1de936a287345d3c",
   "production_paths_equal_baseline": false
  },
  "stages": {
   "controller": {
-   "count": 28,
+   "count": 29,
    "jax_imported": false,
    "modules": [
     "glm_tpu",
@@ -73,6 +73,7 @@
     "glm_tpu.entrypoints.cli.collect_env",
     "glm_tpu.entrypoints.cli.main",
     "glm_tpu.entrypoints.cli.prepare",
+    "glm_tpu.entrypoints.cli.topology",
     "glm_tpu.entrypoints.cli.types",
     "glm_tpu.envs",
     "glm_tpu.exceptions",
