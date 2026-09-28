@@ -251,36 +251,25 @@ The model stays loaded when the UI closes. The same server also exposes a
 stateless [OpenAI-compatible `/v1` API](docs/API.md) with tool calling and
 streaming, for local development tools.
 
-The server attaches only to a controller process started as the controller
-module itself; a session started with `glm-tpu ask --keep-loaded` runs the
-controller inside the `ask` process, whose command line the server's check
-(`glm_tpu/engine/resident_client.py`) refuses. Prepare the first request, then
-start the controller with the printed `PRIVATE_INPUT` file:
-
-```bash
-JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --prepare-only
-JAX_PLATFORMS=cpu python -m glm_tpu.executor.multihost_executor --request /path/to/prepared/request.json --keep-loaded --wall-seconds 14400
-```
-
-The server also needs that controller's dispatch receipt (`--dispatch`): a JSON
-object with the controller's `pid`, its `start_ticks` (field 22 of
-`/proc/<pid>/stat`), its `command` (the argument list) and the `code_hash` of
-the staged commit, as the run's `resident-measurement.json` records it. No
-command of this repository writes that receipt. Then, on rank 0:
+Start the server on rank 0 once the session has answered its first request (the
+controller printed `RESIDENT_RESULT`), with `--run` the directory it printed as
+`RUN <directory>`. The session may have been started by `glm-tpu ask ...
+--keep-loaded` or as the controller module with `--keep-loaded`; the server
+finds and authenticates the controller from that run directory's own records
+([how](docs/UI.md#open-the-workspace)):
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
   --run /absolute/path/to/resident-run \
-  --dispatch /absolute/path/to/controller-dispatch.json \
   --state /absolute/path/outside-the-repository/private-chats \
   --port 8011
 ```
 
 Open http://127.0.0.1:8011 through the forwarded port and ask, or call the API
-with the key the server created at `<state>/api-key`:
+with the key the server created at `<state>/api-key` on rank 0:
 
 ```bash
-export GLM_API_KEY="$(cat /absolute/path/outside-the-repository/private-chats/api-key)"
+export GLM_API_KEY="$(ssh <rank-0 host> cat /absolute/path/outside-the-repository/private-chats/api-key)"
 curl -s http://127.0.0.1:8011/v1/chat/completions \
   -H "Authorization: Bearer $GLM_API_KEY" -H "Content-Type: application/json" \
   -d '{"model": "glm-5.3", "messages": [{"role": "user", "content": "Your question"}]}'

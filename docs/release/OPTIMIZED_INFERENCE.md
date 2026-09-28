@@ -104,7 +104,8 @@ do not run a batch while a resident session owns the fleet.
 
 [Results](STATUS.md) separate the solo, resident-evaluation and four-chat
 evidence. The [chat UI](../UI.md) and the [`/v1` API](../API.md) attach to an
-existing resident session and use its queue one request at a time. There is no
+existing resident session (one started by `ask --keep-loaded` included, once it
+has answered its first request) and use its queue one request at a time. There is no
 online batch admission and no claim of full-32K-input quality. The 8K and 128K
 profiles have their own recorded scope; the 256K profile has no measured speed
 or quality result of its own. The legacy sampled GLM-5.2 interface is history,

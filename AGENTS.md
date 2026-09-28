@@ -204,7 +204,7 @@ glm_tpu/engine/              The request path shared by the controller, the work
   request_session.py         RequestSession and BatchedSession: the per-request host loop, token delivery, fleet votes
   outputs.py                 TokenEvent (one line of the token stream) and final_channel (reasoning versus final answer)
   resident_protocol.py       Every file name, module name, flag and byte string the processes exchange
-  resident_client.py         Resident: the inbox client of a running resident controller, used by the UI and /v1
+  resident_client.py         Resident: the inbox client of a resident controller (found from its run), used by the UI and /v1
 ```
 
 ```text
@@ -389,6 +389,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     test_llm_engine.py       LLMEngine.generate and generate_concurrent over synthetic device results
     test_request.py          Fixed-profile, privacy and budget checks of request preparation
     test_request_session.py  Request-control failures and timing of RequestSession and BatchedSession
+    test_resident_client.py  How Resident finds and authenticates its controller: the run's records, ask sessions, receipts
     test_resident_protocol.py  G8: every resident-protocol constant names what the processes use
     test_vote_schedule.py    The fleet-vote order and failure paths through the worker entry points
   entrypoints/               Tests of glm_tpu/entrypoints

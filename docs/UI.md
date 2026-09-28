@@ -7,17 +7,27 @@ starts TPU workers or unloads the model when the browser or UI server closes.
 
 ## Open the workspace
 
-Run on the resident controller's host, from the published checkout and documented
-Python environment. Use the original controller dispatch receipt (PID, start
-ticks, command and code hash), not a completion-notifier receipt:
+Run on the resident controller's host (rank 0), from the published checkout and
+documented Python environment, once the session has answered its first request
+(the controller printed `RESIDENT_RESULT`). The session may have been started
+with `glm-tpu ask "..." --keep-loaded` or as the controller module with
+`--keep-loaded`; `--run` is the run directory it printed as `RUN <directory>`:
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
   --run /absolute/path/to/resident-run \
-  --dispatch /absolute/path/to/controller-dispatch.json \
   --state /absolute/path/outside-the-repository/private-chats \
   --port 8011
 ```
+
+The server identifies the controller from the run directory's own records: its
+pid, start ticks and staged commit in `controller_identity.json`, and the
+session's first request in the staged `request.json`, whose SHA-256 that record
+holds. Before every step it checks that this exact process (same pid and start
+ticks) still runs a resident controller's command line (the controller module or
+`ask`, with `--keep-loaded`) and that no stop was requested; otherwise it refuses
+and restarts nothing. `--dispatch` takes an explicit receipt instead (`pid`,
+`start_ticks`, `command`, `code_hash`), which must name the run's controller.
 
 Forward port **8011** through VS Code's Ports panel or an SSH tunnel, using the
 same local port, then open **http://127.0.0.1:8011**. The server listens only on

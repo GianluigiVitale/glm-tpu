@@ -1,4 +1,12 @@
-"""The file-inbox client of a resident controller, used by the chat UI and the OpenAI-compatible API."""
+"""The file-inbox client of a resident controller, used by the chat UI and the OpenAI-compatible API.
+
+:class:`Resident` attaches to the controller that owns a resident run directory. It authenticates that controller
+by its process identity (pid, start ticks, a live process whose command line is a resident controller's: the
+controller module or ``glm-tpu ask``, with ``--keep-loaded``) before every step, never starts or stops a model, and
+publishes one request at a time into the run's inbox. The identity comes from the controller's own records in the
+run directory (:func:`controller_receipt`), or from a dispatch receipt the operator wrote, which must then name the
+same controller.
+"""
 
 import fcntl
 import hashlib
@@ -6,9 +14,45 @@ import json
 import os
 from pathlib import Path
 
+from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.engine.outputs import final_channel
 from glm_tpu.exceptions import ApiError
-from glm_tpu.utils.io_utils import atomic
+from glm_tpu.utils.io_utils import atomic, private, read_bounded
+
+STAGED_REQUEST = "request.json"  # the session's first request, staged by the controller into its run directory
+
+
+def controller_receipt(run):
+    """The dispatch receipt of the controller that owns the resident run ``run``, from that controller's own records:
+    ``controller_identity.json`` (its pid, its start ticks and the staged commit) and the staged ``request.json``
+    whose SHA-256 it recorded (the session's first request). A controller started by ``glm-tpu ask --keep-loaded``
+    writes the same records as one started as the controller module."""
+    from glm_tpu.engine import request
+
+    record = run / protocol.CONTROLLER_IDENTITY_FILE
+    private(record)
+    identity = json.loads(read_bounded(record, 1 << 20))
+    staged = run / STAGED_REQUEST
+    if hashlib.sha256(read_bounded(staged, request.PAYLOAD_CAP)).hexdigest() != identity.get("request_file_sha256"):
+        raise ValueError("The resident run's staged request differs from its controller's record.")
+    return dict(
+        pid=identity["controller_pid"],
+        start_ticks=identity["controller_start_ticks"],
+        code_hash=identity["code_hash"],
+        request=str(staged),
+    )
+
+
+def _process(pid):
+    """``(state, start ticks, argv)`` of a live process (``/proc/<pid>``)."""
+    proc = Path("/proc") / str(pid)
+    stat = (proc / "stat").read_text().rsplit(")", 1)[1].split()
+    return stat[0], stat[19], (proc / "cmdline").read_bytes().split(b"\0")
+
+
+def resident_command(argv):
+    """Whether a command line is a resident controller's: the controller module or ``ask``, with ``--keep-loaded``."""
+    return b"--keep-loaded" in argv and (protocol.CONTROLLER_MODULE.encode() in argv or b"ask" in argv)
 
 
 class Resident:
@@ -18,13 +62,24 @@ class Resident:
         from transformers import AutoTokenizer
 
         self.run = run
-        self.identity = json.loads(dispatch.read_text())
+        self.identity = controller_receipt(run) if dispatch is None else json.loads(dispatch.read_text())
+        if dispatch is not None and (run / protocol.CONTROLLER_IDENTITY_FILE).exists():
+            own = controller_receipt(run)
+            if any(str(self.identity.get(k)) != str(own[k]) for k in ("pid", "start_ticks", "code_hash")):
+                raise ValueError("The dispatch receipt names another controller than the run's.")
         self.check()
-        initial = request.read(Path(self.identity["command"][self.identity["command"].index("--request") + 1]))
+        command = self.identity.get("command") or []
+        initial = request.read(Path(self.identity.get("request") or command[command.index("--request") + 1]))
         self.capacity = initial["context_capacity"]
         if self.capacity not in request.CAPACITIES:
             raise ValueError("The resident session uses an unsupported context capacity.")
-        if json.loads((run / "resident-measurement.json").read_text())["code_hash"] != self.identity["code_hash"]:
+        measurement = run / protocol.MEASUREMENT_FILE
+        if not measurement.is_file():
+            raise ValueError(
+                "The resident session has not answered its first request yet; start the server after the "
+                "controller printed RESIDENT_RESULT."
+            )
+        if json.loads(measurement.read_text())["code_hash"] != self.identity["code_hash"]:
             raise ValueError("Resident run does not match controller provenance.")
         self.lease = (run / "benchmark-producer.lock").open("a")
         fcntl.flock(self.lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -32,15 +87,12 @@ class Resident:
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True, trust_remote_code=False)
 
     def check(self):
-        proc = Path("/proc") / str(self.identity["pid"])
         try:
-            stat = (proc / "stat").read_text().rsplit(")", 1)[1].split()
-            argv = (proc / "cmdline").read_bytes().split(b"\0")
+            state, ticks, argv = _process(self.identity["pid"])
             valid = (
-                stat[19] == str(self.identity["start_ticks"])
-                and stat[0] not in ("Z", "X")
-                and b"glm_tpu.executor.multihost_executor" in argv
-                and b"--keep-loaded" in argv
+                ticks == str(self.identity["start_ticks"])
+                and state not in ("Z", "X")
+                and resident_command(argv)
                 and not (self.run / "inbox/stop.json").exists()
             )
         except (OSError, IndexError):

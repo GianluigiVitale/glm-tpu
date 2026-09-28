@@ -22,7 +22,11 @@ from glm_tpu.entrypoints.ui.conversations import ConversationStore
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", type=Path, required=True)
-    parser.add_argument("--dispatch", type=Path, required=True)
+    parser.add_argument(
+        "--dispatch",
+        type=Path,
+        help="a dispatch receipt of the controller (default: the run's own controller_identity.json and request.json)",
+    )
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8011)
     parser.add_argument("--api-key-file", type=Path, help="default: <state>/api-key, created 0600 on first start")
@@ -41,7 +45,8 @@ def main(argv=None):
     from glm_tpu.config.site import SiteConfig
 
     site = SiteConfig.load(args.site)
-    backend = Resident(args.run.resolve(), args.dispatch.resolve(), args.repo.resolve(), site.paths.model_path)
+    dispatch = None if args.dispatch is None else args.dispatch.resolve()
+    backend = Resident(args.run.resolve(), dispatch, args.repo.resolve(), site.paths.model_path)
     queue = JobQueue(args.state, backend)
     store = ConversationStore(queue)
     chat = models = token = key_path = None

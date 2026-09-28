@@ -10,7 +10,7 @@ import sys
 # `python -m glm_tpu.entrypoints.serve.server --help`, byte for byte (S5 A2): argparse wraps to the terminal
 # width (pinned: COLUMNS=100) and its layout differs between Python versions (the literal is Python 3.12's).
 HELP = """\
-usage: server.py [-h] --run RUN --dispatch DISPATCH --state STATE [--port PORT]
+usage: server.py [-h] --run RUN [--dispatch DISPATCH] --state STATE [--port PORT]
                  [--api-key-file API_KEY_FILE] [--no-api] [--repo REPO] [--site SITE]
 
 Loopback chat UI and OpenAI-compatible API attached to an existing resident GLM controller. This
@@ -20,7 +20,8 @@ and requests live outside the checkout.
 options:
   -h, --help            show this help message and exit
   --run RUN
-  --dispatch DISPATCH
+  --dispatch DISPATCH   a dispatch receipt of the controller (default: the run's own
+                        controller_identity.json and request.json)
   --state STATE
   --port PORT
   --api-key-file API_KEY_FILE

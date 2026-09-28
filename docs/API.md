@@ -15,12 +15,12 @@ therefore share one sequential queue.
 The API is on by default when the workspace starts; `--no-api` serves only the
 browser. A key is created at `<state>/api-key` (0600) on first start and printed
 by path, never by value (`--api-key-file` names another location). Run the server
-on the resident controller's host, from the published checkout:
+on the resident controller's host, from the published checkout, after the session
+answered its first request ([how it finds the controller](UI.md#open-the-workspace)):
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
   --run /absolute/path/to/resident-run \
-  --dispatch /absolute/path/to/controller-dispatch.json \
   --state /absolute/path/outside-the-repository/private-chats \
   --port 8011
 ```
