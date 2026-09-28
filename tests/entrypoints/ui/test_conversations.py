@@ -43,3 +43,10 @@ def test_overflow_and_delete_cannot_corrupt_active_chat(tmp_path):
         store.change(dict(action="delete", chat=c))
     store.change(dict(action="rename", chat=c, title="Renamed"))
     assert store.queue.db["chats"][0]["title"] == "Renamed"
+
+
+@pytest.mark.parametrize("capacity", [8192, 32768, 166912])
+def test_snapshot_reports_the_session_capacity(tmp_path, capacity):
+    # The browser's footer shows this value; before H17 it was the constant 32768 whatever the session's capacity.
+    store = open_store(tmp_path, FakeResident(capacity=capacity))
+    assert store.snapshot()["capacity"] == capacity

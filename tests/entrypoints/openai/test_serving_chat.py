@@ -35,6 +35,7 @@ class FakeResident:
     """Records what the template would receive and returns the pinned request shape."""
 
     def __init__(self, answer="42"):
+        self.capacity = 32768
         self.prepared = []
         self.published = {}
         self.sequence = 770

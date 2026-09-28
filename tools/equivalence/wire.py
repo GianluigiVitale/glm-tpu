@@ -1166,6 +1166,7 @@ class FakeResident:
     """The resident backend contract the UI/API use, without tokenizer, controller or model."""
 
     def __init__(self) -> None:
+        self.capacity = 32768
         self.answer = "42"
         self.thinking = "weighing it up"
         self.sequence = 770

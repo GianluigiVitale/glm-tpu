@@ -11,7 +11,8 @@ from glm_tpu.entrypoints.ui.conversations import ConversationStore
 
 
 class FakeResident:
-    def __init__(self):
+    def __init__(self, capacity=32768):
+        self.capacity = capacity
         self.messages = []
         self.published = {}
         self.sequence = 770

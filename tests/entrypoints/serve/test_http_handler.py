@@ -54,6 +54,30 @@ def test_http_csrf_rebinding_static_and_private_payload(tmp_path):
         thread.join()
 
 
+def test_served_page_shows_the_session_capacity_not_a_fixed_32k(tmp_path):
+    # H17: the footer starts neutral and render() writes "<capacity/1024>K context" from /api/state.
+    store = open_store(tmp_path, FakeResident(capacity=166912))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(store))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(base) as response:
+            page = response.read().decode()
+        with urlopen(base + "/app.js") as response:
+            script = response.read().decode()
+        with urlopen(base + "/api/state") as response:
+            state = json.loads(response.read())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+    assert "32K" not in page and "32K" not in script
+    assert '<p class="footer-note" id="contextNote">' in page
+    assert "$('contextNote').textContent=`${Math.round(state.capacity/1024)}K context," in script
+    assert state["capacity"] == 166912
+
+
 def test_atomic_publication_never_overwrites_a_different_request(tmp_path):
     from glm_tpu.engine.request import from_token_ids
 

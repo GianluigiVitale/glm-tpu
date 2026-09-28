@@ -36,7 +36,7 @@ class ConversationStore:
                         jobs=jobs,
                         error=availability,
                         model="GLM-5.3",
-                        capacity=32768,
+                        capacity=self.queue.backend.capacity,
                         scheduling="sequential",
                     )
                 )

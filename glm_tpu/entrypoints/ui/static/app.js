@@ -55,6 +55,7 @@ function render() {
   const active=state.jobs.filter(j=>['queued','generating'].includes(j.status));
   $('statusText').textContent=state.error ? 'Needs attention' : active.length ? `${active.length} active${active.length>1?' / queued':''}` : 'Model ready';
   $('status').classList.toggle('off',!!state.error); $('banner').textContent=state.error || '';
+  if(Number.isInteger(state.capacity) && state.capacity>0)$('contextNote').textContent=`${Math.round(state.capacity/1024)}K context, including conversation and thinking. Chats take turns. Check important answers.`;
   $('convlist').innerHTML='<div class="lbl">Conversations</div>'+[...state.chats].reverse().map(c=>
     `<div class="conv ${c.id===current?'active':''}"><button class="ctitle" data-chat="${c.id}" title="${esc(c.title)}">${esc(c.title)}</button>
     <div class="acts"><button data-rename="${c.id}" aria-label="Rename ${esc(c.title)}" title="Rename">✎</button><button data-delete="${c.id}" aria-label="Delete ${esc(c.title)}" title="Delete">×</button></div></div>`).join('');

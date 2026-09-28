@@ -5,15 +5,20 @@ continues the work. The working rules are in [AGENTS](AGENTS.md), the goal and
 its acceptance criteria in [goal.md](goal.md), the measured results in the
 [release status](docs/release/STATUS.md).
 
-## Current state (2026-09-27)
+## Current state (2026-09-28)
 
 - **Branch.** `release/public-structure-20260922` holds the finished release;
-  its last commit (stage S9) rewrote these governance files. It is not merged:
-  `main` still holds the pre-refactor GLM-5.3 release (tag
+  stage S9 (`62e4e615`) rewrote these governance files, and one later unit
+  (H17: the chat UI shows the session's context capacity) followed. It is not
+  merged: `main` still holds the pre-refactor GLM-5.3 release (tag
   `pre-refactor-main-20260922`). Merging is the owner's decision after review.
-- **Code.** Nothing under `glm_tpu/` and nothing in `pyproject.toml` changed
-  after `ab4c6582`, the commit the TPU comparison ran (below).
-- **Records.** `tests/golden/data/` last changed at `e6fdd113`;
+- **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), only
+  the chat UI's context display changed under `glm_tpu/` (H17: the workspace
+  state reports the resident session's capacity and the page footer shows it,
+  where both said 32K before); nothing in `pyproject.toml` changed. The device
+  programs and the request path are those the comparison ran.
+- **Records.** `tests/golden/data/` last changed at the H17 re-baseline
+  (`http.json`: the served page and script), before that at `e6fdd113`;
   `tools/equivalence/closure_map.toml` is empty, as it must be between units;
   `tools/equivalence/kernel_renames.toml` keeps its four permanent rows (the
   public Pallas kernel names mapped back to their `181c013e` spelling).
@@ -50,7 +55,8 @@ the harness was finished, every change of a record is a separate commit titled
 | S7 | the migration tables and checkers removed (kept in history) | `536deee1` |
 | Tests | the test gaps left by S5 to S7 | `bb428063` |
 | S8 | the TPU run comparison: harness preparation, then the results | `ab4c6582`, `60b68b4a` |
-| S9 | these governance files, the data-contract scan of them and of the release receipts | the tip |
+| S9 | these governance files, the data-contract scan of them and of the release receipts | `62e4e615` |
+| H17 | after the release: the chat UI shows the resident session's context capacity instead of a fixed 32K | the H17 code commit and `[Equivalence] Re-baseline G9 for H17` |
 
 ## Evidence
 
@@ -67,7 +73,7 @@ state).
 | `import_closure.json` | G6 | `e6fdd113` | rename-only, WU-C |
 | `trace_closure.json` | G7 | `93147c55` | rename-only, WU-E |
 | `wire.json` | G9 | `bfd4345c` | reviewed, S3 (module-derived fields only) |
-| `http.json` | G9-http | `a9227529` | reviewed, S2a |
+| `http.json` | G9-http | the H17 re-baseline | reviewed, H17 (the chat UI's context display) |
 
 For the S9 commit every CPU gate passed with every record unchanged:
 `check` (G1, G1-protocol, G3, G4, G6, G7, G9), `check --tier production` (G2,
@@ -138,9 +144,8 @@ None of these blocks the release. Each is its own unit with its own gates.
   a recorded-names one keeps the recorded names (no path nests today), and a new
   Pallas kernel without a `kernel_renames.toml` row fails `j-public` with a cause
   that is not obvious.
-- **Behaviour.** The chat UI shows "32K context" and reports 32,768 slots
-  whatever the session's capacity. `collect-env` run from an uninstalled
-  checkout can read stale in-tree build metadata. `checkpoint verify` should say
+- **Behaviour.** `collect-env` run from an uninstalled checkout can read stale
+  in-tree build metadata. `checkpoint verify` should say
   in its help and report what it does not check, and a malformed manifest (a
   JSON list) escapes it as a traceback. The site-file reader should check the
   opened descriptor and close it on every path, as `read_bounded` now does. One

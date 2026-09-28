@@ -38,9 +38,10 @@ final answers. Thinking is displayed separately and is not replayed as an
 assistant answer. Other conversations' histories never enter the request.
 The complete template/history/input is tokenized without truncation; thinking
 and answer receive **all remaining slots of the session's cache** (32,768 slots
-for a session started with the default `--context 32k`). The page itself still
-labels the context "32K" and reports a capacity of 32,768 whatever the session's
-capacity; the answer uses the session's real capacity. There is
+for a session started with the default `--context 32k`). The page footer shows
+the session's capacity in units of 1,024 slots, as the workspace state
+(`/api/state`, field `capacity`) reports it: "32K" for 32,768 slots, "8K" for
+8,192, "163K" for 166,912. There is
 no separate short-output default or thinking budget. Oversized input is rejected
 before submission. Context exhaustion is visibly incomplete.
 
