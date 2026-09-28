@@ -6,6 +6,9 @@ a link or a documented test file must name a tracked path (``git ls-files``): an
 documentation and does not satisfy a link. In a tree without git metadata (a ``git archive`` export, which holds the
 tracked files only) the file system stands in. The governance files (``AGENTS.md``, ``HANDOFF.md``, ``goal.md``,
 ``docs/release/STATUS.md``) are pages like every other.
+
+The repository map of ``AGENTS.md`` stays current: every tracked file and directory under ``glm_tpu/`` and ``tools/``
+has an entry, every entry names a tracked path and says what it does, and no path is listed twice.
 """
 
 from __future__ import annotations
@@ -128,3 +131,64 @@ def test_documented_test_files_exist(page):
     named = {path for line in code for name in TEST_FILE.findall(line) for path in _expand(name)}
     missing = sorted(name for name in named if not _exists(REPO / name) or not (REPO / name).is_file())
     assert missing == []
+
+
+MAP_PAGE = "AGENTS.md"
+MAP_SECTION = "## Repository map"
+MAPPED_TOPS = ("glm_tpu", "tools")  # every tracked file and directory under these must have an entry
+MAP_ENTRY = re.compile(r"(?P<indent> *)(?P<name>\S+?)(?: {2,}(?P<text>\S.*))?")
+
+
+def _map_entries() -> list[tuple[str, str | None]]:
+    """``(path, description)`` of every entry of the repository map: the fenced blocks of the section, each a tree
+    whose lines are ``<indent><name>  <what it does>``, two spaces of indentation per level, a directory ending in
+    ``/``; a block's first line may name a path from the repository root (``glm_tpu/config/``)."""
+    lines = (REPO / MAP_PAGE).read_text().splitlines()
+    start = lines.index(MAP_SECTION)
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    entries, parents, fenced = [], [], False
+    for line in lines[start + 1 : end]:
+        if line.startswith(("```", "~~~")):
+            fenced, parents = not fenced, []
+            continue
+        if not fenced or not line.strip():
+            continue
+        match = MAP_ENTRY.fullmatch(line)
+        assert match is not None, f"not a map entry: {line!r}"
+        depth, odd = divmod(len(match["indent"]), 2)
+        assert not odd and depth <= len(parents), f"indentation of {line!r}"
+        parents = parents[:depth]
+        entries.append(("".join(parents) + match["name"].rstrip("/"), match["text"]))
+        if match["name"].endswith("/"):
+            parents.append(match["name"])
+    return entries
+
+
+def _mapped_paths_required() -> set[str]:
+    """The tracked files under ``MAPPED_TOPS`` and their directories (in an export: the files on disk)."""
+    if TRACKED is not None:
+        files = {name for name in TRACKED if name.split("/")[0] in MAPPED_TOPS}
+    else:
+        files = {
+            path.relative_to(REPO).as_posix()
+            for top in MAPPED_TOPS
+            for path in (REPO / top).rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts
+        }
+    return files | {str(parent) for name in files for parent in Path(name).parents if str(parent) != "."}
+
+
+def test_the_repository_map_is_parsed_and_every_entry_is_described():
+    entries = _map_entries()
+    assert len(entries) > 250
+    assert [path for path, text in entries if not text] == []
+    assert [path for path, count in Counter(path for path, _ in entries).items() if count > 1] == []
+
+
+def test_every_repository_map_entry_exists():
+    assert [path for path, _ in _map_entries() if not _exists(REPO / path)] == []
+
+
+def test_the_repository_map_lists_every_package_and_tool_file():
+    mapped = {path for path, _ in _map_entries()}
+    assert sorted(_mapped_paths_required() - mapped) == []
