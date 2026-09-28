@@ -8,8 +8,10 @@ runtime at the site's coordinator as that process id, gathers every host's ``jax
 devices (``glm_tpu.distributed.topology.discover_topology``, ``require_v4_64``), all-gathers the digest of the
 contract (the staged commit, the topology and its digest, the physical mesh digest) and requires every host to agree,
 and writes ``topology.rank<r>.json`` (created once, owner-only), the record ``validate_topology_fleet`` authenticates.
-No model, no checkpoint, no device program. ``--preflight-only`` runs the authentication on the CPU and prints this
-host's facts.
+No model program and no checkpoint (the device sync runs one tiny collective). ``--preflight-only`` runs the
+authentication on the CPU and prints this host's facts: its rank and hostname, the staged commit, and the versions of
+its Python, JAX, jaxlib and libtpu (read from the installed metadata; JAX is not imported), which every host must
+share.
 """
 
 from __future__ import annotations
@@ -17,9 +19,11 @@ from __future__ import annotations
 import argparse
 from datetime import UTC, datetime
 from hashlib import sha256
+import ipaddress
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import socket
 
@@ -55,7 +59,9 @@ def preflight(args: argparse.Namespace) -> tuple[SiteConfig, int]:
     if root.parent != site.paths.run_root:
         raise ValueError("protected topology capture identity required")
     set_current_site(site)
-    if args.coordinator_address != site.fleet.coordinator_address:
+    host, _, port = args.coordinator_address.rpartition(":")
+    ipaddress.ip_address(host)  # an IP literal, as the worker admits it
+    if port != "8476" or args.coordinator_address != site.fleet.coordinator_address:
         raise ValueError("coordinator address differs from the staged site")
     raw = io_utils.read_bounded(root / "source_manifest.json", 4 << 20)
     if sha256(raw).hexdigest() != args.source_manifest_sha256:
@@ -112,6 +118,9 @@ def capture(args: argparse.Namespace, site: SiteConfig, rank: int) -> dict:
         if not np.all(digests == digests[0]):
             raise RuntimeError("the hosts disagree on the topology contract")
         multihost_utils.sync_global_devices("glm-tpu-topology-" + contract_hash[:16])
+        observed = [int(device.id) for device in jax.local_devices()]
+        if observed != fleet.tolist()[jax.process_index()]:
+            raise RuntimeError("this host's local devices differ from its gathered row")
         record = dict(
             captured_utc=datetime.now(UTC).isoformat(timespec="seconds"),
             contract=contract,
@@ -125,7 +134,7 @@ def capture(args: argparse.Namespace, site: SiteConfig, rank: int) -> dict:
             jax_process_index=jax.process_index(),
             jax_version=jax.__version__,
             launch_process_id=rank,
-            local_device_ids=sorted(int(device.id) for device in jax.local_devices()),
+            local_device_ids=observed,  # as jax.local_devices() orders them (initialize_runtime compares that order)
             schema_version=1,
         )
         io_utils.create_private_exclusive(
@@ -146,7 +155,24 @@ def main(argv: list[str] | None = None) -> int:
     os.umask(0o077)
     site, rank = preflight(args)
     if args.preflight_only:
-        facts = dict(rank=rank, hostname=socket.gethostname(), code_hash=args.code_hash, tpu_initialized=False)
+        from importlib import metadata
+
+        def version(name):
+            try:
+                return metadata.version(name)
+            except metadata.PackageNotFoundError:
+                return None
+
+        facts = dict(
+            rank=rank,
+            hostname=socket.gethostname(),
+            code_hash=args.code_hash,
+            python=platform.python_version(),
+            jax=version("jax"),
+            jaxlib=version("jaxlib"),
+            libtpu=version("libtpu"),
+            tpu_initialized=False,
+        )
         print(json.dumps(facts, sort_keys=True), flush=True)
         return 0
     record = capture(args, site, rank)

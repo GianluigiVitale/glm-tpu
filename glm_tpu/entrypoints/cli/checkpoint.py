@@ -124,12 +124,15 @@ def mark_source(source: Path, output: Path | None, *, upstream_marker: Path | No
     digests of an earlier marker (``upstream_marker``, to check another copy of the same source)."""
     from glm_tpu.model_loader import source_marker
 
+    earlier = None
     if upstream_marker is None:
         upstream, kind = source_marker.hub_listing(), "huggingface"
     else:
-        upstream, kind = source_marker.marker_listing(upstream_marker), "marker"
+        (upstream, earlier), kind = source_marker.marker_listing(upstream_marker), "marker"
     target = source / source_marker.MARKER if output is None else output
-    return source_marker.mark_source(source, target, upstream=upstream, upstream_kind=kind, workers=workers)
+    return source_marker.mark_source(
+        source, target, upstream=upstream, upstream_kind=kind, workers=workers, upstream_marker_sha256=earlier
+    )
 
 
 class CheckpointSubcommand(CLISubcommand):

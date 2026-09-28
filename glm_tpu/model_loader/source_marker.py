@@ -66,8 +66,14 @@ def hub_listing(repository: str = MODEL_ID, revision: str = REVISION) -> dict[st
     size and git blob id of every other file (network; no download)."""
     from huggingface_hub import HfApi
 
+    try:
+        items = list(HfApi().list_repo_tree(repository, revision=revision, recursive=False))
+    except Exception as exc:  # the client's transport errors (httpx) are not OSError; refuse them as one
+        raise OSError(
+            f"the upstream listing of {repository} at {revision} failed: {type(exc).__name__}: {exc}"
+        ) from exc
     listing = {}
-    for item in HfApi().list_repo_tree(repository, revision=revision, recursive=False):
+    for item in items:
         size = getattr(item, "size", None)
         if size is None:  # a folder
             continue
@@ -82,25 +88,34 @@ def hub_listing(repository: str = MODEL_ID, revision: str = REVISION) -> dict[st
     return listing
 
 
-def marker_listing(path: Path, *, repository: str = MODEL_ID, revision: str = REVISION) -> dict[str, dict[str, Any]]:
-    """The shard and metadata digests of an earlier marker of the same source (``passed`` true, same repository and
-    revision)."""
-    marker = json.loads(read_bounded(Path(path), MARKER_CAP))
+def marker_listing(
+    path: Path, *, repository: str = MODEL_ID, revision: str = REVISION
+) -> tuple[dict[str, dict[str, Any]], str]:
+    """The shard and metadata digests of an earlier marker of the same source: a passed marker of this schema, of
+    the same repository and revision, itself checked against the Hugging Face repository (a marker checked against
+    another marker is refused, so every marker traces back to upstream in one step). Returns the listing and the
+    SHA-256 of the bytes it was read from."""
+    raw = read_bounded(Path(path), MARKER_CAP)
+    marker = json.loads(raw)
     if (
         not isinstance(marker, dict)
+        or marker.get("schema") != SCHEMA
+        or marker.get("upstream") != "huggingface"
         or marker.get("passed") is not True
         or marker.get("repository") != repository
         or marker.get("revision") != revision
         or not isinstance(marker.get("shards"), list)
         or not isinstance(marker.get("metadata"), list)
     ):
-        raise CheckpointValidationError(f"{path} is not a passed completion marker of {repository} at {revision}")
+        raise CheckpointValidationError(
+            f"{path} is not a passed completion marker of {repository} at {revision} checked against the Hub"
+        )
     listing = {}
     for entry in [*marker["shards"], *marker["metadata"]]:
         if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) or entry["name"] in listing:
             raise CheckpointValidationError(f"{path} lists a file entry twice or without a name")
         listing[entry["name"]] = dict(size=entry.get("bytes"), sha256=entry.get("sha256"), git_blob_sha1=None)
-    return listing
+    return listing, sha256(raw).hexdigest()
 
 
 def _differences(name: str, local: Mapping[str, Any], upstream: Mapping[str, Any] | None) -> list[str]:
@@ -131,12 +146,14 @@ def mark_source(
     expected_shards: int = SOURCE_SHARDS,
     expected_bytes: int = SOURCE_BYTES,
     workers: int = 8,
+    upstream_marker_sha256: str | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> dict[str, Any]:
     """Verify the source in ``source`` against ``upstream`` and write the completion marker to ``output`` (a new
     file). Refuses, writing nothing, unless the index names exactly the upstream safetensors files, their count is
     ``expected_shards``, their bytes add up to ``expected_bytes``, every metadata file exists and every file's size
-    and digest equal upstream. Returns the report (with the marker's SHA-256, the site pin)."""
+    and digest equal upstream. ``upstream_marker_sha256`` names the earlier marker an ``upstream_kind`` "marker"
+    listing came from; it is recorded. Returns the report (with the marker's SHA-256, the site pin)."""
     from glm_tpu.model_loader.source_inventory import read_source_inventory
 
     source, output = Path(source), Path(output)
@@ -144,6 +161,8 @@ def mark_source(
         raise ValueError("hash workers must be 1..64")
     if output.exists() or output.is_symlink():
         raise FileExistsError(f"refusing to overwrite the completion marker {output}")
+    if (upstream_kind == "marker") != (upstream_marker_sha256 is not None):
+        raise ValueError("a marker upstream is named by its SHA-256, and only a marker upstream")
     started = now().isoformat(timespec="seconds")
     inventory = read_source_inventory(source, model_id=repository, source_revision=revision)
     shards = {record.filename: record for record in inventory.files}
@@ -186,6 +205,7 @@ def mark_source(
         verified_shards=len(shards),
         verified_bytes=total,
         upstream=upstream_kind,
+        **({} if upstream_marker_sha256 is None else dict(upstream_marker_sha256=upstream_marker_sha256)),
         shards=[
             dict(
                 name=name,
@@ -215,6 +235,7 @@ def mark_source(
         repository=repository,
         revision=revision,
         upstream=upstream_kind,
+        **({} if upstream_marker_sha256 is None else dict(upstream_marker_sha256=upstream_marker_sha256)),
         verified_shards=len(shards),
         verified_bytes=total,
         metadata_files=len(METADATA_FILES),

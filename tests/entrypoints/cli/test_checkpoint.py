@@ -427,6 +427,7 @@ def test_mark_source_against_an_earlier_marker(small_source: Path, tmp_path: Pat
     code, out, err = run(capsys, argv)
     assert (code, err) == (0, "")
     assert json.loads(out)["upstream"] == "marker"
+    assert json.loads(out)["upstream_marker_sha256"] == sha256(first.read_bytes()).hexdigest()
     assert json.loads(output.read_text())["shards"] == json.loads(first.read_text())["shards"]
 
 
@@ -442,9 +443,10 @@ def test_mark_source_refuses_exactly_as_the_library(
     data[-1] ^= 1
     (small_source / SHARDS[0]).write_bytes(bytes(data))
     output = tmp_path / "second.json"
+    listing, digest = source_marker.marker_listing(first)
     with pytest.raises(ValueError) as raised:
         source_marker.mark_source(
-            small_source, output, upstream=source_marker.marker_listing(first), upstream_kind="marker"
+            small_source, output, upstream=listing, upstream_kind="marker", upstream_marker_sha256=digest
         )
     argv = ["checkpoint", "mark-source", str(small_source), "--output", str(output), "--upstream-marker", str(first)]
     refused(capsys, argv, raised.value)
@@ -510,3 +512,19 @@ def test_pack_refusal_is_json_on_stderr(tmp_path: Path, capsys, monkeypatch):
         ["checkpoint", "pack", "--site", str(site_file)],
         ValueError("the checkpoint root already exists on rank 0; never repack it"),
     )
+
+
+def test_mark_source_refuses_a_hub_failure_as_json(small_source: Path, capsys: pytest.CaptureFixture[str], monkeypatch):
+    import huggingface_hub
+    import httpx
+
+    class Api:
+        def list_repo_tree(self, repository, revision, recursive):
+            raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", Api)
+    code, out, err = run(capsys, ["checkpoint", "mark-source", str(small_source)])
+    assert (code, out) == (1, "")
+    refusal = json.loads(err)
+    assert refusal["error"] == "OSError" and refusal["status"] == "checkpoint mark-source refused"
+    assert "ConnectError" in refusal["message"] and not (small_source / "SOURCE_COMPLETE.json").exists()

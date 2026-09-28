@@ -57,7 +57,7 @@ def test_capture_refusal_is_json_on_stderr(tmp_path: Path, monkeypatch, capsys):
 def capture_run(tmp_path: Path) -> Path:
     """A finished capture run: the eight captures and a clean terminal record."""
     run_dir = tmp_path / "runs" / "topology_capture_20260101T000000000000Z"
-    run_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True, mode=0o700)
     site = example_site(tmp_path, paths=dict(run_root=str(tmp_path / "runs")))
     topology.capture_all(run_dir, site, PIN)
     terminal = dict(
@@ -67,6 +67,7 @@ def capture_run(tmp_path: Path) -> Path:
         stalled_ssh_clients=[],
         divergent_records=[],
         uncollected_ranks=[],
+        missing=[],
         collect_error=None,
         code_hash=PIN,
         hosts=topology.HOSTS,

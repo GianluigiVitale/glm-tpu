@@ -105,6 +105,10 @@ def _pin(args, monkeypatch):
     args.code_hash = "main"
 
 
+def _not_an_ip(args, monkeypatch):
+    args.coordinator_address = "controller.example:8476"
+
+
 REFUSALS = {
     "flag": (_flag, "protected topology capture identity required"),
     "run name": (_name, "protected topology capture identity required"),
@@ -113,6 +117,7 @@ REFUSALS = {
     "manifest digest": (_manifest_digest, "source manifest digest differs"),
     "source": (_source_differs, "deployed capture source differs"),
     "coordinator": (_coordinator, "coordinator address differs"),
+    "coordinator not an IP": (_not_an_ip, "does not appear to be an IPv4 or IPv6 address"),
     "hostname": (_hostname, "capture rank differs"),
     "repeat": (_repeat, "never repeated"),
 }
@@ -132,8 +137,18 @@ def test_preflight_only_prints_this_hosts_facts_and_opens_no_device(staged, caps
     argv = ["--output", str(args.output), "--code-hash", PIN, "--source-manifest-sha256", args.source_manifest_sha256]
     argv += ["--site-sha256", args.site_sha256, "--coordinator-address", args.coordinator_address, "--preflight-only"]
     assert worker.main(argv) == 0
-    assert json.loads(capsys.readouterr().out) == dict(
-        rank=3, hostname=fleet.HOSTS[3], code_hash=PIN, tpu_initialized=False
+    facts = json.loads(capsys.readouterr().out)
+    from importlib import metadata
+
+    assert facts == dict(
+        rank=3,
+        hostname=fleet.HOSTS[3],
+        code_hash=PIN,
+        tpu_initialized=False,
+        python=__import__("platform").python_version(),
+        jax=metadata.version("jax"),
+        jaxlib=metadata.version("jaxlib"),
+        libtpu=facts["libtpu"],  # None where libtpu is not installed
     )
     assert "jax" not in sys.modules or not isinstance(sys.modules["jax"], fleet.FakeJax)
     assert not (args.output / worker.capture_file(3)).exists()
@@ -194,8 +209,11 @@ def test_hosts_that_disagree_on_the_contract_write_nothing(staged):
 
 
 def test_a_device_outside_the_gathered_ownership_refuses(staged):
+    # Devices 0 and 4 swap processes: four chips per process still (require_v4_64 passes), but the inventory
+    # no longer names the devices each process gathered.
     args, site = staged
-    moved = [fleet.device(d, process_index=(d // 4 + 1) % 8 if d in (0, 1, 2, 3) else d // 4) for d in range(32)]
-    with fleet.fake_jax(3, all_devices=moved), pytest.raises(Exception, match=r"process|chips per process"):
-        worker.capture(args, site, 3)
-    assert not (args.output / worker.capture_file(3)).exists()
+    swapped = [fleet.device(d, process_index={0: 1, 4: 0}.get(d, d // 4)) for d in range(32)]
+    rank = fleet.PERMUTATION.index(5)  # a host whose own devices are untouched by the swap
+    with fleet.fake_jax(rank, all_devices=swapped), pytest.raises(RuntimeError, match="gathered local devices differ"):
+        worker.capture(args, site, rank)
+    assert not (args.output / worker.capture_file(rank)).exists()

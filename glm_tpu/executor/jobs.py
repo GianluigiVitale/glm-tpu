@@ -207,15 +207,18 @@ class FleetJob:
                 raise
             finally:
                 if failed:
-                    launch.cleanup_owned(
-                        self.commands,
-                        self.root,
-                        self.pin,
-                        hosts=self.hosts,
-                        fleet=self.fleet,
-                        helpers=self.helpers,
-                        module=module,
-                    )
+                    try:
+                        launch.cleanup_owned(
+                            self.commands,
+                            self.root,
+                            self.pin,
+                            hosts=self.hosts,
+                            fleet=self.fleet,
+                            helpers=self.helpers,
+                            module=module,
+                        )
+                    except Exception as exc:  # idle_after below decides; the leases stay held if a host is not idle
+                        print(f"cleanup could not run on every host: {type(exc).__name__}: {exc}", flush=True)
                 try:
                     launch.idle(self.commands, self.root, "idle_after", self.fleet, self.hosts, helpers=self.helpers)
                 except Exception:
@@ -232,8 +235,10 @@ class FleetJob:
         return dict(codes=codes, stalled_ssh_clients=stalled, failed=failed or any(codes), all_hosts_idle=True)
 
     def collect(self, names: Sequence[str]) -> dict[str, Any]:
-        """Each host's records ``names`` (``{rank}`` templates) into the run directory, once, host by host."""
-        divergent, uncollected, error = [], [], None
+        """Each host's records ``names`` (``{rank}`` templates) into the run directory, once, host by host. A host
+        whose fetch failed is listed in ``uncollected_ranks``; a record a host does not have, in ``missing``
+        (``"<rank>:<name>"``, rank 0's own directory included)."""
+        divergent, uncollected, missing, error = [], [], [], None
         try:
             fetched = launch.fetch_records(
                 self.commands,
@@ -246,15 +251,18 @@ class FleetJob:
                 helpers=self.helpers,
                 check=False,
             )
-            for rank in range(1, len(self.hosts)):
+            for rank in range(len(self.hosts)):
                 if fetched[rank] is None:
                     uncollected.append(rank)
                     continue
-                for name, data in fetched[rank].items():
-                    io_utils.write_collected(self.root, name, data, divergent)
+                expected = [template.replace("{rank}", str(rank)) for template in names]
+                missing += [f"{rank}:{name}" for name in expected if name not in fetched[rank]]
+                if rank:
+                    for name, data in fetched[rank].items():
+                        io_utils.write_collected(self.root, name, data, divergent)
         except Exception as exc:
             error = dict(type=type(exc).__name__, message=str(exc))
-        return dict(divergent_records=divergent, uncollected_ranks=uncollected, collect_error=error)
+        return dict(divergent_records=divergent, uncollected_ranks=uncollected, missing=missing, collect_error=error)
 
 
 @contextmanager

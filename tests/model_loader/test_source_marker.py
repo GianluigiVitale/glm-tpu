@@ -127,8 +127,16 @@ def test_marker_records_every_file_and_the_runtime_accepts_it(source: Path, tmp_
 def test_a_marker_checks_another_copy_of_the_same_source(source: Path, tmp_path: Path):
     first = tmp_path / "first.json"
     mark(source, first, listing(source))
-    report = mark(source, tmp_path / "second.json", source_marker.marker_listing(first), upstream_kind="marker")
-    assert report["passed"] is True and report["upstream"] == "marker"
+    listing_, digest = source_marker.marker_listing(first)
+    assert digest == sha256(first.read_bytes()).hexdigest()
+    second = tmp_path / "second.json"
+    report = mark(source, second, listing_, upstream_kind="marker", upstream_marker_sha256=digest)
+    assert report["passed"] is True and report["upstream"] == "marker" and report["upstream_marker_sha256"] == digest
+    assert json.loads(second.read_text())["upstream_marker_sha256"] == digest
+    with pytest.raises(CheckpointValidationError, match="checked against the Hub"):  # no marker of a marker
+        source_marker.marker_listing(second)
+    with pytest.raises(ValueError, match="named by its SHA-256"):
+        mark(source, tmp_path / "third.json", listing_, upstream_kind="marker")
 
 
 def _flip_shard_byte(root: Path, upstream: dict) -> None:
@@ -202,8 +210,15 @@ def test_an_existing_marker_is_never_overwritten(source: Path, tmp_path: Path):
 
 @pytest.mark.parametrize(
     "change",
-    [dict(passed=False), dict(repository="other/model"), dict(revision="0" * 40), dict(shards=None)],
-    ids=["not passed", "repository", "revision", "no shards"],
+    [
+        dict(passed=False),
+        dict(repository="other/model"),
+        dict(revision="0" * 40),
+        dict(shards=None),
+        dict(schema="other"),
+        dict(upstream="marker"),
+    ],
+    ids=["not passed", "repository", "revision", "no shards", "schema", "not from the Hub"],
 )
 def test_marker_listing_refuses_another_source(source: Path, tmp_path: Path, change: dict):
     first = tmp_path / "first.json"
@@ -212,6 +227,19 @@ def test_marker_listing_refuses_another_source(source: Path, tmp_path: Path, cha
     other.write_text(json.dumps(dict(json.loads(first.read_text()), **change)))
     with pytest.raises(CheckpointValidationError, match="is not a passed completion marker"):
         source_marker.marker_listing(other)
+
+
+def test_a_network_failure_of_the_hub_client_is_an_oserror(monkeypatch: pytest.MonkeyPatch):
+    import huggingface_hub
+    import httpx
+
+    class Api:
+        def list_repo_tree(self, repository, revision, recursive):
+            raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", Api)
+    with pytest.raises(OSError, match=r"upstream listing of zai-org/GLM-5\.3 .* failed: ConnectError"):
+        source_marker.hub_listing()
 
 
 def test_hub_listing_reads_lfs_digests_and_blob_ids(monkeypatch: pytest.MonkeyPatch):

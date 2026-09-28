@@ -41,3 +41,21 @@ def test_a_held_workload_lock_of_a_valid_site_is_seen(monkeypatch, tmp_path):
     with open(locks[2], "a") as stream:  # a sync lock (cron backup) is not an indicator
         fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert budget.held_workload_locks() == []
+
+
+def test_a_process_of_a_fleet_module_is_a_live_run(monkeypatch, tmp_path):
+    """The process scan reads /proc/<pid>/cmdline (a fake /proc here: a real child naming a fleet module would make
+    a concurrent heavy gate see a live run): the topology capture counts as the worker and the pack worker do."""
+    proc = tmp_path / "proc"
+    for pid, argv in (
+        (101, [b"python3.12", b"-m", b"glm_tpu.distributed.topology_capture", b"--output", b"/runs/x"]),
+        (102, [b"python3.12", b"-m", b"glm_tpu.model_loader.pack_worker", b"--output", b"/runs/y"]),
+        (103, [b"python3.12", b"-m", b"glm_tpu.entrypoints.serve.server", b"--run", b"/runs/z"]),
+        (104, [b"python3.12", b"-c", b"print('glm_tpu.distributed.topology_capture')"]),
+    ):
+        (proc / str(pid)).mkdir(parents=True)
+        (proc / str(pid) / "cmdline").write_bytes(b"\0".join(argv) + b"\0")
+    (proc / "self").mkdir()
+    real = budget.Path
+    monkeypatch.setattr(budget, "Path", lambda path: proc if str(path) == "/proc" else real(path))
+    assert budget.live_processes() == [101, 102]  # an element naming the module, not a substring

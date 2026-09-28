@@ -16,7 +16,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import shutil
+import re
 import tempfile
 from typing import Any
 
@@ -29,6 +29,7 @@ from glm_tpu.utils import io_utils
 
 TERMINAL_FILE = "capture_terminal.json"
 DEFAULT_WALL_SECONDS = 900
+RUN_NAME = re.compile(r"topology_capture_[0-9]{8}T[0-9]{12}Z")
 
 
 def capture_topology(site: SiteConfig, *, repo: Path | None = None, wall_seconds: int = DEFAULT_WALL_SECONDS) -> dict:
@@ -50,7 +51,10 @@ def capture_topology(site: SiteConfig, *, repo: Path | None = None, wall_seconds
             "--coordinator-address",
             site.fleet.coordinator_address,
         ]
-        job.preflight(worker.MODULE, worker.ENV_FLAG, argv)
+        facts = job.preflight(worker.MODULE, worker.ENV_FLAG, argv)
+        environments = [{k: v for k, v in f.items() if k not in ("rank", "hostname")} for f in facts]
+        require(all(e == environments[0] for e in environments), "the hosts' capture environments differ")
+        require(environments[0].get("jax") == environments[0].get("jaxlib") == "0.10.1", "the JAX version differs")
         job.release_sync()
         env = {"JAX_PLATFORMS": "tpu", worker.ENV_FLAG: "1", "PYTHONDONTWRITEBYTECODE": "1"}
         terminal = job.run(worker.MODULE, env, argv, wall_seconds=wall_seconds)
@@ -58,10 +62,14 @@ def capture_topology(site: SiteConfig, *, repo: Path | None = None, wall_seconds
         terminal.update(code_hash=job.pin, hosts=job.hosts)
         io_utils.persist(job.root / TERMINAL_FILE, terminal)
         require(
-            not terminal["failed"] and not terminal["uncollected_ranks"] and terminal["collect_error"] is None,
+            not terminal["failed"]
+            and not terminal["uncollected_ranks"]
+            and not terminal["missing"]
+            and terminal["collect_error"] is None,
             "topology capture failed; see " + str(job.root),
         )
-        binding = binding_from_run(job.root)
+        binding, raws = binding_from_run(job.root)
+        accepted(binding, raws)
         return dict(
             schema="glm_tpu_topology_capture_report_v1",
             run=str(job.root),
@@ -76,9 +84,14 @@ def capture_topology(site: SiteConfig, *, repo: Path | None = None, wall_seconds
         )
 
 
-def binding_from_run(run: Path, **options: Any) -> dict:
-    """The binding of a finished capture run: its terminal record must show every host exited 0, idle after the
-    capture, no stalled client and complete collection; ``options`` go to ``derive_topology_binding``."""
+def binding_from_run(run: Path, **options: Any) -> tuple[dict, list[bytes]]:
+    """The binding of a finished capture run and the capture bytes it was derived from. The run directory is an
+    owner-only ``topology_capture_<UTC>`` directory whose terminal record shows every host exited 0, idle after the
+    capture, no stalled client and complete collection, for the commit and the hosts the captures name; ``options``
+    go to ``derive_topology_binding``."""
+    run = Path(run)
+    require(RUN_NAME.fullmatch(run.name) is not None, "a capture run is named topology_capture_<UTC>")
+    io_utils.private(run)
     terminal = json.loads(io_utils.read_bounded(run / TERMINAL_FILE, 1 << 20))
     require(
         terminal.get("codes") == [0] * 8
@@ -86,6 +99,7 @@ def binding_from_run(run: Path, **options: Any) -> dict:
         and terminal.get("all_hosts_idle") is True
         and terminal.get("stalled_ssh_clients") == []
         and terminal.get("uncollected_ranks") == []
+        and terminal.get("missing") == []
         and terminal.get("divergent_records") == []
         and terminal.get("collect_error") is None,
         "the capture run did not finish cleanly on every host",
@@ -94,7 +108,27 @@ def binding_from_run(run: Path, **options: Any) -> dict:
     options.setdefault("note", "glm-tpu topology bind of " + run.name)
     binding = derive_topology_binding(raws, all_hosts_idle_after=True, **options)
     require(binding["code_hash"] == terminal.get("code_hash"), "the captures name another commit than their run")
-    return binding
+    require(binding["hosts"] == terminal.get("hosts"), "the captures name other hosts than their run")
+    return binding, raws
+
+
+def accepted(binding: dict, raws: list[bytes]) -> dict:
+    """The runtime's own ``load_topology_binding`` over a staged copy of ``binding`` and ``raws`` (a run directory
+    holds topology_rebinding.json beside topology_capture/); returns its identity."""
+    raw = binding_bytes(binding)
+    with tempfile.TemporaryDirectory() as staged:
+        (Path(staged) / "topology_capture").mkdir()
+        (Path(staged) / "topology_rebinding.json").write_bytes(raw)
+        for name, data in zip(CAPTURE_NAMES, raws, strict=True):
+            (Path(staged) / "topology_capture" / name).write_bytes(data)
+        return load_topology_binding(
+            Path(staged),
+            sha256(raw).hexdigest(),
+            expected_topology=binding["original_topology_sha256"],
+            expected_mesh=binding["mesh_sha256"],
+            original_fleet=binding["original_fleet_sha256"],
+            slice_name=binding["slice_name"],
+        )
 
 
 def bind_topology(
@@ -117,30 +151,17 @@ def bind_topology(
     )
     if note is not None:
         options["note"] = note
-    binding = binding_from_run(Path(run), **options)
+    binding, raws = binding_from_run(Path(run), **options)
     raw = binding_bytes(binding)
     pin = sha256(raw).hexdigest()
-    # The runtime reads the binding from a run directory: topology_rebinding.json beside topology_capture/.
-    with tempfile.TemporaryDirectory() as staged:
-        (Path(staged) / "topology_capture").mkdir()
-        (Path(staged) / "topology_rebinding.json").write_bytes(raw)
-        for name in CAPTURE_NAMES:
-            shutil.copyfile(Path(run) / name, Path(staged) / "topology_capture" / name)
-        identity = load_topology_binding(
-            Path(staged),
-            pin,
-            expected_topology=binding["original_topology_sha256"],
-            expected_mesh=binding["mesh_sha256"],
-            original_fleet=binding["original_fleet_sha256"],
-            slice_name=binding["slice_name"],
-        )
+    identity = accepted(binding, raws)
     output = Path(output)
     old = os.umask(0o077)
     try:
         output.mkdir()
         (output / "captures").mkdir()
-        for name in CAPTURE_NAMES:
-            io_utils.create_private_exclusive(output / "captures" / name, (Path(run) / name).read_bytes())
+        for name, data in zip(CAPTURE_NAMES, raws, strict=True):  # exactly the bytes the binding was derived from
+            io_utils.create_private_exclusive(output / "captures" / name, data)
         io_utils.create_private_exclusive(output / "topology_rebinding.json", raw)
     finally:
         os.umask(old)

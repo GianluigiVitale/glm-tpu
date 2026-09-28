@@ -88,10 +88,13 @@ def test_require_v4_64_refuses_another_slice(change):
         require_v4_64(topology)
 
 
-def test_require_v4_64_refuses_another_shape():
-    devices = [fleet.device(d, coords=(d % 4, (d // 4) % 4, d // 16)) for d in range(32)]  # 4x4x2 is a permutation
-    require_v4_64(discover_topology(devices, slice_name="example-vm", local_device_ids=fleet.local_order()))
-    devices = [fleet.device(d, coords=(d % 8, d // 8, 0)) for d in range(32)]  # 8x4x1
+@pytest.mark.parametrize(
+    "coords",
+    [lambda d: (d % 4, (d // 4) % 4, d // 16), lambda d: (d % 8, d // 8, 0)],
+    ids=["4x4x2 (a permutation the mesh does not map)", "8x4x1"],
+)
+def test_require_v4_64_refuses_another_shape(coords):
+    devices = [fleet.device(d, coords=coords(d)) for d in range(32)]
     topology = discover_topology(devices, slice_name="example-vm", local_device_ids=fleet.local_order())
     with pytest.raises(TopologyValidationError, match="2x4x4"):
         require_v4_64(topology)
@@ -160,6 +163,9 @@ def _edit(captures: list[bytes], rank: int, **changes) -> list[bytes]:
         ("slice", "topology identity drifted"),
         ("contract", "topology fleet contract drifted"),
         ("hostname", "hostnames are not unique"),
+        ("not a capture", "eight capture records"),
+        ("no topology", "holds no topology"),
+        ("original fleet", "64-hex"),
     ],
 )
 def test_derive_topology_binding_refuses(captures: list[bytes], case: str, message: str):
@@ -182,5 +188,11 @@ def test_derive_topology_binding_refuses(captures: list[bytes], case: str, messa
         raws = _edit(captures, 3, contract=contract)
     elif case == "hostname":
         raws = _edit(captures, 3, hostname=fleet.HOSTS[2])
+    elif case == "not a capture":
+        raws = [json.dumps({"launch_process_id": 0}).encode(), *captures[1:]]
+    elif case == "no topology":
+        raws = _edit(captures, 0, contract={"code_hash": CODE_HASH})
+    elif case == "original fleet":
+        options["original_fleet_sha256"] = "E" * 64
     with pytest.raises(ValueError, match=message):
         derive_topology_binding(raws, **options)

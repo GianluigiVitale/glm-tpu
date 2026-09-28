@@ -179,7 +179,10 @@ def pack_checkpoint(
         terminal.update(job.collect(names))
         io_utils.persist(job.root / "pack_terminal.json", terminal)
         require(
-            not terminal["failed"] and not terminal["uncollected_ranks"] and terminal["collect_error"] is None,
+            not terminal["failed"]
+            and not terminal["uncollected_ranks"]
+            and not terminal["missing"]
+            and terminal["collect_error"] is None,
             "the pack job failed; see " + str(job.root),
         )
         if compare is not None:

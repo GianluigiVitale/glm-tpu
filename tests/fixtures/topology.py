@@ -18,7 +18,7 @@ from unittest import mock
 import numpy as np
 
 HOSTS = [f"example-w-{rank}" for rank in range(8)]
-PERMUTATION = (5, 3, 4, 7, 2, 6, 0, 1)
+PERMUTATION = (2, 7, 0, 5, 1, 4, 6, 3)  # synthetic
 
 
 def device(device_id: int, **changes) -> SimpleNamespace:

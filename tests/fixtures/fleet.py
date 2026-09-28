@@ -193,11 +193,16 @@ def install(monkeypatch, fleet: FakeJobFleet, repo: Path, pin: str) -> list[tupl
     return leases
 
 
-def preflight_facts(pin: str) -> Callable[[FakeJobFleet, int, list[str]], tuple[int, bytes]]:
-    """A CPU-step answer: each host's preflight facts (rank, hostname, pin, no TPU)."""
+ENVIRONMENT = dict(python="3.12.0", jax="0.10.1", jaxlib="0.10.1", libtpu="0.0.41")  # every host's, synthetic
+
+
+def preflight_facts(pin: str, **changes: Any) -> Callable[[FakeJobFleet, int, list[str]], tuple[int, bytes]]:
+    """A CPU-step answer: each host's preflight facts (rank, hostname, pin, no TPU, the environment); ``changes``
+    maps a rank to the facts it reports instead (e.g. another pin)."""
 
     def answer(fleet: FakeJobFleet, rank: int, words: list[str]) -> tuple[int, bytes]:
-        facts = dict(rank=rank, hostname=HOSTS[rank], code_hash=pin, tpu_initialized=False)
+        facts = dict(rank=rank, hostname=HOSTS[rank], code_hash=pin, tpu_initialized=False, **ENVIRONMENT)
+        facts.update(changes.get(f"rank{rank}", {}))
         return 0, (json.dumps(facts) + "\n").encode()
 
     return answer

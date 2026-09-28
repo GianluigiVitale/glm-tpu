@@ -277,13 +277,13 @@ def discover_topology(
 
 
 def require_v4_64(topology: PhysicalTopology) -> None:
-    """The one slice this engine runs: 32 TPU v4 chips in a 2x4x4 shape (any axis order), processes 0..7 with four
-    chips each."""
+    """The one slice this engine runs: 32 TPU v4 chips in the 2x4x4 shape the physical mesh maps, processes 0..7
+    with four chips each."""
     counts = [sum(device.process_index == process for device in topology.devices) for process in range(8)]
     kinds = {device.device_kind.lower() for device in topology.devices}
     if (
         len(topology.devices) != 32
-        or sorted(topology.topology_shape) != [2, 4, 4]
+        or topology.topology_shape != (2, 4, 4)  # the shape the physical mesh maps (MeshContract.validate_topology)
         or topology.process_indices != tuple(range(8))
         or counts != [4] * 8
         or {device.platform.lower() for device in topology.devices} != {"tpu"}
@@ -321,10 +321,21 @@ def derive_topology_binding(
         raise ValueError("a topology binding needs exactly eight captures")
     if all_hosts_idle_after is not True:
         raise ValueError("the hosts were not verified idle after the capture")
+    for name, digest in (("original_fleet_sha256", original_fleet_sha256),):
+        if digest is not None and (
+            not isinstance(digest, str) or len(digest) != 64 or digest.strip("0123456789abcdef")
+        ):
+            raise ValueError(f"{name} must be a lower-case 64-hex SHA-256")
     captures = [json.loads(raw) for raw in raw_captures]
-    if any(not isinstance(item, Mapping) or item.get("launch_process_id") != i for i, item in enumerate(captures)):
-        raise ValueError("topology captures must be in launch order 0..7")
-    topology = PhysicalTopology.from_dict(captures[0]["contract"]["topology"])
+    if any(
+        not isinstance(item, Mapping) or set(item) != _TOPOLOGY_CAPTURE_KEYS or item.get("launch_process_id") != i
+        for i, item in enumerate(captures)
+    ):
+        raise ValueError("topology captures must be eight capture records in launch order 0..7")
+    try:
+        topology = PhysicalTopology.from_dict(captures[0]["contract"]["topology"])
+    except (KeyError, TypeError) as exc:
+        raise ValueError("a topology capture's contract holds no topology") from exc
     slice_name = topology.slice_name if slice_name is None else slice_name
     if expected_topology_sha256 not in (None, topology.topology_hash):
         raise ValueError("the captured topology differs from the expected one")
