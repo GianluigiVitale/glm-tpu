@@ -332,8 +332,8 @@
   },
   "get_app_js": {
    "body": {
-    "bytes": 9986,
-    "sha256": "0239bc31f4014c96ae64f23666d3bca0264cb408014ed4826416fdb07e466d16"
+    "bytes": 10201,
+    "sha256": "bc69d41689d9e62a6765c34a2b1442b62e66afebbd2ad7f0c16878aedd1e2b17"
    },
    "headers": [
     [
@@ -346,7 +346,7 @@
     ],
     [
      "Content-Length",
-     "9986"
+     "10201"
     ],
     [
      "Cache-Control",
@@ -364,7 +364,7 @@
    "status": 200
   },
   "get_index": {
-   "body_text": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<title>GLM-5.3 \u00b7 Conversation</title>\n<link rel=\"stylesheet\" href=\"/style.css\"><script src=\"/app.js\" defer></script>\n</head>\n<body>\n<div class=\"app\">\n  <aside class=\"sidebar\" id=\"sidebar\" aria-label=\"Conversations\">\n    <div class=\"brand\"><div class=\"crest\">G</div><div><div class=\"t\">GLM-5.3</div><div class=\"s\">A place to think</div></div></div>\n    <button class=\"newbtn\" id=\"newBtn\"><span aria-hidden=\"true\">\uff0b</span> New conversation</button>\n    <nav class=\"convlist\" id=\"convlist\" aria-label=\"Saved conversations\"></nav>\n    <div class=\"side-foot\"><div class=\"who\">Your private workspace<small>GLM-5.3 FP8 \u00b7 TPU v4</small></div>\n      <button class=\"iconbtn\" id=\"themeBtn\" aria-label=\"Toggle light or dark theme\" title=\"Light / dark\">\u25d0</button></div>\n  </aside>\n  <main class=\"main\">\n    <header class=\"topbar\">\n      <button class=\"iconbtn hamb\" id=\"hamb\" aria-label=\"Toggle conversations\" aria-expanded=\"false\">\u2630</button>\n      <div class=\"ttl\" id=\"topTitle\">New conversation</div>\n      <div class=\"status\" id=\"status\" role=\"status\"><span class=\"dot\"></span><span id=\"statusText\">Connecting</span></div>\n    </header>\n    <div id=\"banner\" role=\"alert\"></div>\n    <div class=\"scroll\" id=\"scroll\"><div class=\"thread\" id=\"thread\"></div></div>\n    <form class=\"composer\" id=\"composer\">\n      <div class=\"cbox\">\n        <textarea id=\"q\" rows=\"2\" aria-label=\"Message GLM-5.3\" placeholder=\"Ask anything, or pick up where you left off\u2026\" maxlength=\"128000\"></textarea>\n        <div class=\"cbot\"><span class=\"model-pill\">GLM-5.3 \u00b7 Thinking</span>\n          <span class=\"hint\">Enter to send \u00b7 Shift + Enter for a new line</span>\n          <button class=\"send\" id=\"send\" type=\"submit\" aria-label=\"Send message\" title=\"Send message\">\n            <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 19V5M5 12l7-7 7 7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>\n          </button>\n        </div>\n      </div>\n      <p class=\"footer-note\">32K context, including conversation and thinking. Chats take turns. Check important answers.</p>\n    </form>\n  </main>\n</div>\n<div class=\"toast\" id=\"toast\" role=\"status\"></div>\n</body></html>\n",
+   "body_text": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<title>GLM-5.3 \u00b7 Conversation</title>\n<link rel=\"stylesheet\" href=\"/style.css\"><script src=\"/app.js\" defer></script>\n</head>\n<body>\n<div class=\"app\">\n  <aside class=\"sidebar\" id=\"sidebar\" aria-label=\"Conversations\">\n    <div class=\"brand\"><div class=\"crest\">G</div><div><div class=\"t\">GLM-5.3</div><div class=\"s\">A place to think</div></div></div>\n    <button class=\"newbtn\" id=\"newBtn\"><span aria-hidden=\"true\">\uff0b</span> New conversation</button>\n    <nav class=\"convlist\" id=\"convlist\" aria-label=\"Saved conversations\"></nav>\n    <div class=\"side-foot\"><div class=\"who\">Your private workspace<small>GLM-5.3 FP8 \u00b7 TPU v4</small></div>\n      <button class=\"iconbtn\" id=\"themeBtn\" aria-label=\"Toggle light or dark theme\" title=\"Light / dark\">\u25d0</button></div>\n  </aside>\n  <main class=\"main\">\n    <header class=\"topbar\">\n      <button class=\"iconbtn hamb\" id=\"hamb\" aria-label=\"Toggle conversations\" aria-expanded=\"false\">\u2630</button>\n      <div class=\"ttl\" id=\"topTitle\">New conversation</div>\n      <div class=\"status\" id=\"status\" role=\"status\"><span class=\"dot\"></span><span id=\"statusText\">Connecting</span></div>\n    </header>\n    <div id=\"banner\" role=\"alert\"></div>\n    <div class=\"scroll\" id=\"scroll\"><div class=\"thread\" id=\"thread\"></div></div>\n    <form class=\"composer\" id=\"composer\">\n      <div class=\"cbox\">\n        <textarea id=\"q\" rows=\"2\" aria-label=\"Message GLM-5.3\" placeholder=\"Ask anything, or pick up where you left off\u2026\" maxlength=\"128000\"></textarea>\n        <div class=\"cbot\"><span class=\"model-pill\">GLM-5.3 \u00b7 Thinking</span>\n          <span class=\"hint\">Enter to send \u00b7 Shift + Enter for a new line</span>\n          <button class=\"send\" id=\"send\" type=\"submit\" aria-label=\"Send message\" title=\"Send message\">\n            <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 19V5M5 12l7-7 7 7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>\n          </button>\n        </div>\n      </div>\n      <p class=\"footer-note\" id=\"contextNote\">Conversation and thinking share the session's context. Chats take turns. Check important answers.</p>\n    </form>\n  </main>\n</div>\n<div class=\"toast\" id=\"toast\" role=\"status\"></div>\n</body></html>\n",
    "headers": [
     [
      "Server",
@@ -376,7 +376,7 @@
     ],
     [
      "Content-Length",
-     "2364"
+     "2386"
     ],
     [
      "Cache-Control",
@@ -697,12 +697,12 @@
  "gate": "G9-http",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "S2a"
+  "reason": "H17"
  },
- "recorded_unix": 1790177161,
+ "recorded_unix": 1790602526,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "f68388ba7d4f1996323bdd2ec22520a5b850a7ed",
+  "head": "db5aeb4d184b8a166149773106a659a723f3e827",
   "production_paths_equal_baseline": false
  }
 }
