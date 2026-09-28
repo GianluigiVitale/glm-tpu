@@ -571,7 +571,7 @@ docs/                        Documentation (not in the wheel)
     glm53-resident-results-20260922.json  Receipt: the resident GSM8K evaluation
 examples/                    Examples of operator configuration
   site.example.toml          Template of the untracked site file; documents every key
-licenses/                    License texts of material kept only in the repository history (THIRD_PARTY_NOTICES.md)
+licenses/                    License texts of material kept only in the repository history; not in the wheel
   Apache-2.0.txt             Apache 2.0 as distributed with Transformers 5.12.0, for the archived reference extracts
   GLM-5.2-MIT.txt            MIT license of the archived GLM-5.2-FP8 repository snapshot
 ```

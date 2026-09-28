@@ -10,7 +10,9 @@ readme = "README.md"
 # The project's own work is under the Apache License 2.0 (LICENSE); the GLM-5.3 configuration, template and
 # tokenizer metadata files in the wheel keep Z.AI's GLM-5.3 license (THIRD_PARTY_NOTICES.md).
 license = "Apache-2.0 AND LicenseRef-GLM-5.3"
-license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*.txt", "glm_tpu/models/glm_moe_dsa/hf_config/LICENSE"]
+# licenses/*.txt cover material kept only in the repository history; no file of the wheel relies on them, so the
+# wheel does not carry them (THIRD_PARTY_NOTICES.md).
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "glm_tpu/models/glm_moe_dsa/hf_config/LICENSE"]
 requires-python = ">=3.12,<3.13"
 classifiers = [
   "Private :: Do Not Upload",

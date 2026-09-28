@@ -9,14 +9,18 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
 
 - **Branch.** `release/public-structure-20260922` holds the finished release;
   stage S9 (`62e4e615`) rewrote these governance files, and one later unit
-  (H17: the chat UI shows the session's context capacity) followed. It is not
+  (H17: the chat UI shows the session's context capacity) followed, then three
+  documentation and packaging commits (the repository map of AGENTS.md, the
+  README quickstart, the wheel's license files). It is not
   merged: `main` still holds the pre-refactor GLM-5.3 release (tag
   `pre-refactor-main-20260922`). Merging is the owner's decision after review.
 - **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), only
   the chat UI's context display changed under `glm_tpu/` (H17: the workspace
   state reports the resident session's capacity and the page footer shows it,
-  where both said 32K before); nothing in `pyproject.toml` changed. The device
-  programs and the request path are those the comparison ran.
+  where both said 32K before). `pyproject.toml` changed only in its license
+  files: the wheel no longer carries the license texts of material kept only in
+  the history ([notices](THIRD_PARTY_NOTICES.md)). The device programs and the
+  request path are those the comparison ran.
 - **Records.** `tests/golden/data/` last changed at the H17 re-baseline
   (`http.json`: the served page and script), before that at `e6fdd113`;
   `tools/equivalence/closure_map.toml` is empty, as it must be between units;
@@ -180,8 +184,7 @@ None of these blocks the release. Each is its own unit with its own gates.
   before any publication. The data-contract scan of the governance files and the
   release receipts catches home paths, private addresses, run and pack names,
   bucket URIs and zones, but not node, host or account names, and it accepts any
-  value under a receipt's `run` or `run_id` key. Decide whether the wheel keeps
-  the GLM-5.2 MIT text and the Hugging Face Apache text among its license files.
+  value under a receipt's `run` or `run_id` key.
 
 ## Limitations
 

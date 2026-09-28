@@ -9,7 +9,20 @@ equivalence harness, the documentation and the compact result receipts) is
 licensed under the [Apache License, Version 2.0](LICENSE). The material listed
 below keeps its own license; the Apache License does not relicense it. The package
 metadata states the combination as the SPDX expression
-`Apache-2.0 AND LicenseRef-GLM-5.3` (`pyproject.toml`).
+`Apache-2.0 AND LicenseRef-GLM-5.3` (`pyproject.toml`). The wheel carries three
+license files: [LICENSE](LICENSE), this file and the
+[GLM-5.3 license](glm_tpu/models/glm_moe_dsa/hf_config/LICENSE).
+
+### Chat UI styling
+
+The palette, sidebar, message layout, composer and responsive styling of
+`glm_tpu/entrypoints/ui/static/style.css` are the owner's own work, adapted from
+the owner's own `as-pt` project, file `aspt_rag/web/index.html` at commit
+`4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256 in
+[docs/UI.md](docs/UI.md)). Nothing in them is adapted from a third party. The
+owner contributes this styling under this repository's license, like the rest
+of the project's own work; this notice licenses nothing else of the `as-pt`
+project.
 
 ## Material in this tree with its own license
 
@@ -24,21 +37,20 @@ license is distinct from GLM-5.2's MIT license. The tokenizer vocabulary and the
 model weights are external: they are never part of Git or of the wheel, and their
 use is governed by the model publisher's license.
 
-### Chat UI styling
-
-The palette, sidebar, message layout, composer and responsive styling of
-`glm_tpu/entrypoints/ui/static/style.css` are adapted from the owner's own `as-pt`
-project, file `aspt_rag/web/index.html` at commit
-`4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256 in
-[docs/UI.md](docs/UI.md)). The owner contributes this adaptation under this
-repository's license. This notice licenses nothing else of the `as-pt` project.
+Two of these files, `generation_config.json` and `tokenizer_config.json`, are
+byte-identical to their counterparts in the GLM-5.2-FP8 snapshot listed below.
+The copies here are those of the GLM-5.3 revision above (checked byte for byte
+against it) and are distributed under the GLM-5.3 license with that license's
+text; they do not rely on GLM-5.2's MIT license.
 
 ## Material in the repository history only
 
 These files are not in this tree. They are preserved, with their original headers,
 at the tag `archive/research-20260922` (the research tree this release was cut
 from) and in the Git history, which a clone of this repository carries. Their
-license texts stay in `licenses/` for that reason.
+license texts stay in `licenses/` for that reason. Neither these files nor their
+license texts are in the wheel, which ships nothing that relies on these licenses
+(see the GLM-5.3 note above).
 
 - **Hugging Face Transformers reference extracts**:
   `reference/configuration_glm_moe_dsa.py`, `reference/modeling_glm_moe_dsa.py`,
