@@ -12,6 +12,8 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+# WU-C5: cli/main.py imports the topology subcommand at module level.
+"glm_tpu.entrypoints.cli.topology" = "WU-C: the topology subcommand, capture and bind (G6 controller stage)"
 
 [removed]
 # "glm_tpu.recorded.bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

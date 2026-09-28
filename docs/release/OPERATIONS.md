@@ -9,9 +9,10 @@ site file ([INSTALLATION](INSTALLATION.md#the-site-file)).
 
 | Entry | Role |
 |---|---|
-| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`mark-source`/`verify` on local files; `ask` prepares requests and runs the controller |
+| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`mark-source`/`verify` on local files; `ask` prepares requests and runs the controller; `topology capture` runs the model-free topology capture on the fleet and `topology bind` derives the binding ([below](#the-topology-binding)) |
 | `python -m glm_tpu.executor.multihost_executor` | the rank-0 controller: one request (or a resident session) on the fleet |
 | `python -m glm_tpu.worker.tpu_worker` | the per-host worker; the controller starts it on every host (it refuses to run without the controller's handshake) |
+| `python -m glm_tpu.distributed.topology_capture` | the per-host topology capture; `topology capture` starts it on every host (it refuses to run without that job's handshake) |
 | `python -m glm_tpu.model_loader.pack_worker` | the per-host checkpoint packer, started by a packing driver outside this repository ([CHECKPOINTS](CHECKPOINTS.md#packing)) |
 | `python -m glm_tpu.entrypoints.serve.server` | the loopback chat UI and `/v1` API attached to a resident session ([UI](../UI.md), [API](../API.md)) |
 | `glm_tpu/executor/remote/*.py` | standard-library helper programs the controller sends to the hosts as `<interpreter> -c <text> <JSON>`, where the interpreter is the site's `fleet.helper_python` (`fleet.worker_python` for `stage_bundle.py`); never run by hand |
@@ -74,6 +75,50 @@ idle and collects the records before it releases the locks. A successful
 resident record says `all_hosts_idle_after=false`: the workers were meant to stay.
 Idle time has no timeout. The chat UI and the `/v1` API use the same inbox through
 one producer lock; run only one producer at a time.
+
+## The topology binding
+
+The site's `[topology]` table pins the fleet's physical identity: the topology
+digest (every chip's id, owning JAX process, coordinates and core), the physical
+mesh digest, the fleet digest (which host is which JAX process with which chips)
+and `topology_rebinding.json` with the eight hosts' captures, which every worker
+authenticates before it opens a device (`glm_tpu/distributed/topology.py`). Two
+commands produce them, on rank 0:
+
+```bash
+python -m glm_tpu topology capture --site ~/.config/glm-tpu/site.toml
+python -m glm_tpu topology bind /path/to/runs/<capture run> --output /path/to/binding
+```
+
+`topology capture` is a fleet job under the controller's rules (launch policy,
+both workload locks for the whole job and the sync locks until staging, idle
+hosts before and after, cleanup of only its own authenticated processes,
+collection that never overwrites). It stages the pinned commit and the resolved
+site, runs `python -m glm_tpu.distributed.topology_capture --preflight-only` on
+the CPU of every host, then the capture on all eight at once: each host joins the
+JAX runtime at `fleet.coordinator_address` as the process that its hostname's rank
+names and records its devices, and the eight hosts must agree on one contract
+digest. No model or checkpoint is involved; the TPUs are busy for about a minute.
+The run directory (printed as `RUN <directory>`) then holds every host's
+`topology.rank<r>.json` and `capture_terminal.json`, and the report names the
+topology, mesh and fleet digests and each host's slots.
+
+`topology bind` reads a finished capture run (every host exited 0 and was idle
+afterwards, every capture collected), derives the binding, checks it with the
+runtime's own `load_topology_binding` and writes a new directory holding
+`topology_rebinding.json` and `captures/`. It contacts no host. Its report holds
+the values of the site's `[topology]` table: `binding_dir`, `binding_sha256`,
+`capture_root`, `topology_sha256`, `topology_fleet_sha256`, `mesh_sha256` and
+`slice_name`.
+
+A first binding records its own fleet as the original one. When the slice is
+recreated with other hostnames on the same physical chips, capture again and bind
+with `--original-fleet-sha256` set to the site's `topology_fleet_sha256` and
+`--expected-topology-sha256` and `--expected-mesh-sha256` set to its pins: the
+topology, mesh and fleet pins stay, only `binding_dir` and `binding_sha256`
+change, and a checkpoint packed for that mesh stays valid. The capture records
+the site's `topology.slice_name`, so set it before capturing (conventionally the
+TPU name); pins that a later step produces stay 64 zeros until then.
 
 ## Failures
 

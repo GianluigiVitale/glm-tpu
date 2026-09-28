@@ -32,14 +32,14 @@ manifest_sha256 = "<64-hex>"              # the "manifest_sha256" field inside m
 success_sha256 = "<64-hex>"               # the "success_sha256" field inside SUCCESS (not the file's SHA-256)
 source_complete_sha256 = "<64-hex>"       # SHA-256 of the bytes of <model_path>/SOURCE_COMPLETE.json
 
-[topology]                                 # from the topology-binding workflow
+[topology]                                 # the values `glm-tpu topology bind` prints
 binding_dir = "/path/to/derived_binding"   # topology_rebinding.json + captures/topology.rank{0..7}.json
 binding_sha256 = "<64-hex>"
 capture_root = "/path/to/topology/host_records"
 topology_sha256 = "<64-hex>"
 topology_fleet_sha256 = "<64-hex>"
 mesh_sha256 = "<64-hex>"
-slice_name = "<tpu-vm-name>"
+slice_name = "<tpu-vm-name>"               # recorded by `glm-tpu topology capture`: set it first
 
 [storage]
 source_uri = "gs://<bucket>/<prefix>/GLM-5.3-FP8"

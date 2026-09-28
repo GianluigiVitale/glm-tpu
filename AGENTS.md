@@ -218,6 +218,7 @@ glm_tpu/entrypoints/         What a user runs or connects to
     prepare.py               prepare-request: tokenize a private chat file (8k or 128k profile); launches nothing
     collect_env.py           collect-env (alias doctor): installed versions against the declared pins of a profile
     checkpoint.py            checkpoint inventory, mark-source and verify on local files (no JAX, no lock)
+    topology.py              topology capture (the model-free capture job on the fleet) and topology bind
   openai/                    The OpenAI-compatible /v1 surface over a resident session
     __init__.py              Package docstring
     serving_chat.py          OpenAIServingChat: stateless /v1/chat/completions, buffered or streamed
@@ -246,6 +247,8 @@ glm_tpu/executor/            The rank-0 controller and its launch machinery; imp
   multihost_executor.py      The controller: locks, idle checks, staging, the eight workers, resident inbox, cleanup, records
   launch_policy.py           Which checkout may launch (the site's [launch] table) and the commit it stages
   staging.py                 stage_bundle: git archive of the pinned commit, its source manifest, the request, the site
+  jobs.py                    Model-free fleet jobs under the controller's rules: leases, idle, staging, preflight, start, cleanup
+  topology_job.py            capture_topology (a fleet job) and bind_topology (the binding of a capture run)
   fleet.py                   The exact SSH command strings; HelperTexts, the pinned snapshot of the helper texts
   remote/                    Standard-library helper programs sent as <interpreter> -c <text> <JSON>; never imported on a host
     __init__.py              The rules every helper follows (Python 3.10, one JSON argument, main(argv))
@@ -349,7 +352,8 @@ glm_tpu/distributed/         Multi-host runtime state
   __init__.py                Package docstring
   parallel_state.py          initialize_runtime (JAX distributed, topology check, mesh) and the all-host vote
   mesh.py                    MeshContract and the physical expert=8 x feature=4 mesh
-  topology.py                The eight hosts' topology captures and the authenticated topology binding
+  topology.py                The eight hosts' topology captures, the authenticated topology binding and its derivation
+  topology_capture.py        python -m glm_tpu.distributed.topology_capture: one host's model-free topology capture
 ```
 
 ```text
@@ -373,6 +377,10 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     __init__.py              Package marker
     test_model.py            The pinned geometry, identity, inventory binding and template checks
     test_site.py             The site file is fail-closed; the worker's site binding refuses incomplete sites
+  distributed/               Tests of glm_tpu/distributed
+    __init__.py              Package docstring
+    test_topology.py         Device inventory, the v4-64 shape, and bindings the runtime's own validator accepts
+    test_topology_capture.py  The capture process: staged-input refusals and the record on a fake JAX fleet
   engine/                    Tests of glm_tpu/engine
     __init__.py              Package marker
     fleet_fakes.py           Fleet and device fakes for the vote-schedule tests
@@ -390,6 +398,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
       test_collect_env.py    The environment report against the declared pins
       test_main.py           Help text, info output and every argument pinned; no command module loaded early
       test_prepare.py        prepare-request, without a tokenizer
+      test_topology.py       topology capture and bind through the command line
     openai/                  The /v1 surface
       __init__.py            Package docstring
       test_serving_chat.py   /v1 chat: messages, tools, streaming, statelessness, capacity, keys, failures
@@ -410,12 +419,15 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     test_multihost_executor.py  The controller's summary, lease order, resident stop and failure paths on a fake fleet
     test_remote_helpers.py   Helpers are self-contained standard-library programs, never templated
     test_remote_loopback.py  G8: runs the exact remote command strings on this host
+    test_topology_job.py     The capture job and the fleet-job machinery on a fake fleet; bind of its run
   fixtures/                  Shared synthetic fixtures (neutral example values only)
     __init__.py              Package docstring
+    fleet.py                 FakeJobFleet: a fake eight-host fleet for the fleet-job tests
     serving.py               FakeResident and open_store for the serving tests
     site.py                  Example site configurations (the harness's synthetic site)
     tiny_checkpoint.py       A one-tensor source checkpoint for the checkpoint tests
     tiny_model.py            The frozen tiny GLM checkpoint (fixture v1) of the CPU tests
+    topology.py              A synthetic v4-64 fleet: fake devices, a fake jax per host, the captures the worker writes
     prefill_layer_schema.json  Tensor schema of the 78-layer checkpoint, for shape evaluation only
   golden/                    Thin pytest wrappers around python -m tools.equivalence
     __init__.py              Package docstring

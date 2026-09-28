@@ -2,8 +2,8 @@
 
 ``live_tpu_run()`` is true when any of these holds:
 
-* a process whose ``/proc/<pid>/cmdline`` names the controller, worker or pack-worker module
-  (181c013e names and the post-refactor names);
+* a process whose ``/proc/<pid>/cmdline`` names the controller, worker, pack-worker or
+  topology-capture module (181c013e names and the post-refactor names);
 * ``/tmp/libtpu_lockfile`` is open by a visible process (scan of ``/proc/*/fd`` links);
 * a workload lock inode of the site is present in ``/proc/locks``;
 * the site file exists but cannot be loaded (invalid, wrong owner or mode, unreadable): the
@@ -29,6 +29,7 @@ MODULES = (
     b"glm_tpu.executor.multihost_executor",
     b"glm_tpu.worker.tpu_worker",
     b"glm_tpu.model_loader.pack_worker",
+    b"glm_tpu.distributed.topology_capture",
 )
 LIBTPU_LOCK = "/tmp/libtpu_lockfile"
 REFUSAL = "a TPU run is live on this host; run heavy gates elsewhere or later"

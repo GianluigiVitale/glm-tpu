@@ -4,7 +4,10 @@
 topology, launch-host to JAX-process permutation, fleet digest); ``device_record`` is the device
 description ``initialize_runtime`` compares with each live device (both moved verbatim in S2a).
 ``apply_topology_binding`` authenticates the site's topology binding, a recorded reassignment of
-hosts on the unchanged physical mesh, before the initializer checks live devices. Nothing here
+hosts on the unchanged physical mesh, before the initializer checks live devices. The capture side
+(``glm_tpu.distributed.topology_capture``, ``glm-tpu topology capture``) describes the live devices
+with ``discover_topology`` and ``require_v4_64``; ``derive_topology_binding`` turns the eight
+captures into the binding the site file pins (``glm-tpu topology bind``). Nothing here
 initializes JAX or admits checkpoint bytes or model graphs.
 """
 
@@ -229,6 +232,153 @@ def apply_topology_binding(args, root: Path, pin: str | None) -> dict | None:
     args.topology_capture_root = root / "topology_capture"
     args.topology_fleet_sha256 = identity["fleet_sha256"]
     return identity
+
+
+BINDING_SCHEMA = "glm_perf_topology_rebinding_v1"
+# No generator at import time: G7 records every function the production composition executes.
+CAPTURE_NAMES = tuple(map("topology.rank{}.json".format, range(8)))
+
+
+def discover_topology(
+    devices: Sequence[object], *, slice_name: str, local_device_ids: Mapping[int, int]
+) -> PhysicalTopology:
+    """The physical inventory of the live ``devices`` (``jax.devices()``): id, owning process, coordinates, core,
+    platform and kind as the runtime reports them, and each device's position in its process's
+    ``jax.local_devices()`` (``local_device_ids``, gathered from every host: TPU v4 reports no
+    ``local_hardware_id``). The shape is the extent of the zero-based coordinates; nothing is inferred from list
+    order. ``initialize_runtime`` later compares every live device with this record (``device_record``)."""
+    captured = []
+    for device in devices:
+        device_id = int(device.id)
+        runtime_local = device.local_hardware_id
+        observed = local_device_ids.get(device_id)
+        if observed is None or (runtime_local is not None and int(runtime_local) != observed):
+            raise TopologyValidationError(f"device {device_id}: no observed local id, or it disagrees with the runtime")
+        captured.append(
+            PhysicalDevice(
+                device_id=device_id,
+                process_index=int(device.process_index),
+                local_device_id=int(observed),
+                coordinates=tuple(int(value) for value in device.coords),
+                core_on_chip=int(device.core_on_chip),
+                platform=str(device.platform),
+                device_kind=str(device.device_kind),
+            )
+        )
+    if not captured:
+        raise TopologyValidationError("the runtime reports no devices")
+    dimensions = len(captured[0].coordinates)
+    if any(len(device.coordinates) != dimensions for device in captured):
+        raise TopologyValidationError("the devices report coordinates of different dimensionality")
+    if any(min(device.coordinates[axis] for device in captured) != 0 for axis in range(dimensions)):
+        raise TopologyValidationError("device coordinates must be zero-based")
+    shape = tuple(max(device.coordinates[axis] for device in captured) + 1 for axis in range(dimensions))
+    return PhysicalTopology(slice_name=slice_name, topology_shape=shape, devices=tuple(captured))
+
+
+def require_v4_64(topology: PhysicalTopology) -> None:
+    """The one slice this engine runs: 32 TPU v4 chips in a 2x4x4 shape (any axis order), processes 0..7 with four
+    chips each."""
+    counts = [sum(device.process_index == process for device in topology.devices) for process in range(8)]
+    kinds = {device.device_kind.lower() for device in topology.devices}
+    if (
+        len(topology.devices) != 32
+        or sorted(topology.topology_shape) != [2, 4, 4]
+        or topology.process_indices != tuple(range(8))
+        or counts != [4] * 8
+        or {device.platform.lower() for device in topology.devices} != {"tpu"}
+        or len(kinds) != 1
+        or not all("tpu v4" in kind for kind in kinds)
+    ):
+        raise TopologyValidationError(
+            f"the slice is not 32 TPU v4 chips on eight hosts in 2x4x4: shape {list(topology.topology_shape)}, "
+            f"{len(topology.devices)} devices, chips per process {counts}, kinds {sorted(kinds)}"
+        )
+
+
+def derive_topology_binding(
+    raw_captures: Sequence[bytes],
+    *,
+    all_hosts_idle_after: bool,
+    note: str,
+    slice_name: str | None = None,
+    original_fleet_sha256: str | None = None,
+    expected_topology_sha256: str | None = None,
+    expected_mesh_sha256: str | None = None,
+) -> dict:
+    """The topology binding of eight captures (``topology.rank0.json`` .. ``topology.rank7.json`` bytes, in launch
+    order): the fleet digest and the slot ownership computed as ``validate_topology_fleet`` and
+    ``load_topology_binding`` recompute them, re-authenticated by calling ``validate_topology_fleet`` with them.
+
+    ``original_fleet_sha256`` is the site's ``topology_fleet_sha256`` the binding reassigns (default: this fleet, a
+    first binding); ``expected_topology_sha256`` and ``expected_mesh_sha256`` (default: the captured ones) must
+    equal the captured physical identity, the binding's premise; ``slice_name`` defaults to the captured one. The
+    hosts must have been verified idle after the capture (``all_hosts_idle_after``). ``note`` is recorded as
+    ``derived_by``."""
+    from glm_tpu.distributed.mesh import build_physical_mesh
+
+    if len(raw_captures) != 8:
+        raise ValueError("a topology binding needs exactly eight captures")
+    if all_hosts_idle_after is not True:
+        raise ValueError("the hosts were not verified idle after the capture")
+    captures = [json.loads(raw) for raw in raw_captures]
+    if any(not isinstance(item, Mapping) or item.get("launch_process_id") != i for i, item in enumerate(captures)):
+        raise ValueError("topology captures must be in launch order 0..7")
+    topology = PhysicalTopology.from_dict(captures[0]["contract"]["topology"])
+    slice_name = topology.slice_name if slice_name is None else slice_name
+    if expected_topology_sha256 not in (None, topology.topology_hash):
+        raise ValueError("the captured topology differs from the expected one")
+    projection = {
+        "fleet_local_device_ids_in_runtime_order": captures[0]["fleet_local_device_ids_in_runtime_order"],
+        "records": [
+            {
+                name: item[name]
+                for name in ("contract_hash", "hostname", "jax_process_index", "launch_process_id", "local_device_ids")
+            }
+            for item in captures
+        ],
+    }
+    fleet = sha256(
+        json.dumps(projection, allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
+    ).hexdigest()
+    topology, ordered, _ = validate_topology_fleet(
+        tuple(captures),
+        expected_topology_sha256=topology.topology_hash,
+        expected_fleet_sha256=fleet,
+        slice_name=slice_name,
+    )
+    physical = build_physical_mesh(topology)
+    if expected_mesh_sha256 not in (None, physical.mesh_hash):
+        raise ValueError("the captured physical mesh differs from the expected one")
+    slots = {
+        str(i): [s for s, device in enumerate(physical.flattened_device_ids) if device in capture["local_device_ids"]]
+        for i, capture in enumerate(ordered)
+    }
+    return {
+        "schema": BINDING_SCHEMA,
+        "physical_devices_identical": True,
+        "all_hosts_idle_after": True,
+        "original_topology_sha256": topology.topology_hash,
+        "mesh_sha256": physical.mesh_hash,
+        "original_fleet_sha256": fleet if original_fleet_sha256 is None else original_fleet_sha256,
+        "fleet_sha256": fleet,
+        "capture_sha256": {
+            name: sha256(raw).hexdigest() for name, raw in zip(CAPTURE_NAMES, raw_captures, strict=True)
+        },
+        "host_to_slots": slots,
+        "code_hash": ordered[0]["contract"].get("code_hash"),
+        "slice_name": slice_name,
+        "hosts": [capture["hostname"] for capture in ordered],
+        "launch_to_jax_process": {str(c["launch_process_id"]): c["jax_process_index"] for c in ordered},
+        "contract_sha256": ordered[0]["contract_hash"],
+        "captured_utc": sorted({c["captured_utc"] for c in ordered}),
+        "derived_by": note,
+    }
+
+
+def binding_bytes(binding: Mapping[str, Any]) -> bytes:
+    """``topology_rebinding.json`` as written (indented, sorted keys, final newline); its SHA-256 is the site pin."""
+    return (json.dumps(binding, indent=2, sort_keys=True) + "\n").encode()
 
 
 def _product(values: Sequence[int]) -> int:

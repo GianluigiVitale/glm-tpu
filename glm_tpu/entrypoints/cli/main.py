@@ -11,6 +11,7 @@ from pathlib import Path
 from glm_tpu.entrypoints.cli.checkpoint import CheckpointSubcommand
 from glm_tpu.entrypoints.cli.collect_env import CollectEnvSubcommand
 from glm_tpu.entrypoints.cli.prepare import PrepareRequestSubcommand
+from glm_tpu.entrypoints.cli.topology import TopologySubcommand
 from glm_tpu.entrypoints.cli.types import CLISubcommand
 
 
@@ -129,6 +130,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CollectEnvSubcommand(),
         PrepareRequestSubcommand(),
         CheckpointSubcommand(),
+        TopologySubcommand(),
     ):
         subparser = command.subparser_init(sub)
         commands.update({name: command for name, choice in sub.choices.items() if choice is subparser})

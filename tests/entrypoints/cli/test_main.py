@@ -70,13 +70,13 @@ for name in ("jax", "jaxlib", "libtpu", "torch", "transformers"):
 # between Python versions (the literals are Python 3.12's).
 HELP = {
     "": """\
-usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint} ...
+usage: glm-tpu [-h] {info,ask,collect-env,doctor,prepare-request,checkpoint,topology} ...
 
 Release information, environment and checkpoint checks, local request preparation and question
 submission.
 
 positional arguments:
-  {info,ask,collect-env,doctor,prepare-request,checkpoint}
+  {info,ask,collect-env,doctor,prepare-request,checkpoint,topology}
     info                show supported scope and release limitations
     ask                 answer questions on the configured TPU site; optionally batch up to four
     collect-env (doctor)
@@ -84,6 +84,7 @@ positional arguments:
     prepare-request     tokenize a private chat locally; does NOT launch inference
     checkpoint          inventory or mark a checkpoint source, or verify a sealed checkpoint, on
                         local files
+    topology            capture the fleet's topology on the TPUs, or derive the topology binding
 
 options:
   -h, --help            show this help message and exit
@@ -199,6 +200,53 @@ options:
   --local-slot-layout   the root holds only the --slots files (a worker's layout); any other slot
                         file is refused
 """,
+    "topology": """\
+usage: glm-tpu topology [-h] {capture,bind} ...
+
+positional arguments:
+  {capture,bind}
+    capture       record every host's TPU devices (a model-free fleet job, about a minute on the
+                  TPUs)
+    bind          write the topology binding of a finished capture run
+
+options:
+  -h, --help      show this help message and exit
+""",
+    "topology capture": """\
+usage: glm-tpu topology capture [-h] [--site SITE] [--repo REPO] [--wall-seconds WALL_SECONDS]
+
+options:
+  -h, --help            show this help message and exit
+  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else
+                        $GLM_TPU_CONFIG_ROOT/site.toml)
+  --repo REPO           git checkout to stage; must be this one (default: the site paths.repo)
+  --wall-seconds WALL_SECONDS
+                        deadline of the capture processes, 60..3600 (default: 900)
+""",
+    "topology bind": """\
+usage: glm-tpu topology bind [-h] --output OUTPUT [--original-fleet-sha256 ORIGINAL_FLEET_SHA256]
+                             [--expected-topology-sha256 EXPECTED_TOPOLOGY_SHA256]
+                             [--expected-mesh-sha256 EXPECTED_MESH_SHA256]
+                             [--slice-name SLICE_NAME] [--note NOTE]
+                             run
+
+positional arguments:
+  run                   the capture's run directory (the RUN line of topology capture)
+
+options:
+  -h, --help            show this help message and exit
+  --output OUTPUT       the new binding directory (never overwritten)
+  --original-fleet-sha256 ORIGINAL_FLEET_SHA256
+                        the site's topology_fleet_sha256 that this binding reassigns (default: the
+                        captured fleet)
+  --expected-topology-sha256 EXPECTED_TOPOLOGY_SHA256
+                        refuse unless the captured topology has this digest
+  --expected-mesh-sha256 EXPECTED_MESH_SHA256
+                        refuse unless the captured physical mesh has this digest
+  --slice-name SLICE_NAME
+                        the site's topology.slice_name (default: the captured one)
+  --note NOTE           recorded as derived_by (default: names the capture run)
+""",
 }
 HELP["doctor"] = HELP["collect-env"]  # the alias's parser is collect-env's
 
@@ -294,7 +342,7 @@ ARGUMENTS = {
     "": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
         "_SubParsersAction command dest=command nargs='A...' "
-        "choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request', 'checkpoint'] required",
+        "choices=['info', 'ask', 'collect-env', 'doctor', 'prepare-request', 'checkpoint', 'topology'] required",
     ],
     "info": ["_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='"],
     "ask": [
@@ -333,6 +381,10 @@ ARGUMENTS = {
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
         "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'mark-source', 'verify'] required",
     ],
+    "topology": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_SubParsersAction action dest=action nargs='A...' choices=['capture', 'bind'] required",
+    ],
     "checkpoint inventory": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
         "_StoreAction source dest=source type='Path' required",
@@ -353,6 +405,22 @@ ARGUMENTS = {
         "_StoreAction --root dest=root type='Path'",
         "_StoreAction --slots dest=slots nargs='+' type='int' metavar='SLOT'",
         "_StoreTrueAction --local-slot-layout dest=local_slot_layout nargs=0 const=True default=False",
+    ],
+    "topology capture": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --site dest=site type='Path'",
+        "_StoreAction --repo dest=repo type='Path'",
+        "_StoreAction --wall-seconds dest=wall_seconds default=900 type='int'",
+    ],
+    "topology bind": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction run dest=run type='Path' required",
+        "_StoreAction --output dest=output type='Path' required",
+        "_StoreAction --original-fleet-sha256 dest=original_fleet_sha256",
+        "_StoreAction --expected-topology-sha256 dest=expected_topology_sha256",
+        "_StoreAction --expected-mesh-sha256 dest=expected_mesh_sha256",
+        "_StoreAction --slice-name dest=slice_name",
+        "_StoreAction --note dest=note",
     ],
 }
 
@@ -431,13 +499,16 @@ def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, 
         ["checkpoint", "inventory", "--help"],
         ["checkpoint", "mark-source", "--help"],
         ["checkpoint", "verify", "--help"],
+        ["topology", "--help"],
+        ["topology", "capture", "--help"],
+        ["topology", "bind", "--help"],
     ],
     ids=" ".join,
 )
 def test_info_collect_env_and_help_leave_the_command_modules_unloaded(argv):
     """The subcommands that need neither load neither the ask module nor the request module (imported by `ask` and
-    `prepare-request` when they run) nor the checkpoint library (imported by `checkpoint` when it runs), nor a model
-    library."""
+    `prepare-request` when they run) nor the checkpoint library (imported by `checkpoint` when it runs), nor the
+    executor or the topology code (imported by `topology` when it runs), nor a model library."""
     code = f"""
 import contextlib, io, sys
 from glm_tpu.entrypoints.cli.main import main
@@ -446,8 +517,8 @@ with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.St
         main({argv!r})
     except SystemExit:
         pass
-unloaded = ("glm_tpu.entrypoints.cli.ask", "glm_tpu.engine.request", "glm_tpu.model_loader", "jax", "jaxlib", "libtpu",
-            "torch", "transformers")
+unloaded = ("glm_tpu.entrypoints.cli.ask", "glm_tpu.engine.request", "glm_tpu.model_loader", "glm_tpu.executor",
+            "glm_tpu.distributed", "jax", "jaxlib", "libtpu", "torch", "transformers")
 loaded = [name for name in unloaded if name in sys.modules]
 assert not loaded, loaded
 """
