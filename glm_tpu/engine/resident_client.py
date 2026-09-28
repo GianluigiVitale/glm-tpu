@@ -44,10 +44,10 @@ def controller_receipt(run):
 
 
 def _process(pid):
-    """``(state, start ticks, argv)`` of a live process (``/proc/<pid>``)."""
+    """``(state, start ticks, argv, owner uid)`` of a live process (``/proc/<pid>``)."""
     proc = Path("/proc") / str(pid)
     stat = (proc / "stat").read_text().rsplit(")", 1)[1].split()
-    return stat[0], stat[19], (proc / "cmdline").read_bytes().split(b"\0")
+    return stat[0], stat[19], (proc / "cmdline").read_bytes().split(b"\0"), proc.stat().st_uid
 
 
 def resident_command(argv):
@@ -88,9 +88,10 @@ class Resident:
 
     def check(self):
         try:
-            state, ticks, argv = _process(self.identity["pid"])
+            state, ticks, argv, uid = _process(self.identity["pid"])
             valid = (
                 ticks == str(self.identity["start_ticks"])
+                and uid == os.geteuid()
                 and state not in ("Z", "X")
                 and resident_command(argv)
                 and not (self.run / "inbox/stop.json").exists()

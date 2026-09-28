@@ -108,7 +108,7 @@ and writes nothing.
 `checkpoint pack` packs, seals and installs the checkpoint on the eight hosts, on
 their CPUs (no TPU is opened). It is a fleet job with the controller's rules
 ([OPERATIONS](OPERATIONS.md#the-topology-binding)): the site's launch policy, both
-workload locks for the whole job and the sync locks until staging is done, idle
+workload locks for the whole job and the sync locks until staging and the CPU preflight are done, idle
 hosts before and after, cleanup of only its own authenticated processes, and a
 collection that never overwrites. It stages the pinned commit, the resolved site
 (`site.json`, bound by `--site-sha256`) and the site's topology binding, then runs
@@ -124,8 +124,9 @@ python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --compare-s
 ```
 
 - **Pack** (no mode flag): every host writes its four slots into
-  `checkpoint.root` (a new directory; the run directory under `paths.run_root`
-  has the same name, `greenfield_ws32_runtime_pack_<UTC>`), hashing each file and
+  `checkpoint.root` (a new directory directly inside `checkpoint.namespace`,
+  named `greenfield_ws32_runtime_pack_<UTC>`; the run directory under
+  `paths.run_root` takes the same name, so a name is used once), hashing each file and
   tensor it writes (`pack_runtime_slots`). The controller combines the eight
   hashed receipts into the manifest (`assemble_owner_manifest`, with each source
   shard's upstream SHA-256 from `SOURCE_COMPLETE.json`), writes the self-hashed
@@ -137,7 +138,9 @@ python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --compare-s
 - **Recover** (`--recover-seal DIR`, a directory holding a kept `manifest.json`
   and `SUCCESS`): the same pack, then every file record of the eight receipts
   must equal the kept manifest on every key, and only then is the kept seal
-  installed byte for byte. The site must already pin that seal. This rebuilds a
+  installed byte for byte. The site must already pin that seal, and
+  `checkpoint.root` needs a new name (the first pack's run directory keeps the
+  old one; the seal does not depend on the root's name). This rebuilds a
   checkpoint that a host restart removed from tmpfs without inventing a new
   seal.
 - **Compare** (`--compare-seal DIR`, a directory holding a `manifest.json`): a dry
@@ -146,10 +149,11 @@ python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --compare-s
   and re-derives `--tensors` tensors of each of its slots (0 for all) in memory
   from the source, as the packer places them, comparing their SHA-256s with the
   manifest's. The choice covers the FP8 and BF16 weights, routed experts and each
-  sharded axis.
+  sharded axis. The report lists every difference and the command exits 1 when
+  there is one.
 - **Preflight** (`--preflight-only`): the pack's checks on every host (among them
-  a new target and enough tmpfs for the host's slots plus an 8 GiB reserve), then
-  each host's facts; nothing is packed.
+  that `checkpoint.root` does not exist yet and that there is enough tmpfs for the
+  host's slots plus an 8 GiB reserve), then each host's facts; nothing is packed.
 
 The packed files live in tmpfs, and systemd-logind removes a user's `/dev/shm`
 files when that user's last session on a host ends (`RemoveIPC`): before a pack,

@@ -137,8 +137,12 @@ def pack_checkpoint(
     require(tensors >= 0, "the canary tensor count must be 0 (all) or positive")
     packing = compare is None and not preflight_only
     tag = site.checkpoint.root.name if packing else new_tag()
-    require(TAG.fullmatch(tag) is not None, "checkpoint.root must be named greenfield_ws32_runtime_pack_<UTC>")
-    require(packing or tag != site.checkpoint.root.name, "a dry run never uses the checkpoint's own name")
+    root = site.checkpoint.root
+    require(
+        TAG.fullmatch(root.name) is not None and root.parent == site.checkpoint.namespace,
+        "checkpoint.root must be <checkpoint.namespace>/greenfield_ws32_runtime_pack_<UTC>, directly inside it",
+    )
+    require(packing or tag != root.name, "a dry run never uses the checkpoint's own name")
     kept = read_seal(seal or compare, success=seal is not None) if (seal or compare) else None
     if seal is not None:
         require(
@@ -146,8 +150,13 @@ def pack_checkpoint(
             and kept["success"]["success_sha256"] == site.checkpoint.success_sha256,
             "the site's checkpoint pins are not this seal's",
         )
-    if packing:
-        require(not site.checkpoint.root.exists(), "the checkpoint root already exists on rank 0; never repack it")
+    if packing or preflight_only:
+        require(not root.exists(), "the checkpoint root already exists on rank 0; never repack it")
+    require(
+        not packing or not (site.paths.run_root / tag).exists(),
+        "a pack run named " + tag + " exists under the run root: a new pack or a recovery needs a new "
+        "checkpoint.root name (a recovery keeps the manifest and SUCCESS pins)",
+    )
     inventory = authenticated_inventory(site.checkpoint.source_inventory, site.checkpoint.source_inventory_sha256)
     model.require_inventory(inventory)
     inventory_file_sha = sha256(io_utils.read_bounded(site.checkpoint.source_inventory, 64 << 20)).hexdigest()
@@ -163,7 +172,9 @@ def pack_checkpoint(
         if compare is not None:
             argv += ["--compare-seal", "--seal-manifest-sha256", sha256(kept["manifest_raw"]).hexdigest()]
             argv += ["--compare-tensors", str(tensors)]
-        facts = job.preflight(MODULE, protocol.PACK_WORKER_ENV_FLAG, argv)
+        # a preflight-only run checks, on every host, the checkpoint root the pack would write
+        checked = argv + (["--target-name", root.name] if preflight_only else [])
+        facts = job.preflight(MODULE, protocol.PACK_WORKER_ENV_FLAG, checked)
         binding = json.loads(files["topology_rebinding.json"])
         require(
             all(value["slots"] == binding["host_to_slots"][str(rank)] for rank, value in enumerate(facts)),

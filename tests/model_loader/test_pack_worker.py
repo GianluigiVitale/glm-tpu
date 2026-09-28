@@ -27,7 +27,7 @@ usage: pack_worker.py [-h] --output OUTPUT --source-inventory SOURCE_INVENTORY -
                       [--compare-seal | --install-seal]
                       [--seal-manifest-sha256 SEAL_MANIFEST_SHA256]
                       [--seal-success-sha256 SEAL_SUCCESS_SHA256]
-                      [--compare-tensors COMPARE_TENSORS]
+                      [--compare-tensors COMPARE_TENSORS] [--target-name TARGET_NAME]
 
 CPU-only GLM-5.3 owner packing on one host, started on every host by glm-tpu checkpoint pack.
 Default: pack this host's slots into a new checkpoint root. --compare-seal: re-derive chosen
@@ -53,6 +53,7 @@ options:
   --seal-manifest-sha256 SEAL_MANIFEST_SHA256
   --seal-success-sha256 SEAL_SUCCESS_SHA256
   --compare-tensors COMPARE_TENSORS
+  --target-name TARGET_NAME
 """
 
 
@@ -134,3 +135,14 @@ def _seal_mode_refusals():
         pack_worker.main([*base, "--install-seal", "--seal-manifest-sha256", "0" * 64])
     with pytest.raises(SystemExit):  # one mode at a time
         pack_worker.main([*base, "--compare-seal", "--install-seal", "--seal-manifest-sha256", "0" * 64])
+
+
+def test_a_target_name_is_only_for_a_preflight_only_run():
+    args = Namespace(target_name="greenfield_ws32_runtime_pack_" + "20000101T" + "0" * 15 + "Z", preflight_only=False)
+    with pytest.raises(ValueError, match="--target-name names the checkpoint a preflight-only run checks"):
+        pack_worker.check_target_name(args)
+    args.preflight_only = True
+    pack_worker.check_target_name(args)
+    args.target_name = "../elsewhere"
+    with pytest.raises(ValueError, match="--target-name"):
+        pack_worker.check_target_name(args)

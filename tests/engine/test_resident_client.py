@@ -155,3 +155,12 @@ def test_a_controller_that_is_not_the_recorded_one_is_unavailable(tmp_path: Path
         run = resident_run(tmp_path, os.getpid(), start_ticks(os.getpid()))  # pytest: not a resident command line
     with pytest.raises(ValueError, match="resident model is unavailable"):
         attach(monkeypatch, run)
+
+
+def test_a_controller_of_another_user_is_unavailable(tmp_path: Path, monkeypatch, controller):
+    run = resident_run(tmp_path, controller.pid, start_ticks(controller.pid))
+    backend = attach(monkeypatch, run)
+    real = resident_client._process
+    monkeypatch.setattr(resident_client, "_process", lambda pid: (*real(pid)[:3], os.geteuid() + 1))
+    with pytest.raises(ValueError, match="resident model is unavailable"):
+        backend.check()

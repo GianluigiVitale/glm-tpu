@@ -90,8 +90,21 @@ def authenticate(args):
     geometry = model.geometry(REPO)
     _, plans = build_runtime_file_plans(inventory, geometry, mesh_hash=binding["mesh_sha256"])
     slots = binding["host_to_slots"][str(rank)]
-    target = site.checkpoint.namespace / args.output.name
+    target = site.checkpoint.namespace / check_target_name(args)
     return inventory, geometry, binding, rank, slots, target, plans, site
+
+
+def check_target_name(args):
+    """The checkpoint root's name: the run directory's, or ``--target-name`` for a preflight-only run that checks the
+    root a pack would write (a pack run name)."""
+    if args.target_name is None:
+        return args.output.name
+    if (
+        not args.preflight_only
+        or re.fullmatch(r"greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z", args.target_name) is None
+    ):
+        raise ValueError("--target-name names the checkpoint a preflight-only run checks")
+    return args.target_name
 
 
 def preflight(args):
@@ -212,6 +225,7 @@ def main(argv=None):
     parser.add_argument("--seal-manifest-sha256")
     parser.add_argument("--seal-success-sha256")
     parser.add_argument("--compare-tensors", type=int, default=8)
+    parser.add_argument("--target-name")
     args = parser.parse_args(argv)
     os.umask(0o077)
     if args.compare_seal or args.install_seal:
@@ -251,6 +265,18 @@ def main(argv=None):
     return 0
 
 
+def run_seal_mode(args, inventory, geometry, binding, rank, slots, target, plans, site, facts):
+    """Compare or install after :func:`authenticate`; prints the host's report as JSON. The exit code is 0 once a
+    comparison has written its report, whatever it found (the job reads the report), and 0 after a verified install;
+    a refusal raises."""
+    if args.compare_seal:
+        report = compare_seal(args, inventory, geometry, rank, slots, plans, site)
+    else:
+        report = install_seal(args, inventory, geometry, binding, rank, slots, target, site)
+    print(json.dumps(dict(facts, **{k: v for k, v in report.items() if k != "tensors"}), sort_keys=True))
+    return 0
+
+
 def seal_mode(args):
     """--compare-seal or --install-seal (with --preflight-only: the checks, then this host's facts)."""
     if args.seal_manifest_sha256 is None or (args.install_seal and args.seal_success_sha256 is None):
@@ -269,12 +295,7 @@ def seal_mode(args):
         staged_seal(args, success=args.install_seal)
         print(json.dumps(facts, sort_keys=True))
         return 0
-    if args.compare_seal:
-        report = compare_seal(args, inventory, geometry, rank, slots, plans, site)
-    else:
-        report = install_seal(args, inventory, geometry, binding, rank, slots, target, site)
-    print(json.dumps(dict(facts, **{k: v for k, v in report.items() if k != "tensors"}), sort_keys=True))
-    return 0 if report.get("passed", True) else 1
+    return run_seal_mode(args, inventory, geometry, binding, rank, slots, target, plans, site, facts)
 
 
 if __name__ == "__main__":

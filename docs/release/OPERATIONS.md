@@ -91,7 +91,7 @@ python -m glm_tpu topology bind /path/to/runs/<capture run> --output /path/to/bi
 ```
 
 `topology capture` is a fleet job under the controller's rules (launch policy,
-both workload locks for the whole job and the sync locks until staging, idle
+both workload locks for the whole job and the sync locks until staging and the CPU preflight, idle
 hosts before and after, cleanup of only its own authenticated processes,
 collection that never overwrites). It stages the pinned commit and the resolved
 site, runs `python -m glm_tpu.distributed.topology_capture --preflight-only` on
@@ -183,7 +183,12 @@ diagnosis. Keep weights, private questions and raw answers out of Git.
 ## Weights and storage
 
 Weights are external and never in Git. The packed checkpoint lives in tmpfs on
-every host, which a host restart loses; mounted weights alone do not prove that a
-cold start will succeed. Keep private questions, answers and raw databases out of
+every host, which a host restart loses, and so does the end of the operator's
+last session on a host while systemd-logind's `RemoveIPC` is on: enable lingering
+for that account (`loginctl enable-linger`) on every host before packing
+([CHECKPOINTS](CHECKPOINTS.md#packing)). A lost checkpoint whose seal was kept is
+rebuilt with `checkpoint pack --recover-seal`, under a new `checkpoint.root` name
+with the same pins. Mounted weights alone do not prove
+that a cold start will succeed. Keep private questions, answers and raw databases out of
 Git and keep compact receipts instead. Do not make full-size safety copies of the
 weights.
