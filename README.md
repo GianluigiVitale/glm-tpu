@@ -232,7 +232,8 @@ JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --keep-loaded --wall-sec
 ```
 
 The default is **32,768 combined input/history/thinking/output slots**
-(`--context 8k|32k|128k|256k`). The runtime reserves the cache and compiles fixed
+(`--context 8k|32k|128k|256k`: 8,192, 32,768, 128K prompt / 163K total
+(166,912 slots) or 262,144). The runtime reserves the cache and compiles fixed
 shapes at startup; shorter questions do not have to fill that capacity. Omitting
 an output cap gives the answer every remaining slot. Thinking is enabled at
 maximum effort.

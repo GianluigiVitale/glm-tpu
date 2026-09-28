@@ -128,8 +128,9 @@ bank of per-conversation caches, then one decode program advances all of them;
 each conversation keeps its own delivery and stopping (`BatchedSession`). There
 is no online admission into a running group. [CONCURRENT](CONCURRENT.md).
 
-Capacities are fixed at load: 8,192, 32,768, 166,912 (a 128K prompt) or 262,144
-combined slots; generation is capped at 163,840 tokens.
+Capacities are fixed at load: 8,192, 32,768, 166,912 (the `128k` profile: 128K
+prompt / 163K total) or 262,144 combined slots; generation is capped at 163,840
+tokens.
 
 ## Numerical conventions
 

@@ -14,8 +14,9 @@ JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --keep-loaded --wall-sec
 ```
 
 The default is 32K combined prompt, history, thinking and output slots
-(`--context 32k`); the other capacities are `8k`, `128k` (a prompt of up to
-131,072 tokens in 166,912 slots) and `256k` (262,144 slots, offered but refused
+(`--context 32k`); the other capacities are `8k` (8,192 slots), `128k` (128K
+prompt / 163K total: a prompt of up to 131,072 tokens in 166,912 slots) and
+`256k` (262,144 slots, offered but refused
 by HBM admission on 32 TPU v4 chips when it was tried). The cache is allocated and
 the TPU programs are compiled for the chosen capacity at load, and every request
 of the session must use it. Thinking is on at maximum effort; omitting

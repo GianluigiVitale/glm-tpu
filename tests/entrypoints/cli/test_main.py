@@ -109,6 +109,8 @@ options:
   --questions QUESTIONS
                         private JSON array of one to ten question strings
   --context {8k,32k,128k,256k}
+                        the session's context slots: 8k = 8,192; 32k = 32,768 (default); 128k =
+                        128K prompt / 163K total (166,912 slots); 256k = 262,144
   --keep-loaded         retain the ordinary model and fleet leases after answering; explicit stop
                         required
   --concurrent          batch up to four conversations; requires --context 32k
@@ -281,7 +283,7 @@ INFO = """\
   "hardware": "8 hosts / 32 TPU v4 chips",
   "installation": "the wheel holds the Python package with its UI assets and model configuration files, no weights; deployment requires the source checkout, a site file and external assets",
   "model": "zai-org/GLM-5.3",
-  "ordinary_profile": "greedy; 8K combined, 32K combined (the ask default; per conversation when concurrent), 128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)",
+  "ordinary_profile": "greedy; 8K combined, 32K combined (the ask default; per conversation when concurrent), 128K prompt / 163K total (166,912 slots), or 256K combined (offered by ask --context 256k; refused by HBM admission on 32 TPU v4 chips)",
   "project": "glm-tpu",
   "quality": "full benchmark/model-card parity not established",
   "queued_questions": 10,

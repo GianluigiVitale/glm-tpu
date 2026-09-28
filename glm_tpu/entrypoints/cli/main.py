@@ -36,8 +36,8 @@ class InfoSubcommand(CLISubcommand):
                     hardware="8 hosts / 32 TPU v4 chips",
                     ordinary_profile=(
                         "greedy; 8K combined, 32K combined (the ask default; per conversation when concurrent), "
-                        "128K prompt / 166912 combined slots, or 256K combined (offered by ask --context 256k; refused "
-                        "by HBM admission on 32 TPU v4 chips)"
+                        "128K prompt / 163K total (166,912 slots), or 256K combined (offered by ask --context 256k; "
+                        "refused by HBM admission on 32 TPU v4 chips)"
                     ),
                     concurrent_requests=4,
                     model="zai-org/GLM-5.3",
@@ -91,7 +91,15 @@ class AskSubcommand(CLISubcommand):
         inputs = ask.add_mutually_exclusive_group(required=True)
         inputs.add_argument("question", nargs="?")
         inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
-        ask.add_argument("--context", choices=("8k", "32k", "128k", "256k"), default="32k")
+        ask.add_argument(
+            "--context",
+            choices=("8k", "32k", "128k", "256k"),
+            default="32k",
+            help=(
+                "the session's context slots: 8k = 8,192; 32k = 32,768 (default); 128k = 128K prompt / 163K total "
+                "(166,912 slots); 256k = 262,144"
+            ),
+        )
         ask.add_argument(
             "--keep-loaded",
             action="store_true",

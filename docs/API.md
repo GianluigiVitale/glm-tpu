@@ -89,8 +89,9 @@ Concurrent client requests queue rather than run together; up to ten may wait.
 There is no way to make this parallel without a different session.
 
 - **The window is the loaded session's capacity**, shared by system, tools,
-  history, thinking and answer. Ordinary profiles are 8,192 / 32,768 / 166,912 /
-  262,144 total slots, chosen with `--context 8k|32k|128k|256k` when the session
+  history, thinking and answer. Ordinary profiles are 8,192 / 32,768 / 166,912
+  (128K prompt / 163K total) / 262,144 total slots, chosen with
+  `--context 8k|32k|128k|256k` when the session
   starts and compiled in at load. `GET /v1/models` is served by whichever session
   is running; the server rejects a request that no longer leaves room to generate.
 - **Generation is capped at 163,840 tokens** regardless of capacity, so a 256K
