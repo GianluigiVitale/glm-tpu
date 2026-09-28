@@ -6,9 +6,9 @@ Weights are external to Git and to the wheel.
 
 The official FP8 `zai-org/GLM-5.3` checkpoint is pinned at revision
 `aca966e4e02791568aa6a4ced368624b3d897f42`: 141 shards, 755,632,050,320 bytes.
-Every upstream SHA-256 and every cloud generation was verified when it was
-acquired, and a completion marker, `SOURCE_COMPLETE.json`, binds the completed
-acquisition. The site file names where the source lives (`storage.source_uri`,
+A completion marker, `SOURCE_COMPLETE.json`, binds a verified copy: every shard
+and metadata file equal to the upstream repository in size and digest
+(`checkpoint mark-source`, [below](#mark-the-source)). The site file names where the source lives (`storage.source_uri`,
 under one of `storage.allowed_source_uri_prefixes`) and where the tokenizer
 files and the completion marker are on each host (`paths.model_path`). The
 chat template, `config.json` and `generation_config.json` ship in
@@ -77,6 +77,31 @@ topology binding; pass them with `--slots` and `--local-slot-layout`), and, when
 `--root` is given, that the directory lies inside `checkpoint.namespace`. Every
 pin comes from the site file; no flag overrides one, so verifying a copy sealed
 with other pins needs a site file with those pins.
+
+## Mark the source
+
+```bash
+python -m glm_tpu checkpoint mark-source /path/to/GLM-5.3-FP8
+python -m glm_tpu checkpoint mark-source /path/to/copy --output /path/to/new-marker.json --upstream-marker /path/to/GLM-5.3-FP8/SOURCE_COMPLETE.json
+```
+
+`checkpoint mark-source` hashes every safetensors shard that the index names and
+the metadata files the engine reads (`config.json`, `generation_config.json`,
+`model.safetensors.index.json`, `tokenizer.json`, `tokenizer_config.json`,
+`chat_template.jinja`), then compares each file's size and digest with the
+upstream listing: by default the Hugging Face repository `zai-org/GLM-5.3` at the
+pinned revision (the LFS SHA-256 of each shard, the git blob id of each small
+file; a network call, nothing is downloaded), or with `--upstream-marker` the
+digests of an earlier marker, to check another copy of the same source. Only
+when the index names exactly the upstream shards, there are 141 of them with
+755,632,050,320 bytes and every file agrees does it write the marker, a new
+owner-only file (default: `SOURCE_COMPLETE.json` in the source directory; an
+existing file is refused). The report on standard output holds the marker's
+SHA-256, the site's `checkpoint.source_complete_sha256`. The workers and the pack
+worker read the marker from `paths.model_path` on every host, so every host needs
+the same bytes there. Hashing the full source takes a while (`--workers`, default
+8, files in parallel); a refusal prints the differences as JSON on standard error
+and writes nothing.
 
 ## Packing
 

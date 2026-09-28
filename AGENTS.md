@@ -217,7 +217,7 @@ glm_tpu/entrypoints/         What a user runs or connects to
     ask.py                   ask: prepare one to ten questions under the run root, then run the controller in-process
     prepare.py               prepare-request: tokenize a private chat file (8k or 128k profile); launches nothing
     collect_env.py           collect-env (alias doctor): installed versions against the declared pins of a profile
-    checkpoint.py            checkpoint inventory and checkpoint verify on local files (no JAX, no other host, no lock)
+    checkpoint.py            checkpoint inventory, mark-source and verify on local files (no JAX, no lock)
   openai/                    The OpenAI-compatible /v1 surface over a resident session
     __init__.py              Package docstring
     serving_chat.py          OpenAIServingChat: stateless /v1/chat/completions, buffered or streamed
@@ -277,6 +277,7 @@ glm_tpu/runner/              Device-program preparation for one worker
 glm_tpu/model_loader/        The checkpoint pipeline
   __init__.py                Package docstring
   source_inventory.py        Payload-free, content-addressed inventory of a safetensors source (index and headers only)
+  source_marker.py           SOURCE_COMPLETE.json: written only when every shard and metadata file equals upstream
   placement.py               Which slice of every source tensor goes to which of the 32 device slots
   pack_worker.py             python -m glm_tpu.model_loader.pack_worker: one host's packing, started by an outside driver
   sharded_state/             The packed runtime checkpoint: one file per device slot
@@ -385,7 +386,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     cli/                     The command line
       __init__.py            Package docstring
       test_ask.py            Question preparation and dispatch boundaries, without a model call
-      test_checkpoint.py     checkpoint inventory and verify on the tiny checkpoint
+      test_checkpoint.py     checkpoint inventory, mark-source and verify on tiny sources and checkpoints
       test_collect_env.py    The environment report against the declared pins
       test_main.py           Help text, info output and every argument pinned; no command module loaded early
       test_prepare.py        prepare-request, without a tokenizer
@@ -473,6 +474,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     test_pack_worker.py      The pack worker's command line
     test_placement.py        Placement of every source tensor onto the 32 slots
     test_source_inventory.py  The inventory reconciles headers and index and refuses disagreement
+    test_source_marker.py    The completion marker: every file compared with upstream; the runtime reads what it writes
     sharded_state/           The packed checkpoint
       __init__.py            Package docstring
       test_format.py         Pack, verify and load of the 32 owner files; a failure never commits a manifest

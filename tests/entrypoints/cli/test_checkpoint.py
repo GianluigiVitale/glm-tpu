@@ -1,11 +1,13 @@
 """Tests of :mod:`glm_tpu.entrypoints.cli.checkpoint`: ``glm-tpu checkpoint inventory`` and ``checkpoint verify`` on the
 G4 tiny checkpoint (the one-tensor source and one-layer geometry of the checkpoint unit tests, which the G4 gate packs
-too), CPU only. Each command prints what the checkpoint library returns and refuses exactly as the library does: the
-exception's type and message as JSON on standard error, nothing on standard output, exit 1."""
+too), and ``checkpoint mark-source`` on a two-shard source, CPU only. Each command prints what the checkpoint library
+returns and refuses exactly as the library does: the exception's type and message as JSON on standard error, nothing
+on standard output, exit 1."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -381,3 +383,68 @@ print(json.dumps([name for name in {(*UNLOADED, "numpy")!r} if name in sys.modul
     assert inspect_source_inventory(output) == read_source_inventory(
         source, model_id=MODEL_ID, source_revision=REVISION
     )
+
+
+# ------------------------------------------------------------------------------------------- checkpoint mark-source
+@pytest.fixture
+def small_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A two-shard source with every metadata file (tests.model_loader.test_source_marker); the command's shard count
+    and bytes are the small source's (mark_source's keyword defaults: the pinned GLM-5.3 ones)."""
+    from glm_tpu.model_loader import source_marker
+    from tests.model_loader.test_source_marker import shard_bytes, write_source
+
+    root = write_source(tmp_path / "source")
+    monkeypatch.setitem(source_marker.mark_source.__kwdefaults__, "expected_shards", 2)
+    monkeypatch.setitem(source_marker.mark_source.__kwdefaults__, "expected_bytes", shard_bytes(root))
+    return root
+
+
+def test_mark_source_against_the_hub_writes_the_marker_into_the_source(
+    small_source: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    from glm_tpu.model_loader import source_marker
+    from tests.model_loader.test_source_marker import listing
+
+    asked = []
+    monkeypatch.setattr(source_marker, "hub_listing", lambda: asked.append(True) or listing(small_source))
+    code, out, err = run(capsys, ["checkpoint", "mark-source", str(small_source), "--workers", "2"])
+    assert (code, err, asked) == (0, "", [True])
+    report = json.loads(out)
+    marker = small_source / "SOURCE_COMPLETE.json"
+    assert report["output"] == str(marker) and report["upstream"] == "huggingface" and report["passed"] is True
+    assert report["marker_sha256"] == sha256(marker.read_bytes()).hexdigest()
+
+
+def test_mark_source_against_an_earlier_marker(small_source: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    from glm_tpu.model_loader import source_marker
+    from tests.model_loader.test_source_marker import listing
+
+    first = tmp_path / "first.json"
+    source_marker.mark_source(small_source, first, upstream=listing(small_source), upstream_kind="huggingface")
+    output = tmp_path / "second.json"
+    argv = ["checkpoint", "mark-source", str(small_source), "--output", str(output), "--upstream-marker", str(first)]
+    code, out, err = run(capsys, argv)
+    assert (code, err) == (0, "")
+    assert json.loads(out)["upstream"] == "marker"
+    assert json.loads(output.read_text())["shards"] == json.loads(first.read_text())["shards"]
+
+
+def test_mark_source_refuses_exactly_as_the_library(
+    small_source: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    from glm_tpu.model_loader import source_marker
+    from tests.model_loader.test_source_marker import SHARDS, listing
+
+    first = tmp_path / "first.json"
+    source_marker.mark_source(small_source, first, upstream=listing(small_source), upstream_kind="huggingface")
+    data = bytearray((small_source / SHARDS[0]).read_bytes())
+    data[-1] ^= 1
+    (small_source / SHARDS[0]).write_bytes(bytes(data))
+    output = tmp_path / "second.json"
+    with pytest.raises(ValueError) as raised:
+        source_marker.mark_source(
+            small_source, output, upstream=source_marker.marker_listing(first), upstream_kind="marker"
+        )
+    argv = ["checkpoint", "mark-source", str(small_source), "--output", str(output), "--upstream-marker", str(first)]
+    refused(capsys, argv, raised.value)
+    assert not output.exists()

@@ -82,7 +82,8 @@ positional arguments:
     collect-env (doctor)
                         check installed version metadata without initializing TPU
     prepare-request     tokenize a private chat locally; does NOT launch inference
-    checkpoint          inventory a checkpoint source or verify a sealed checkpoint on local files
+    checkpoint          inventory or mark a checkpoint source, or verify a sealed checkpoint, on
+                        local files
 
 options:
   -h, --help            show this help message and exit
@@ -142,15 +143,17 @@ options:
   --max-new-tokens MAX_NEW_TOKENS
 """,
     "checkpoint": """\
-usage: glm-tpu checkpoint [-h] {inventory,verify} ...
+usage: glm-tpu checkpoint [-h] {inventory,mark-source,verify} ...
 
 positional arguments:
-  {inventory,verify}
-    inventory         write the inventory of a local safetensors source (no payload is read)
-    verify            verify a local sealed runtime checkpoint against the site file's pins
+  {inventory,mark-source,verify}
+    inventory           write the inventory of a local safetensors source (no payload is read)
+    mark-source         hash a local GLM-5.3 source, compare it with upstream and write
+                        SOURCE_COMPLETE.json
+    verify              verify a local sealed runtime checkpoint against the site file's pins
 
 options:
-  -h, --help          show this help message and exit
+  -h, --help            show this help message and exit
 """,
     "checkpoint inventory": """\
 usage: glm-tpu checkpoint inventory [-h] --output OUTPUT --model-id MODEL_ID --revision REVISION
@@ -164,6 +167,23 @@ options:
   --output OUTPUT      the new inventory file (never overwritten)
   --model-id MODEL_ID  the model id to record, e.g. zai-org/GLM-5.3
   --revision REVISION  the source revision to record
+""",
+    "checkpoint mark-source": """\
+usage: glm-tpu checkpoint mark-source [-h] [--output OUTPUT] [--upstream-marker UPSTREAM_MARKER]
+                                      [--workers WORKERS]
+                                      source
+
+positional arguments:
+  source                directory of the downloaded GLM-5.3 source (shards and metadata)
+
+options:
+  -h, --help            show this help message and exit
+  --output OUTPUT       the new marker file (default: SOURCE/SOURCE_COMPLETE.json; never
+                        overwritten)
+  --upstream-marker UPSTREAM_MARKER
+                        compare with the digests of this earlier marker instead of the Hugging
+                        Face repository
+  --workers WORKERS     files hashed in parallel, 1..64 (default: 8)
 """,
     "checkpoint verify": """\
 usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]
@@ -311,7 +331,7 @@ ARGUMENTS = {
     ],
     "checkpoint": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
-        "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'verify'] required",
+        "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'mark-source', 'verify'] required",
     ],
     "checkpoint inventory": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
@@ -319,6 +339,13 @@ ARGUMENTS = {
         "_StoreAction --output dest=output type='Path' required",
         "_StoreAction --model-id dest=model_id required",
         "_StoreAction --revision dest=revision required",
+    ],
+    "checkpoint mark-source": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction source dest=source type='Path' required",
+        "_StoreAction --output dest=output type='Path'",
+        "_StoreAction --upstream-marker dest=upstream_marker type='Path'",
+        "_StoreAction --workers dest=workers default=8 type='int'",
     ],
     "checkpoint verify": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
@@ -402,6 +429,7 @@ def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, 
         ["collect-env", "--help"],
         ["checkpoint", "--help"],
         ["checkpoint", "inventory", "--help"],
+        ["checkpoint", "mark-source", "--help"],
         ["checkpoint", "verify", "--help"],
     ],
     ids=" ".join,

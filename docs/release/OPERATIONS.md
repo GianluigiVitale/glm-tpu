@@ -9,7 +9,7 @@ site file ([INSTALLATION](INSTALLATION.md#the-site-file)).
 
 | Entry | Role |
 |---|---|
-| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`verify` on local files; `ask` prepares requests and runs the controller |
+| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`mark-source`/`verify` on local files; `ask` prepares requests and runs the controller |
 | `python -m glm_tpu.executor.multihost_executor` | the rank-0 controller: one request (or a resident session) on the fleet |
 | `python -m glm_tpu.worker.tpu_worker` | the per-host worker; the controller starts it on every host (it refuses to run without the controller's handshake) |
 | `python -m glm_tpu.model_loader.pack_worker` | the per-host checkpoint packer, started by a packing driver outside this repository ([CHECKPOINTS](CHECKPOINTS.md#packing)) |

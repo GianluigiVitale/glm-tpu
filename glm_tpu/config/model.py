@@ -26,6 +26,9 @@ from glm_tpu.utils.json_utils import fingerprint
 
 MODEL_ID = "zai-org/GLM-5.3"
 REVISION = "aca966e4e02791568aa6a4ced368624b3d897f42"
+# The pinned source: its safetensors shards and their bytes (what SOURCE_COMPLETE.json records as verified).
+SOURCE_SHARDS = 141
+SOURCE_BYTES = 755632050320
 # The source bucket URI and the tokenizer/model directory are site values
 # (storage.source_uri, paths.model_path in the site file; glm_tpu.config.site).
 # The pinned GLM-5.3 assets (config, generation config, tokenizer config, chat template) are
