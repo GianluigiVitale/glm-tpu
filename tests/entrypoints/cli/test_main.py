@@ -82,8 +82,8 @@ positional arguments:
     collect-env (doctor)
                         check installed version metadata without initializing TPU
     prepare-request     tokenize a private chat locally; does NOT launch inference
-    checkpoint          inventory or mark a checkpoint source, or verify a sealed checkpoint, on
-                        local files
+    checkpoint          inventory or mark a checkpoint source; pack, seal or verify the runtime
+                        checkpoint
     topology            capture the fleet's topology on the TPUs, or derive the topology binding
 
 options:
@@ -144,13 +144,15 @@ options:
   --max-new-tokens MAX_NEW_TOKENS
 """,
     "checkpoint": """\
-usage: glm-tpu checkpoint [-h] {inventory,mark-source,verify} ...
+usage: glm-tpu checkpoint [-h] {inventory,mark-source,pack,verify} ...
 
 positional arguments:
-  {inventory,mark-source,verify}
+  {inventory,mark-source,pack,verify}
     inventory           write the inventory of a local safetensors source (no payload is read)
     mark-source         hash a local GLM-5.3 source, compare it with upstream and write
                         SOURCE_COMPLETE.json
+    pack                pack, seal and install the runtime checkpoint on the eight hosts (a CPU
+                        fleet job)
     verify              verify a local sealed runtime checkpoint against the site file's pins
 
 options:
@@ -185,6 +187,25 @@ options:
                         compare with the digests of this earlier marker instead of the Hugging
                         Face repository
   --workers WORKERS     files hashed in parallel, 1..64 (default: 8)
+""",
+    "checkpoint pack": """\
+usage: glm-tpu checkpoint pack [-h] [--site SITE] [--repo REPO]
+                               [--preflight-only | --recover-seal DIR | --compare-seal DIR]
+                               [--tensors TENSORS] [--wall-seconds WALL_SECONDS]
+
+options:
+  -h, --help            show this help message and exit
+  --site SITE           site file (default: $GLM_TPU_SITE_CONFIG, else
+                        $GLM_TPU_CONFIG_ROOT/site.toml)
+  --repo REPO           git checkout to stage; must be this one (default: the site paths.repo)
+  --preflight-only      run the pack's checks on every host; pack nothing
+  --recover-seal DIR    pack, then install this kept seal (manifest.json, SUCCESS) only if every
+                        packed file equals it
+  --compare-seal DIR    dry run: compare tensors re-derived in memory with this seal's
+                        manifest.json; pack nothing
+  --tensors TENSORS     with --compare-seal: tensors per slot, 0 for all (default: 8)
+  --wall-seconds WALL_SECONDS
+                        deadline of the pack processes, 600..86400 (default: 18000)
 """,
     "checkpoint verify": """\
 usage: glm-tpu checkpoint verify [-h] [--site SITE] [--root ROOT] [--slots SLOT [SLOT ...]]
@@ -379,7 +400,8 @@ ARGUMENTS = {
     ],
     "checkpoint": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
-        "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'mark-source', 'verify'] required",
+        "_SubParsersAction action dest=action nargs='A...' choices=['inventory', 'mark-source', 'pack', 'verify'] "
+        "required",
     ],
     "topology": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
@@ -398,6 +420,17 @@ ARGUMENTS = {
         "_StoreAction --output dest=output type='Path'",
         "_StoreAction --upstream-marker dest=upstream_marker type='Path'",
         "_StoreAction --workers dest=workers default=8 type='int'",
+    ],
+    "checkpoint pack": [
+        "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
+        "_StoreAction --site dest=site type='Path'",
+        "_StoreAction --repo dest=repo type='Path'",
+        "_StoreTrueAction --preflight-only dest=preflight_only nargs=0 const=True default=False",
+        "_StoreAction --recover-seal dest=recover_seal type='Path' metavar='DIR'",
+        "_StoreAction --compare-seal dest=compare_seal type='Path' metavar='DIR'",
+        "_StoreAction --tensors dest=tensors default=8 type='int'",
+        "_StoreAction --wall-seconds dest=wall_seconds default=18000 type='int'",
+        "exclusive required=False: preflight_only recover_seal compare_seal",
     ],
     "checkpoint verify": [
         "_HelpAction -h/--help dest=help nargs=0 default='==SUPPRESS=='",
@@ -498,6 +531,7 @@ def test_doctor_prints_the_report_and_exits_by_its_verdict(monkeypatch, capsys, 
         ["checkpoint", "--help"],
         ["checkpoint", "inventory", "--help"],
         ["checkpoint", "mark-source", "--help"],
+        ["checkpoint", "pack", "--help"],
         ["checkpoint", "verify", "--help"],
         ["topology", "--help"],
         ["topology", "capture", "--help"],

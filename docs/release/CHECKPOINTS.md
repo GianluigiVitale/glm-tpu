@@ -105,27 +105,63 @@ and writes nothing.
 
 ## Packing
 
-Packing is a fleet workflow that this repository does not contain: a private
-driver stages the source code and the controller-resolved site configuration to
-every host and runs `python -m glm_tpu.model_loader.pack_worker` there. The pack
-worker verifies the staged source and the pins, then writes its host's owner
-files with `pack_runtime_slots` (`glm_tpu/model_loader/sharded_state/writer.py`)
-from the source inventory, the pinned geometry and the host-to-slot binding;
-`assemble_owner_manifest` (`glm_tpu/model_loader/sharded_state/manifest.py`)
-combines the eight hosts' hashed owner receipts into the manifest. The driver
-must follow the current contracts: the pack worker reads only the site
-configuration staged owner-only as `site.json` in its run directory
-(`SiteConfig.resolved_json()` of the site file) and requires `--site-sha256` with
-that file's SHA-256; the remote helpers are the files of
-`glm_tpu/executor/remote/`, sent with one JSON argument; cleanup
-(`glm_tpu.executor.multihost_executor.cleanup_owned`) takes the authenticated
-host list, the site's fleet, the run's helper snapshot and the pack worker module.
+`checkpoint pack` packs, seals and installs the checkpoint on the eight hosts, on
+their CPUs (no TPU is opened). It is a fleet job with the controller's rules
+([OPERATIONS](OPERATIONS.md#the-topology-binding)): the site's launch policy, both
+workload locks for the whole job and the sync locks until staging is done, idle
+hosts before and after, cleanup of only its own authenticated processes, and a
+collection that never overwrites. It stages the pinned commit, the resolved site
+(`site.json`, bound by `--site-sha256`) and the site's topology binding, then runs
+`python -m glm_tpu.model_loader.pack_worker` on every host; each host checks the
+staged source, the pins, the completion marker, the source inventory and the
+binding before it reads a byte of the source.
 
-A repack needs the site operator, both workload and sync locks, authenticated
-idle hosts and about 107 GB of free tmpfs per host. It is not a wheel-only
-bootstrap. Never repack an intact live checkpoint or invent a completion seal;
-reconstruct only when the files are genuinely absent (tmpfs is lost when a host
-restarts), and keep the source, its history and the recovery receipts.
+```bash
+python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --preflight-only
+python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml
+python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --recover-seal /path/to/kept-seal
+python -m glm_tpu checkpoint pack --site ~/.config/glm-tpu/site.toml --compare-seal /path/to/kept-seal --tensors 8
+```
+
+- **Pack** (no mode flag): every host writes its four slots into
+  `checkpoint.root` (a new directory; the run directory under `paths.run_root`
+  has the same name, `greenfield_ws32_runtime_pack_<UTC>`), hashing each file and
+  tensor it writes (`pack_runtime_slots`). The controller combines the eight
+  hashed receipts into the manifest (`assemble_owner_manifest`, with each source
+  shard's upstream SHA-256 from `SOURCE_COMPLETE.json`), writes the self-hashed
+  `SUCCESS` seal for it (with the SHA-256s of this run's preflight, terminal and
+  post-run idle records), stages both into the run's `seal/`, and every host
+  installs them into its root and verifies the root as a worker does before a
+  load. The report holds the new `manifest_sha256` and `success_sha256` for the
+  site's `[checkpoint]` table.
+- **Recover** (`--recover-seal DIR`, a directory holding a kept `manifest.json`
+  and `SUCCESS`): the same pack, then every file record of the eight receipts
+  must equal the kept manifest on every key, and only then is the kept seal
+  installed byte for byte. The site must already pin that seal. This rebuilds a
+  checkpoint that a host restart removed from tmpfs without inventing a new
+  seal.
+- **Compare** (`--compare-seal DIR`, a directory holding a `manifest.json`): a dry
+  run that packs nothing and writes nothing to tmpfs. Every host compares all 32
+  file plans (re-derived from the inventory and the geometry) with the manifest
+  and re-derives `--tensors` tensors of each of its slots (0 for all) in memory
+  from the source, as the packer places them, comparing their SHA-256s with the
+  manifest's. The choice covers the FP8 and BF16 weights, routed experts and each
+  sharded axis.
+- **Preflight** (`--preflight-only`): the pack's checks on every host (among them
+  a new target and enough tmpfs for the host's slots plus an 8 GiB reserve), then
+  each host's facts; nothing is packed.
+
+The packed files live in tmpfs, and systemd-logind removes a user's `/dev/shm`
+files when that user's last session on a host ends (`RemoveIPC`): before a pack,
+enable lingering for the operator account (`loginctl enable-linger`) or turn
+`RemoveIPC` off on every host. A pack needs the site operator, about 107 GB of
+free tmpfs per host and hours of CPU time on every host (the measured GLM-5.3 pack took 2 h 40 min through a
+read-only cloud-storage mount); `--wall-seconds` bounds it. Nothing is retried. A
+failed pack leaves its partial files and receipts for inspection; a new attempt
+needs a new `checkpoint.root` name, or the partial root removed on the affected
+hosts once its owner is proven. Never repack an intact live checkpoint or invent a
+completion seal; reconstruct only when the files are genuinely absent (tmpfs is
+lost when a host restarts), and keep the source, its history and the kept seal.
 
 ## Capacity
 

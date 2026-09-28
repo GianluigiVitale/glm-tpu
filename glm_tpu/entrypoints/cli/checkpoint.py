@@ -1,14 +1,16 @@
-"""``glm-tpu checkpoint``: inventory and mark a checkpoint source, verify a sealed runtime checkpoint, on local files.
+"""``glm-tpu checkpoint``: inventory and mark a checkpoint source; pack, seal and verify the runtime checkpoint.
 
 ``checkpoint inventory`` reads the index, the safetensors headers and the configuration of a local source checkpoint
 (never a tensor payload), writes the inventory to a new file and reads the file back. ``checkpoint mark-source``
 hashes every shard and metadata file of the local GLM-5.3 source, compares them with the upstream digests (the
 Hugging Face repository at the pinned revision, or an earlier marker) and writes the completion marker
 ``SOURCE_COMPLETE.json`` (``glm_tpu.model_loader.source_marker``). ``checkpoint verify`` checks a local sealed runtime
-checkpoint against the pins of the site file, as a worker does before it loads one. None of them contacts another
-host, takes a lock or imports JAX (``mark-source`` reads the upstream listing over the network unless it is given a
-marker). The commands add no check of their own but the read-back: they print what the checkpoint library returns and
-refuse as it refuses.
+checkpoint against the pins of the site file, as a worker does before it loads one. None of these three contacts
+another host, takes a lock or imports JAX (``mark-source`` reads the upstream listing over the network unless it is
+given a marker); they add no check of their own but the read-back: they print what the checkpoint library returns and
+refuse as it refuses. ``checkpoint pack`` is the fleet job of ``glm_tpu.executor.pack_job``: it packs every host's
+slots from the source, seals the manifest and installs it on every host (or recovers a kept seal, or compares a seal
+with tensors re-derived in memory as a dry run), under the site's launch policy and both workload locks.
 """
 
 from __future__ import annotations
@@ -131,9 +133,9 @@ def mark_source(source: Path, output: Path | None, *, upstream_marker: Path | No
 
 
 class CheckpointSubcommand(CLISubcommand):
-    """``glm-tpu checkpoint inventory|mark-source|verify``: the report as JSON, exit 0; a refusal (the library's
-    ``ValueError`` or ``OSError``, a site-file refusal included) prints its type and message as JSON on standard error
-    and exits 1."""
+    """``glm-tpu checkpoint inventory|mark-source|pack|verify``: the report as JSON, exit 0 (1 for a report that did
+    not pass: a dry run that found a difference); a refusal (the library's ``ValueError`` or ``OSError``, a site-file
+    refusal included) prints its type and message as JSON on standard error and exits 1."""
 
     name = "checkpoint"
 
@@ -145,6 +147,19 @@ class CheckpointSubcommand(CLISubcommand):
             elif args.action == "mark-source":
                 report = mark_source(
                     args.source, args.output, upstream_marker=args.upstream_marker, workers=args.workers
+                )
+            elif args.action == "pack":
+                from glm_tpu.config.site import SiteConfig
+                from glm_tpu.executor import pack_job
+
+                report = pack_job.pack_checkpoint(
+                    SiteConfig.load(args.site),
+                    seal=args.recover_seal,
+                    compare=args.compare_seal,
+                    tensors=args.tensors,
+                    preflight_only=args.preflight_only,
+                    repo=args.repo,
+                    wall_seconds=args.wall_seconds,
                 )
             else:
                 from glm_tpu.config.site import SiteConfig
@@ -160,11 +175,11 @@ class CheckpointSubcommand(CLISubcommand):
             print(json.dumps(refusal), file=sys.stderr)
             return 1
         print(json.dumps(report, indent=2, sort_keys=True))
-        return 0
+        return 0 if report.get("passed", True) else 1
 
     def subparser_init(self, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
         checkpoint = subparsers.add_parser(
-            "checkpoint", help="inventory or mark a checkpoint source, or verify a sealed checkpoint, on local files"
+            "checkpoint", help="inventory or mark a checkpoint source; pack, seal or verify the runtime checkpoint"
         )
         actions = checkpoint.add_subparsers(dest="action", required=True)
         inventory = actions.add_parser(
@@ -190,6 +205,40 @@ class CheckpointSubcommand(CLISubcommand):
             help="compare with the digests of this earlier marker instead of the Hugging Face repository",
         )
         mark.add_argument("--workers", type=int, default=8, help="files hashed in parallel, 1..64 (default: 8)")
+        pack = actions.add_parser(
+            "pack", help="pack, seal and install the runtime checkpoint on the eight hosts (a CPU fleet job)"
+        )
+        pack.add_argument(
+            "--site", type=Path, help="site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)"
+        )
+        pack.add_argument(
+            "--repo", type=Path, help="git checkout to stage; must be this one (default: the site paths.repo)"
+        )
+        mode = pack.add_mutually_exclusive_group()
+        mode.add_argument(
+            "--preflight-only", action="store_true", help="run the pack's checks on every host; pack nothing"
+        )
+        mode.add_argument(
+            "--recover-seal",
+            type=Path,
+            metavar="DIR",
+            help="pack, then install this kept seal (manifest.json, SUCCESS) only if every packed file equals it",
+        )
+        mode.add_argument(
+            "--compare-seal",
+            type=Path,
+            metavar="DIR",
+            help="dry run: compare tensors re-derived in memory with this seal's manifest.json; pack nothing",
+        )
+        pack.add_argument(
+            "--tensors", type=int, default=8, help="with --compare-seal: tensors per slot, 0 for all (default: 8)"
+        )
+        pack.add_argument(
+            "--wall-seconds",
+            type=int,
+            default=18000,
+            help="deadline of the pack processes, 600..86400 (default: 18000)",
+        )
         verify = actions.add_parser(
             "verify", help="verify a local sealed runtime checkpoint against the site file's pins"
         )

@@ -9,11 +9,11 @@ site file ([INSTALLATION](INSTALLATION.md#the-site-file)).
 
 | Entry | Role |
 |---|---|
-| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`mark-source`/`verify` on local files; `ask` prepares requests and runs the controller; `topology capture` runs the model-free topology capture on the fleet and `topology bind` derives the binding ([below](#the-topology-binding)) |
+| `python -m glm_tpu` (`glm-tpu`) | `info`, `collect-env` (`doctor`), `prepare-request`, `checkpoint inventory`/`mark-source`/`verify` on local files; `ask` prepares requests and runs the controller; `topology capture` runs the model-free topology capture on the fleet and `topology bind` derives the binding ([below](#the-topology-binding)); `checkpoint pack` packs, seals and installs the checkpoint on the fleet ([CHECKPOINTS](CHECKPOINTS.md#packing)) |
 | `python -m glm_tpu.executor.multihost_executor` | the rank-0 controller: one request (or a resident session) on the fleet |
 | `python -m glm_tpu.worker.tpu_worker` | the per-host worker; the controller starts it on every host (it refuses to run without the controller's handshake) |
 | `python -m glm_tpu.distributed.topology_capture` | the per-host topology capture; `topology capture` starts it on every host (it refuses to run without that job's handshake) |
-| `python -m glm_tpu.model_loader.pack_worker` | the per-host checkpoint packer, started by a packing driver outside this repository ([CHECKPOINTS](CHECKPOINTS.md#packing)) |
+| `python -m glm_tpu.model_loader.pack_worker` | the per-host checkpoint packer (and its seal comparison and installation); `checkpoint pack` starts it on every host (it refuses to run without that job's handshake) |
 | `python -m glm_tpu.entrypoints.serve.server` | the loopback chat UI and `/v1` API attached to a resident session ([UI](../UI.md), [API](../API.md)) |
 | `glm_tpu/executor/remote/*.py` | standard-library helper programs the controller sends to the hosts as `<interpreter> -c <text> <JSON>`, where the interpreter is the site's `fleet.helper_python` (`fleet.worker_python` for `stage_bundle.py`); never run by hand |
 | `python -m tools.equivalence` | the CPU graph-equivalence gates ([README](../../tools/equivalence/README.md)); never touches a TPU |

@@ -1,6 +1,7 @@
 """Tests of :mod:`glm_tpu.entrypoints.cli.checkpoint`: ``glm-tpu checkpoint inventory`` and ``checkpoint verify`` on the
 G4 tiny checkpoint (the one-tensor source and one-layer geometry of the checkpoint unit tests, which the G4 gate packs
-too), and ``checkpoint mark-source`` on a two-shard source, CPU only. Each command prints what the checkpoint library
+too), ``checkpoint mark-source`` on a two-shard source, and the arguments ``checkpoint pack`` hands to its fleet job
+(faked; the job itself: tests/executor/test_pack_job.py), CPU only. Each command prints what the checkpoint library
 returns and refuses exactly as the library does: the exception's type and message as JSON on standard error, nothing
 on standard output, exit 1."""
 
@@ -448,3 +449,64 @@ def test_mark_source_refuses_exactly_as_the_library(
     argv = ["checkpoint", "mark-source", str(small_source), "--output", str(output), "--upstream-marker", str(first)]
     refused(capsys, argv, raised.value)
     assert not output.exists()
+
+
+# ------------------------------------------------------------------------------------------------- checkpoint pack
+@pytest.mark.parametrize(
+    "argv,expected",
+    [
+        ([], dict(seal=None, compare=None, tensors=8, preflight_only=False, repo=None, wall_seconds=18000)),
+        (
+            ["--preflight-only"],
+            dict(seal=None, compare=None, tensors=8, preflight_only=True, repo=None, wall_seconds=18000),
+        ),
+        (
+            ["--recover-seal", "/kept"],
+            dict(seal=Path("/kept"), compare=None, tensors=8, preflight_only=False, repo=None, wall_seconds=18000),
+        ),
+        (
+            ["--compare-seal", "/kept", "--tensors", "0", "--wall-seconds", "3600"],
+            dict(seal=None, compare=Path("/kept"), tensors=0, preflight_only=False, repo=None, wall_seconds=3600),
+        ),
+    ],
+    ids=["pack", "preflight", "recover", "compare"],
+)
+def test_pack_hands_the_mode_to_the_pack_job(tmp_path: Path, capsys, monkeypatch, argv, expected):
+    from glm_tpu.executor import pack_job
+
+    site_file = write_example_site(tmp_path / "site.toml")
+    calls = []
+
+    def pack(site, **options):
+        calls.append((site.resolved_sha256(), options))
+        return dict(passed=True)
+
+    monkeypatch.setattr(pack_job, "pack_checkpoint", pack)
+    code, out, err = run(capsys, ["checkpoint", "pack", "--site", str(site_file), *argv])
+    assert (code, err, json.loads(out)) == (0, "", dict(passed=True))
+    assert calls == [(example_site(tmp_path).resolved_sha256(), expected)]
+
+
+def test_pack_exits_1_on_a_report_that_did_not_pass(tmp_path: Path, capsys, monkeypatch):
+    from glm_tpu.executor import pack_job
+
+    site_file = write_example_site(tmp_path / "site.toml")
+    monkeypatch.setattr(pack_job, "pack_checkpoint", lambda site, **options: dict(passed=False, problems=["x"]))
+    code, out, err = run(capsys, ["checkpoint", "pack", "--site", str(site_file), "--compare-seal", "/kept"])
+    assert (code, err, json.loads(out)) == (1, "", dict(passed=False, problems=["x"]))
+
+
+def test_pack_refusal_is_json_on_stderr(tmp_path: Path, capsys, monkeypatch):
+    from glm_tpu.executor import pack_job
+
+    site_file = write_example_site(tmp_path / "site.toml")
+
+    def pack(site, **options):
+        raise ValueError("the checkpoint root already exists on rank 0; never repack it")
+
+    monkeypatch.setattr(pack_job, "pack_checkpoint", pack)
+    refused(
+        capsys,
+        ["checkpoint", "pack", "--site", str(site_file)],
+        ValueError("the checkpoint root already exists on rank 0; never repack it"),
+    )

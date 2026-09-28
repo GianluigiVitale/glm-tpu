@@ -217,7 +217,7 @@ glm_tpu/entrypoints/         What a user runs or connects to
     ask.py                   ask: prepare one to ten questions under the run root, then run the controller in-process
     prepare.py               prepare-request: tokenize a private chat file (8k or 128k profile); launches nothing
     collect_env.py           collect-env (alias doctor): installed versions against the declared pins of a profile
-    checkpoint.py            checkpoint inventory, mark-source and verify on local files (no JAX, no lock)
+    checkpoint.py            checkpoint inventory, mark-source and verify on local files; checkpoint pack (a fleet job)
     topology.py              topology capture (the model-free capture job on the fleet) and topology bind
   openai/                    The OpenAI-compatible /v1 surface over a resident session
     __init__.py              Package docstring
@@ -249,6 +249,7 @@ glm_tpu/executor/            The rank-0 controller and its launch machinery; imp
   staging.py                 stage_bundle: git archive of the pinned commit, its source manifest, the request, the site
   jobs.py                    Model-free fleet jobs under the controller's rules: leases, idle, staging, preflight, start, cleanup
   topology_job.py            capture_topology (a fleet job) and bind_topology (the binding of a capture run)
+  pack_job.py                pack_checkpoint: pack, seal and install on every host; recover a kept seal; the dry runs
   fleet.py                   The exact SSH command strings; HelperTexts, the pinned snapshot of the helper texts
   remote/                    Standard-library helper programs sent as <interpreter> -c <text> <JSON>; never imported on a host
     __init__.py              The rules every helper follows (Python 3.10, one JSON argument, main(argv))
@@ -282,12 +283,13 @@ glm_tpu/model_loader/        The checkpoint pipeline
   source_inventory.py        Payload-free, content-addressed inventory of a safetensors source (index and headers only)
   source_marker.py           SOURCE_COMPLETE.json: written only when every shard and metadata file equals upstream
   placement.py               Which slice of every source tensor goes to which of the 32 device slots
-  pack_worker.py             python -m glm_tpu.model_loader.pack_worker: one host's packing, started by an outside driver
+  pack_worker.py             python -m glm_tpu.model_loader.pack_worker: one host's pack, seal compare or seal install
   sharded_state/             The packed runtime checkpoint: one file per device slot
     __init__.py              Package docstring
     format.py                The packed format: file and tensor plans, headers, digests, RuntimePackConfig
     writer.py                pack_runtime_slots and finalize_runtime_checkpoint: owner slot files, their records, the manifest
     manifest.py              assemble_owner_manifest: the manifest from the eight hosts' owner receipts
+    seal.py                  The SUCCESS record, receipts and plans against a seal, the payload canary, seal installation
     verify.py                verify_runtime_checkpoint: metadata, manifest and SUCCESS seals, file hashes
     loader.py                load_runtime_checkpoint: place verified owner files on the device mesh
 ```
@@ -394,7 +396,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     cli/                     The command line
       __init__.py            Package docstring
       test_ask.py            Question preparation and dispatch boundaries, without a model call
-      test_checkpoint.py     checkpoint inventory, mark-source and verify on tiny sources and checkpoints
+      test_checkpoint.py     checkpoint inventory, mark-source, verify and pack (faked job) on tiny inputs
       test_collect_env.py    The environment report against the declared pins
       test_main.py           Help text, info output and every argument pinned; no command module loaded early
       test_prepare.py        prepare-request, without a tokenizer
@@ -419,6 +421,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     test_multihost_executor.py  The controller's summary, lease order, resident stop and failure paths on a fake fleet
     test_remote_helpers.py   Helpers are self-contained standard-library programs, never templated
     test_remote_loopback.py  G8: runs the exact remote command strings on this host
+    test_pack_job.py         Pack, recover and the dry runs of checkpoint pack on the tiny checkpoint and a fake fleet
     test_topology_job.py     The capture job and the fleet-job machinery on a fake fleet; bind of its run
   fixtures/                  Shared synthetic fixtures (neutral example values only)
     __init__.py              Package docstring
@@ -483,7 +486,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
       test_router.py         noaux_tc selection, bias and tie rules
   model_loader/              Tests of glm_tpu/model_loader
     __init__.py              Package docstring
-    test_pack_worker.py      The pack worker's command line
+    test_pack_worker.py      The pack worker's command line and the checks of its seal modes
     test_placement.py        Placement of every source tensor onto the 32 slots
     test_source_inventory.py  The inventory reconciles headers and index and refuses disagreement
     test_source_marker.py    The completion marker: every file compared with upstream; the runtime reads what it writes
@@ -491,6 +494,7 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
       __init__.py            Package docstring
       test_format.py         Pack, verify and load of the 32 owner files; a failure never commits a manifest
       test_manifest.py       Manifest assembly from real tiny owner files
+      test_seal.py           SUCCESS admitted by verify, receipt and plan comparisons, the canary, one-time install
       test_verify.py         The names the verification helpers answer to
   models/                    Tests of glm_tpu/models
     __init__.py              Package docstring

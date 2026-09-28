@@ -45,7 +45,7 @@ def _verify_source_header(root: Path, record: SourceFile) -> None:
         raise CheckpointValidationError(f"source header identity drifted for {record.filename!r}")
 
 
-def _flat_contiguous_offset(
+def flat_contiguous_offset(
     shape: tuple[int, ...],
     starts: tuple[int, ...],
     stops: tuple[int, ...],
@@ -136,7 +136,7 @@ def _write_slot_files(
                     if len(raw) != placement.byte_count:
                         raise CheckpointValidationError(f"source slice size drifted for {source.name!r}")
                     tensor = tensor_by_slot_name[(placement.slot, placement.destination_name)]
-                    flat_start, element_count = _flat_contiguous_offset(
+                    flat_start, element_count = flat_contiguous_offset(
                         placement.destination_shape,
                         placement.destination_starts,
                         placement.destination_stops,
