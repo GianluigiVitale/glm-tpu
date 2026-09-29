@@ -191,4 +191,6 @@ rebuilt with `checkpoint pack --recover-seal`, under a new `checkpoint.root` nam
 with the same pins. Mounted weights alone do not prove
 that a cold start will succeed. Keep private questions, answers and raw databases out of
 Git and keep compact receipts instead. Do not make full-size safety copies of the
-weights.
+source weights. The one exception is the owner-approved backup of the packed runtime
+checkpoint in the project's bucket: after a host restart, restoring it into tmpfs
+and running `checkpoint verify` replaces a multi-hour repack.

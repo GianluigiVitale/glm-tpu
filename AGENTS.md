@@ -52,7 +52,9 @@ instructions to restart that work; the older version of this file is
   delete anything.
 - Storage: only the project's bucket in the fleet's region, as the operator's
   site file names it, within its existing storage bounds. No full-size safety
-  copies of the weights.
+  copies of the source weights; the one exception is the owner-approved backup of
+  the packed runtime checkpoint in that bucket, which a restore puts back into
+  tmpfs instead of a repack.
 - Keep out of Git: weights, credentials, private questions and answers, raw run
   directories, token logs, caches, databases, large generated artifacts, and
   private infrastructure literals (home directories, private addresses, host,
