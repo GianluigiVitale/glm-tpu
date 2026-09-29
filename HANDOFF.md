@@ -5,7 +5,7 @@ continues the work. The working rules are in [AGENTS](AGENTS.md), the goal and
 its acceptance criteria in [goal.md](goal.md), the measured results in the
 [release status](docs/release/STATUS.md).
 
-## Current state (2026-09-28)
+## Current state (2026-09-29)
 
 - **Branch.** `release/public-structure-20260922` holds the finished release;
   stage S9 (`62e4e615`) rewrote these governance files, and one later unit
@@ -16,9 +16,16 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
   `checkpoint pack` (WU-C4..WU-C6, with a G6 re-baseline), the chat UI and `/v1`
   attaching to a session that `glm-tpu ask --keep-loaded` started (H18), one
   wording for the 166,912-slot profile (H19) and the quickstart in which every
-  step is a command of this repository. It is not
-  merged: `main` still holds the pre-refactor GLM-5.3 release (tag
-  `pre-refactor-main-20260922`). Merging is the owner's decision after review.
+  step is a command of this repository (`6fa21301`).
+- **Release.** On 2026-09-29 `main` was fast-forwarded to `6fa21301`, and the
+  annotated tag `v1.0.0` marks that commit; `main` equals the release branch.
+  The pre-refactor GLM-5.3 release keeps the tag `pre-refactor-main-20260922`.
+  The documentation update that followed the tag was pushed to both branches.
+- **Publication.** The owner decided to make the repository public. A
+  full-history secret scan on 2026-09-29 found no credential
+  ([SECURITY](SECURITY.md#history-scan)); the infrastructure names that earlier
+  commits keep (bucket, node, zone and host names, internal addresses, home
+  paths) grant no access, and the owner accepts them in the history.
 - **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), the
   device programs, the request path, the controller and the worker are
   unchanged. Changed under `glm_tpu/`: the chat UI's context display (H17: the
@@ -40,9 +47,11 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
 - **Fleet** (as left on 2026-09-28 after the fleet checks of the public
   commands). The eight hosts were idle and no workload lock was held. The
   verified packed checkpoint made for the TPU comparison (32 owner files,
-  `checkpoint verify` passed) is still in tmpfs on every host; a host restart
-  loses it. The operator's site file and its site-check baseline are on rank 0,
-  outside Git; the site still pins the binding of 2026-09-27.
+  `checkpoint verify` passed) is still in tmpfs on every host. A host restart
+  loses the tmpfs copy, but the operator keeps a backup of the packed checkpoint
+  in the project's bucket, with a restore procedure kept privately. The
+  operator's site file and its site-check baseline are on rank 0, outside Git;
+  the site still pins the binding of 2026-09-27.
 - **Fleet checks of the public commands** (2026-09-28, the pushed code commits):
   `topology capture` on the eight hosts (a model-free TPU job, 39 s) recorded
   the pinned topology and mesh and the same host-to-slot and host-to-JAX-process
@@ -86,7 +95,8 @@ the harness was finished, every change of a record is a separate commit titled
 | S8 | the TPU run comparison: harness preparation, then the results | `ab4c6582`, `60b68b4a` |
 | S9 | these governance files, the data-contract scan of them and of the release receipts | `62e4e615` |
 | H17 | after the release: the chat UI shows the resident session's context capacity instead of a fixed 32K | the H17 code commit and `[Equivalence] Re-baseline G9 for H17` |
-| Public path | the operator workflow as commands (`checkpoint mark-source`, `topology capture`/`bind`, `checkpoint pack`), the UI attaching to `ask` sessions (H18), the 166,912-slot wording (H19) | the WU-C4, WU-C5, WU-C6, H18 and H19 commits, `[Equivalence] Re-baseline G6 for WU-C` |
+| Public path | the operator workflow as commands (`checkpoint mark-source`, `topology capture`/`bind`, `checkpoint pack`), the UI attaching to `ask` sessions (H18), the 166,912-slot wording (H19) | the WU-C4, WU-C5, WU-C6, H18 and H19 commits, `[Equivalence] Re-baseline G6 for WU-C`, `6fa21301` |
+| Release | `main` fast-forwarded to the release branch; the annotated tag `v1.0.0` | `6fa21301` |
 
 ## Evidence
 
@@ -205,12 +215,10 @@ None of these blocks the release. Each is its own unit with its own gates.
   documentation sentences are stale in detail (a top-k merge docstring, the
   prefill-semantics test docstring, a side-by-side sentence in TESTING, the API
   page's offline test list).
-- **Publication (owner).** The history keeps private infrastructure literals in
-  old trees and commit messages; a whole-tree private-literal scan should exist
-  before any publication. The data-contract scan of the governance files and the
-  release receipts catches home paths, private addresses, run and pack names,
-  bucket URIs and zones, but not node, host or account names, and it accepts any
-  value under a receipt's `run` or `run_id` key.
+- **Private-literal scan.** The data-contract scan of the governance files and
+  the release receipts catches home paths, private addresses, run and pack
+  names, bucket URIs and zones, but not node, host or account names, and it
+  accepts any value under a receipt's `run` or `run_id` key.
 
 ## Limitations
 

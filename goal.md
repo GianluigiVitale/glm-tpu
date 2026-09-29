@@ -9,8 +9,9 @@ authorization it carried, is preserved as
 The public-structure release that followed had one goal: **turn the released
 engine into a package that a reader can navigate, test and extend, without
 changing what runs on the TPU.** It started from the research tree at
-`181c013e` (tag `archive/research-20260922`) and was finished on 2026-09-27 on
-the branch `release/public-structure-20260922`.
+`181c013e` (tag `archive/research-20260922`), was finished on 2026-09-27 on
+the branch `release/public-structure-20260922` and was released on `main` as
+`v1.0.0` on 2026-09-29.
 
 ## Acceptance
 
@@ -55,12 +56,15 @@ and the [release status](docs/release/STATUS.md).
    the tests that check them describe the tree as it is; the project's own work is
    under the Apache License 2.0.
 
+## Release
+
+`main` was fast-forwarded to the release branch at `6fa21301`, which the
+annotated tag `v1.0.0` marks; the pre-refactor release keeps the tag
+`pre-refactor-main-20260922`. The owner decided to make the repository public
+after a full-history secret scan ([SECURITY](SECURITY.md#history-scan)).
+
 ## Left to the owner
 
-- Review the release and merge `release/public-structure-20260922` into `main`,
-  which still holds the pre-refactor release (tag `pre-refactor-main-20260922`).
-- Decide on any publication. The history keeps private infrastructure
-  literals; publishing is not a step of this goal.
 - Schedule the [post-release backlog](HANDOFF.md#post-release-backlog).
 
 ## Direction for later work

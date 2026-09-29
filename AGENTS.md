@@ -17,15 +17,15 @@ instructions to restart that work; the older version of this file is
 
 - The owner is the integrator and the only one who approves a re-baseline of the
   equivalence records, a deviation from these rules, a run on the TPU fleet, a
-  merge into `main`, a publication and any change of repository visibility or
-  upstream.
+  merge into `main` and any change of repository visibility or upstream.
 - An approval given in advance for a class of work covers that work's
   re-baselines, hardware runs and decisions; record every decision taken under it
   where the owner will review it. It never covers a merge into `main`, a
-  publication, a change of visibility or upstream, or a deviation from a hard rule:
-  each needs the owner's explicit approval for that instance.
-- Merge into `main` only after the release checks and the review have passed and
-  a backup of the work has been verified.
+  change of visibility or upstream, or a deviation from a hard rule: each needs
+  the owner's explicit approval for that instance.
+- `main` holds the release (tag `v1.0.0`). Merge a later change into it only
+  after the release checks and the review have passed and a backup of the work
+  has been verified, and only as a fast-forward.
 - Work in units, one at a time: write down the scope, expected record changes and
   risks first; implement; run every gate the change requires (below) on the tree
   you commit; commit locally; have a separate verifier pass review the commit and
@@ -61,9 +61,10 @@ instructions to restart that work; the older version of this file is
   recorded). Cite compact receipts, pins and digests instead. Never print a
   suspected secret.
 - **No force-push**, no history rewriting, no change of visibility or upstream;
-  push only this private repository, fast-forward. Preserve other people's
-  changes, every tag (among them `glm-5.2`, `glm-5.3`, `archive/research-20260922`,
-  `pre-refactor-main-20260922` and `freeze-correct-128k-20260712`), the research
+  push only to this repository, fast-forward. Preserve other people's
+  changes, every tag (among them `v1.0.0`, `glm-5.2`, `glm-5.3`,
+  `archive/research-20260922`, `pre-refactor-main-20260922` and
+  `freeze-correct-128k-20260712`), the research
   branches, the receipts and the original evidence.
 - Before removing a file, establish what depends on it and that a preserved
   commit (a tag or a research branch) keeps it; static import reachability alone

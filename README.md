@@ -327,12 +327,14 @@ stopping point limit the interpretation of the partial score.
 | [Reviewer guide](docs/release/REVIEWER_GUIDE.md) | a reading order and the source package |
 | [Release status](docs/release/STATUS.md) · [Migration history](docs/release/GLM53_MIGRATION.md) | the measured GLM-5.3 release, the TPU comparison of this tree, and how the release was reached |
 | [Handoff](HANDOFF.md) · [Goal](goal.md) · [Agent instructions](AGENTS.md) | the current state, the goal and the working rules |
-| [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | the development policy and the release checks |
+| [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | the development policy, the release checks and vulnerability reporting |
 
 ## History
 
-The GLM-5.2 implementation and measurements are preserved at the tag `glm-5.2`;
-its weight payloads were retired. The research tree this release was cut from
+This release is tagged `v1.0.0`; the GLM-5.3 release before the restructure is
+preserved at the tag `pre-refactor-main-20260922`. The GLM-5.2 implementation
+and measurements are preserved at the tag `glm-5.2`; its weight payloads were
+retired. The research tree this release was cut from
 (research history, the curation ledger, the legacy sampled and long-context
 interfaces, benchmarks and their evidence) is preserved at the tag
 `archive/research-20260922`; for example
@@ -345,5 +347,6 @@ Copyright 2026 Gianluigi Vitale. The project's own work is licensed under the
 GLM-5.3 configuration files under `glm_tpu/models/glm_moe_dsa/hf_config/` are
 under Z.AI's GLM-5.3 license ([notices](THIRD_PARTY_NOTICES.md)).
 
-Maintained by **Gianluigi Vitale**. The repository is private. Review is
-assistant self-review, not independent review.
+Maintained by **Gianluigi Vitale**. Review is assistant self-review, not
+independent review. Report security problems privately, as
+[SECURITY](SECURITY.md#reporting-a-vulnerability) describes.

@@ -1,10 +1,19 @@
 # Security and private data
 
-This repository is private. There is no supported public HTTP endpoint: the chat
-UI and the `/v1` API listen on loopback only and are reached through a private
-tunnel ([UI](docs/UI.md), [API](docs/API.md)). Operation assumes a trusted
-operator on the existing authenticated TPU hosts; the engine is not a hardened
-multi-tenant service or a sandbox for untrusted Python code.
+The source is public; a deployment is not. There is no supported public HTTP
+endpoint: the chat UI and the `/v1` API listen on loopback only and are reached
+through a private tunnel ([UI](docs/UI.md), [API](docs/API.md)). Operation
+assumes a trusted operator on the existing authenticated TPU hosts; the engine is
+not a hardened multi-tenant service or a sandbox for untrusted Python code.
+
+## Reporting a vulnerability
+
+Report a vulnerability, or a credential you find in the repository or its
+history, privately: through GitHub's private vulnerability reporting (the
+repository's **Security** tab, **Report a vulnerability**) or by contacting the
+maintainer, Gianluigi Vitale, directly. Do not open a public issue for it and do
+not reproduce a credential's value. Problems that are not security-sensitive go
+to ordinary public issues.
 
 ## Keep outside Git
 
@@ -17,8 +26,8 @@ permission to commit sensitive files under other names.
 
 Keep credentials in the existing operator-managed authentication environment. Do
 not paste tokens into issues, commit messages, command arguments or logs. If a
-real credential is found, notify the owner privately without reproducing its
-value. Removing a current file does not remove it from history; rotation and any
+real credential is found, report it as [above](#reporting-a-vulnerability),
+without reproducing its value. Removing a current file does not remove it from history; rotation and any
 history rewrite need explicit coordination and are never an automatic cleanup
 step.
 
@@ -84,8 +93,26 @@ single historical passkey assessment. All belong to the explicitly labelled
 synthetic passkey task, not to GPQA or AIME questions; that compact scientific
 receipt is preserved at the tag.
 
-Before any public release, revisit the Git history (it still holds private
-infrastructure literals of earlier commits), third-party provenance, operator and
-site-specific information in the release records, and benchmark data
-permissions. Keeping this repository private does not make credentials safe to
-store in it. Do not change its visibility as part of release engineering.
+## History scan
+
+Before the repository was made public, the whole Git history was scanned on
+2026-09-29: all 35 branches, 5 tags and 2,177 commits.
+
+- gitleaks 8.28.0 reported 293 findings, all false positives: SHA-256 digests
+  labelled as a token or key, and prose such as "92 tokens".
+- A pattern scan of all 13,100 blob versions and of every commit message for
+  private keys, SSH keys, Hugging Face, GitHub, Google, OAuth, AWS, Anthropic,
+  OpenAI and Slack tokens, `Bearer` headers and hard-coded passwords found none.
+  The only `"private_key":` matches are detection patterns in the repository's
+  own audit tools (`tools/audit_release_content.py` and
+  `tools/release_inventory.py`, both kept in the history).
+- No credential-like file name (`id_rsa`, `.pem`, `.key`, `.env`,
+  `credentials`, service-account JSON, `.netrc`, API-key or Hugging Face token
+  files) was ever committed.
+
+Earlier commits keep infrastructure names (bucket, node, zone and host names,
+internal addresses, home paths). They grant no access, and the owner accepts
+them in the history; new commits keep them out (see [above](#keep-outside-git)).
+Like the earlier audit, the scan is heuristic, not complete security clearance,
+and it looked for credentials only: it is no review of third-party provenance
+([notices](THIRD_PARTY_NOTICES.md)) or of benchmark data permissions.

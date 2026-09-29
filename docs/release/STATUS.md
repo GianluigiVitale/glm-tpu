@@ -9,7 +9,8 @@ proved it on the CPU and on the fleet. The state of the work is in the
 
 ## The current tree
 
-The branch `release/public-structure-20260922` restructures the released engine
+The public-structure release, tag `v1.0.0` on `main` (developed on the branch
+`release/public-structure-20260922`), restructures the released engine
 (the research tree at `181c013e`, preserved at the tag
 `archive/research-20260922`) into the layout of the
 [README](../../README.md#repository-layout): one package with public module,
@@ -18,8 +19,8 @@ every deployment value ([template](../../examples/site.example.toml)); a launch
 policy that admits only a clean checkout of a pushed commit on an allowed
 branch; a command line split into subcommands, with `checkpoint inventory`,
 `checkpoint verify` and `collect-env`; rewritten documentation; the Apache
-License 2.0. The pre-refactor release is on `main` (tag
-`pre-refactor-main-20260922`); merging the branch is the owner's decision.
+License 2.0. The pre-refactor release is kept at the tag
+`pre-refactor-main-20260922`.
 
 The restructuring was checked on the CPU, commit by commit, against records of
 `181c013e` ([equivalence harness](../../tools/equivalence/README.md)): the TPU
@@ -202,6 +203,7 @@ durable restart recovery.
 
 The equivalence proof lowers the TPU programs on the CPU but does not run XLA's
 TPU compilation, so a compiler or libtpu change is caught only by a TPU
-comparison; the site check reads rank 0's assets only. The history keeps private
-infrastructure literals; any publication is the owner's decision.
+comparison; the site check reads rank 0's assets only. The Git history keeps
+infrastructure names of earlier commits; a full-history scan found no
+credential in it ([SECURITY](../../SECURITY.md#history-scan)).
 [History](GLM53_MIGRATION.md) preserves earlier results and failures.

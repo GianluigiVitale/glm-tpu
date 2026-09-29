@@ -1,8 +1,10 @@
 # Contributing
 
-This repository is private. `main` carries the supported release; work happens on
-branches and reaches `main` only after review. The layout is described in the
-[README](README.md#repository-layout) and in [ARCHITECTURE](docs/release/ARCHITECTURE.md).
+`main` carries the supported release (tag `v1.0.0`); work happens on branches and
+reaches `main` only after review. Report security problems privately, as
+[SECURITY](SECURITY.md#reporting-a-vulnerability) describes. The layout is
+described in the [README](README.md#repository-layout) and in
+[ARCHITECTURE](docs/release/ARCHITECTURE.md).
 
 ## Changes
 
@@ -17,8 +19,8 @@ branches and reaches `main` only after review. The layout is described in the
   ([notices](THIRD_PARTY_NOTICES.md)).
 - Review the actual diff, tests, dependencies, claims, failures and retention
   before merge; self-review is not independent review.
-- Never change a check to relabel a historical failure as a pass. Do not publish
-  the repository or rewrite history during cleanup.
+- Never change a check to relabel a historical failure as a pass. Do not rewrite
+  history or change the repository's visibility during cleanup.
 - Cosmetic cleanup needs no new TPU run; an execution change needs its own
   hardware validation, recorded like the release receipts.
 
