@@ -19,7 +19,7 @@ checked against pinned digests, before a request is prepared. The `LICENSE` in
 
 ## The packed runtime checkpoint
 
-The runtime reads a packed checkpoint: 32 owner files, one per device slot, in
+The runtime reads a packed checkpoint: 32 slot files, one per device slot, in
 their final expert-8 x feature-4 layout, each behind a fixed header. Every host
 holds only its own four slots, in a tmpfs directory (`checkpoint.root`, inside
 `checkpoint.namespace`). A `manifest.json` records every file and tensor and is
@@ -27,7 +27,7 @@ published only after every source, destination file and tensor checksum was
 verified; a separately published, self-hashed `SUCCESS` seal completes the
 checkpoint. The measured GLM-5.3 pack has 32 files, 786,181,673,984 bytes,
 about 98.27 GB of host RAM per host. The ordinary path binds the dense layers
-directly from these owner files and builds its resident BF16 tensors from them;
+directly from these slot files and builds its resident BF16 tensors from them;
 no separate dense overlay is needed.
 
 The site file's `[checkpoint]` table pins the checkpoint the runtime may load:
@@ -95,7 +95,7 @@ file; a network call, nothing is downloaded), or with `--upstream-marker` the
 digests of an earlier marker, to check another copy of the same source. Only
 when the index names exactly the upstream shards, there are 141 of them with
 755,632,050,320 bytes and every file agrees does it write the marker, a new
-owner-only file (default: `SOURCE_COMPLETE.json` in the source directory; an
+file readable only by you (mode 600) (default: `SOURCE_COMPLETE.json` in the source directory; an
 existing file is refused). The report on standard output holds the marker's
 SHA-256, the site's `checkpoint.source_complete_sha256`. The workers and the pack
 worker read the marker from `paths.model_path` on every host, so every host needs
@@ -164,7 +164,7 @@ free tmpfs per host and hours of CPU time on every host (the measured GLM-5.3 pa
 read-only cloud-storage mount); `--wall-seconds` bounds it. Nothing is retried. A
 failed pack leaves its partial files and receipts for inspection; a new attempt
 needs a new `checkpoint.root` name, or the partial root removed on the affected
-hosts once its owner is proven. Never repack an intact live checkpoint or invent a
+hosts once it is proven to belong to the failed pack. Never repack an intact live checkpoint or invent a
 completion seal; reconstruct only when the files are genuinely absent (tmpfs is
 lost when a host restarts), and keep the source, its history and the kept seal.
 

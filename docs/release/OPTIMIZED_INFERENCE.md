@@ -50,7 +50,7 @@ ln /path/to/prepared/request.json /path/to/run-directory/inbox/0001.json
 Use the next unused sequence number (`0002.json`, and so on), one producer at a
 time. After a round completes, `resident-ready.json` names its sequence. Never
 overwrite, delete or replace an admitted input. The prepared file must be
-owner-only and on the same filesystem for the hard link. The controller checks
+readable only by you (mode 600) and on the same filesystem for the hard link. The controller checks
 the input's integrity and capacity and sends the identical request to all eight
 workers.
 
@@ -78,8 +78,9 @@ is no process-restart or durable KV recovery. An invalid input or a worker or
 controller failure ends the session through authenticated cleanup; validate
 prepared inputs before publishing them.
 
-To unload the model after outstanding work finishes, atomically place an
-owner-only file containing `{"stop":true}` at `inbox/stop.json`. The controller
+To unload the model after outstanding work finishes, atomically place a
+file readable only by you (mode 600) containing `{"stop":true}` at
+`inbox/stop.json`. The controller
 then verifies cleanup on all eight hosts and releases its workload locks. This
 stops the model, not just the queue. There is no in-flight cancellation that
 keeps the model loaded.

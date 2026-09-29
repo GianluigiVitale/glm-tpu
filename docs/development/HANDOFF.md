@@ -1,9 +1,9 @@
 # Handoff
 
 The state of the repository after the public-structure release, for whoever
-continues the work. The working rules are in [AGENTS](AGENTS.md), the goal and
+continues the work. The working rules are in [AGENTS](../../AGENTS.md), the goal and
 its acceptance criteria in [goal.md](goal.md), the measured results in the
-[release status](docs/release/STATUS.md).
+[release status](../release/STATUS.md).
 
 ## Current state (2026-09-29)
 
@@ -21,11 +21,14 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
   annotated tag `v1.0.0` marks that commit; `main` equals the release branch.
   The pre-refactor GLM-5.3 release keeps the tag `pre-refactor-main-20260922`.
   The documentation update that followed the tag was pushed to both branches.
-- **Publication.** The owner decided to make the repository public. A
-  full-history secret scan on 2026-09-29 found no credential
-  ([SECURITY](SECURITY.md#history-scan)); the infrastructure names that earlier
-  commits keep (bucket, node, zone and host names, internal addresses, home
-  paths) grant no access, and the owner accepts them in the history.
+  A later documentation commit states the results neutrally, restructures the
+  README as an abstract and artifact guide, adds `CITATION.cff` and moves this
+  file and goal.md from the repository root to `docs/development/`.
+- **Publication.** The repository is public. A full-history secret scan on
+  2026-09-29 found no credential ([SECURITY](../../SECURITY.md#history-scan)).
+  The infrastructure names that earlier commits keep (bucket, node, zone and
+  host names, internal addresses, home paths) grant no access and stay in the
+  history, which is not rewritten.
 - **Code.** After `ab4c6582`, the commit the TPU comparison ran (below), the
   device programs, the request path, the controller and the worker are
   unchanged. Changed under `glm_tpu/`: the chat UI's context display (H17: the
@@ -36,7 +39,7 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
   chat server finding its controller from the run directory (H18); the `ask`
   help and `info` wording (H19). `pyproject.toml` changed only in its license
   files: the wheel no longer carries the license texts of material kept only in
-  the history ([notices](THIRD_PARTY_NOTICES.md)). The device programs and the
+  the history ([notices](../../THIRD_PARTY_NOTICES.md)). The device programs and the
   request path are those the comparison ran.
 - **Records.** `tests/golden/data/` last changed at the WU-C re-baseline of
   the topology commands (`import_closure.json`: the command-line stage imports
@@ -46,7 +49,7 @@ its acceptance criteria in [goal.md](goal.md), the measured results in the
   public Pallas kernel names mapped back to their `181c013e` spelling).
 - **Fleet** (as left on 2026-09-28 after the fleet checks of the public
   commands). The eight hosts were idle and no workload lock was held. The
-  verified packed checkpoint made for the TPU comparison (32 owner files,
+  verified packed checkpoint made for the TPU comparison (32 slot files,
   `checkpoint verify` passed) is still in tmpfs on every host. A host restart
   loses the tmpfs copy, but the operator keeps a backup of the packed checkpoint
   in the project's bucket, with a restore procedure kept privately. The
@@ -101,7 +104,7 @@ the harness was finished, every change of a record is a separate commit titled
 ## Evidence
 
 **On the CPU**, commit by commit: the gates of the
-[equivalence harness](tools/equivalence/README.md) against these records (a few
+[equivalence harness](../../tools/equivalence/README.md) against these records (a few
 early commits deferred the heavy gates to their stage's close, as their messages
 state).
 
@@ -119,7 +122,7 @@ For the S9 commit every CPU gate passed with every record unchanged:
 `check` (G1, G1-protocol, G3, G4, G6, G7, G9), `check --tier production` (G2,
 G2-protocol), `check --gates G6-static`, `selftest` (G14, 23 cases), the helper
 contract tests (G8), the full test suite and the `cpu32` golden wrappers; the
-counts are in the [release status](docs/release/STATUS.md#verification-and-review).
+counts are in the [release status](../release/STATUS.md#verification-and-review).
 The site check (G5) and the site-bound test need the fleet; they last ran in the
 TPU comparison below.
 
@@ -131,8 +134,8 @@ request and two inbox rounds, then stop) 3/3 token streams identical; slowest-ho
 harness lowers (9/9 programs, 1,062/1,062 Pallas kernels, for both trees); the
 site check passed before and after; a dirty checkout was refused; the chat UI
 and the `/v1` API answered against the resident session. Details:
-[release status](docs/release/STATUS.md#tpu-comparison-of-the-current-tree) and
-[harness README](tools/equivalence/README.md#tpu-comparison-compare_runpy).
+[release status](../release/STATUS.md#tpu-comparison-of-the-current-tree) and
+[harness README](../../tools/equivalence/README.md#tpu-comparison-compare_runpy).
 
 **The resident-stop defect** of the GLM-5.3 release (after `inbox/stop.json`
 the controller crashed with `FileExistsError` while writing its final records)
@@ -140,13 +143,12 @@ is fixed in `79e9b39e`: the stop keeps every collected record. In the TPU
 comparison the tree's resident stop exited 0, where `181c013e` still ends in
 that error.
 
-The raw run directories, gate logs and the unit-by-unit design notes are kept
-privately by the owner; the commit messages and these pages are the public
-record.
+The raw run directories, gate logs and the unit-by-unit design notes are not
+published; the commit messages and these pages are the public record.
 
 ## Resuming work
 
-Use the pinned environment of [INSTALLATION](docs/release/INSTALLATION.md)
+Use the pinned environment of [INSTALLATION](../release/INSTALLATION.md)
 (Python 3.12, jax and jaxlib 0.10.1, numpy 2.3.5, ml-dtypes 0.5.4, and for G4
 torch 2.10.0 CPU and safetensors 0.7.0): the records are bound to these versions,
 and another version makes a gate skip (fail with `GLM_EQUIVALENCE_STRICT=1`).
@@ -160,15 +162,15 @@ GLM_EQUIVALENCE_STRICT=1 python -m pytest -q -p no:cacheprovider tests/golden -m
 ```
 
 `budget` must report `"live": false` before any heavy gate. Then follow the gate
-table of [AGENTS](AGENTS.md#changing-the-code) for the change at hand.
+table of [AGENTS](../../AGENTS.md#changing-the-code) for the change at hand.
 
-A hardware run needs the owner's authorization, the site file
-([template](examples/site.example.toml)), the site check
+A hardware run needs the maintainer's approval, the site file
+([template](../../examples/site.example.toml)), the site check
 (`python -m tools.equivalence site-check`, on rank 0 with the fleet idle), a
 packed checkpoint that passes `python -m glm_tpu checkpoint verify`, lingering
 (or RemoveIPC off) on every host before a tmpfs pack, and both workload locks
-free ([OPERATIONS](docs/release/OPERATIONS.md),
-[CHECKPOINTS](docs/release/CHECKPOINTS.md)).
+free ([OPERATIONS](../release/OPERATIONS.md),
+[CHECKPOINTS](../release/CHECKPOINTS.md)).
 
 ## Post-release backlog
 
@@ -236,15 +238,16 @@ None of these blocks the release. Each is its own unit with its own gates.
   recreated fleet (the first ones were lost with the earlier slice), with a
   checkpoint re-packed from the pinned source whose slot records equal the
   sealed manifest.
-- The GLM-5.3 release's own limits stand: a partial, owner-stopped GSM8K
-  evaluation, short prompts, sequential resident mode, no durable recovery
-  ([release status](docs/release/STATUS.md#limitations)).
-- Review: the restructure was implemented by assistant sessions. From S4.2b on,
+- The GLM-5.3 release's own limits stand: a partial GSM8K evaluation (the
+  first 770 of the 1,319 test questions), short prompts, sequential resident
+  mode, no durable recovery
+  ([release status](../release/STATUS.md#limitations)).
+- Review: the restructure was implemented with AI coding agents. From S4.2b on,
   each unit's code commit was checked with its raw gate evidence by a separate
-  adversarial verifier session before it was pushed (in all units but one, on
+  adversarial verifier (another agent session) before it was pushed (in all units but one, on
   the local commit); fixes for its findings were amended into the unpushed
   commit, the other findings were recorded as follow-ups, and a re-baseline
   commit, where the unit needed one, was recorded after that pass. Before S4.2b
   there was no standing verifier step: some commits cite review rounds or a
-  verifier, many cite none. The owner reviews afterwards. None of this is
-  independent human review.
+  verifier, many cite none. The maintainer reviews the units after they are
+  pushed. None of this is independent human review.

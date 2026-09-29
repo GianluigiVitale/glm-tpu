@@ -16,11 +16,11 @@ license files: [LICENSE](LICENSE), this file and the
 ### Chat UI styling
 
 The palette, sidebar, message layout, composer and responsive styling of
-`glm_tpu/entrypoints/ui/static/style.css` are the owner's own work, adapted from
-the owner's own `as-pt` project, file `aspt_rag/web/index.html` at commit
+`glm_tpu/entrypoints/ui/static/style.css` are the author's own work, adapted from
+the author's own `as-pt` project, file `aspt_rag/web/index.html` at commit
 `4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256 in
 [docs/UI.md](docs/UI.md)). Nothing in them is adapted from a third party. The
-owner contributes this styling under this repository's license, like the rest
+author contributes this styling under this repository's license, like the rest
 of the project's own work; this notice licenses nothing else of the `as-pt`
 project.
 

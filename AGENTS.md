@@ -1,10 +1,11 @@
 # Working in this repository
 
 This file is for anyone, person or agent, who explores or changes this
-repository. Read the [handoff](HANDOFF.md), the [goal](goal.md) and the
-[release status](docs/release/STATUS.md) first: they hold the current state. The
-working rules come next; then the [repository map](#repository-map) lists every
-directory and file with one line on what it does, and
+repository. Read the [handoff](docs/development/HANDOFF.md), the
+[goal](docs/development/goal.md) and the
+[release status](docs/release/STATUS.md) first: they hold the current state.
+The working rules come next; then the [repository map](#repository-map) lists
+every directory and file with one line on what it does, and
 [where to start](#where-to-start) follows a request from the command line down to
 the TPU program. The development policy is in
 [CONTRIBUTING](CONTRIBUTING.md) and the exact test commands in
@@ -15,14 +16,15 @@ instructions to restart that work; the older version of this file is
 
 ## Roles and review
 
-- The owner is the integrator and the only one who approves a re-baseline of the
-  equivalence records, a deviation from these rules, a run on the TPU fleet, a
-  merge into `main` and any change of repository visibility or upstream.
+- The maintainer is the integrator and the only one who approves a re-baseline
+  of the equivalence records, a deviation from these rules, a run on the TPU
+  fleet, a merge into `main` and any change of repository visibility or
+  upstream.
 - An approval given in advance for a class of work covers that work's
   re-baselines, hardware runs and decisions; record every decision taken under it
-  where the owner will review it. It never covers a merge into `main`, a
+  where the maintainer will review it. It never covers a merge into `main`, a
   change of visibility or upstream, or a deviation from a hard rule: each needs
-  the owner's explicit approval for that instance.
+  the maintainer's explicit approval for that instance.
 - `main` holds the release (tag `v1.0.0`). Merge a later change into it only
   after the release checks and the review have passed and a backup of the work
   has been verified, and only as a fast-forward.
@@ -31,14 +33,15 @@ instructions to restart that work; the older version of this file is
   you commit; commit locally; have a separate verifier pass review the commit and
   the raw gate evidence adversarially before anything is pushed; amend blocking
   fixes into the unpushed commit and re-run the gates they affect; record the other
-  findings as follow-ups; push. The owner reviews each unit afterwards. A verifier
-  pass by another assistant session is not independent human review; describe
-  review as it was done, and resolve material findings before a merge.
+  findings as follow-ups; push. The maintainer reviews each unit after it is
+  pushed. A verifier pass by another agent session is not independent human
+  review; describe review as it was done, and resolve material findings before a
+  merge.
 
 ## Hard rules
 
 - Tests and source audits run on the CPU (`JAX_PLATFORMS=cpu`). Never initialize
-  a TPU outside a hardware run the owner authorized.
+  a TPU outside a hardware run the maintainer approved.
 - Never create, delete, resize or reconfigure compute (TPU VMs, nodes, queued
   resources), write instance metadata or run provisioning scripts. A hardware run
   holds both site workload locks, runs one workload at a time and is waited for;
@@ -52,7 +55,7 @@ instructions to restart that work; the older version of this file is
   delete anything.
 - Storage: only the project's bucket in the fleet's region, as the operator's
   site file names it, within its existing storage bounds. No full-size safety
-  copies of the source weights; the one exception is the owner-approved backup of
+  copies of the source weights; the one exception is the maintainer-approved backup of
   the packed runtime checkpoint in that bucket, which a restore puts back into
   tmpfs instead of a repack.
 - Keep out of Git: weights, credentials, private questions and answers, raw run
@@ -71,8 +74,8 @@ instructions to restart that work; the older version of this file is
 - Before removing a file, establish what depends on it and that a preserved
   commit (a tag or a research branch) keeps it; static import reachability alone
   is not deletion authority.
-- Do not resume the owner-stopped GSM8K evaluation or the research optimization
-  campaigns.
+- Do not resume the partial GSM8K evaluation (stopped after test row 769) or the
+  research optimization campaigns.
 - Shell work: absolute paths, `git -C <path>`, `set -euo pipefail`, and a scratch
   directory of your own for each task. Do not edit a checkout that someone else
   or a live run is using. Never run a mutating git command (checkout, switch,
@@ -131,7 +134,7 @@ absorbed silently ([re-baselining](tools/equivalence/README.md#re-baselining)):
 
 - G1-G4 and the fixture are frozen: recorded only from production paths equal to
   the baseline `181c013e`, never changed by a restructuring commit. A change meant
-  to alter them (numerical, kernel or model) needs the owner's decision on a new
+  to alter them (numerical, kernel or model) needs the maintainer's decision on a new
   baseline before it starts.
 - A move or rename that changes G6 or G7 carries reviewed entries in
   `tools/equivalence/closure_map.toml` in its code commit; a separate commit,
@@ -147,7 +150,7 @@ absorbed silently ([re-baselining](tools/equivalence/README.md#re-baselining)):
 - A change the CPU records cannot hold (the compiler, libtpu, host behaviour)
   needs a TPU comparison: golden runs of the previous tree and runs of the change
   on the same fleet, compared with `python -m tools.equivalence compare-run`, in
-  hardware time the owner authorized.
+  hardware time the maintainer approved.
 
 Commit messages: a title prefix (`[Refactor]`, `[Tests]`, `[Docs]`,
 `[Equivalence]`, `[Launch]`, `[Config]`, `[Packaging]`) and the unit's token where
@@ -168,13 +171,12 @@ what the entry does.
 ### Root
 
 ```text
-README.md                    Overview, measured results, layout, CPU checks, how to run inference, documentation index
+README.md                    Abstract, contributions, design, evaluation, reproduction steps, layout, documentation, citation
 AGENTS.md                    This file: working rules, the repository map, where to start
-HANDOFF.md                   State of the repository, evidence, how to resume, the backlog and the limitations
-goal.md                      Goal of the public-structure release and its acceptance criteria
 CONTRIBUTING.md              Development policy: branches, CPU-only tests, equivalence gates, formatting and lint
 SECURITY.md                  Private data, the loopback-only serving surface, the release checks
 LICENSE                      Apache License 2.0 of the project's own work
+CITATION.cff                 How to cite the software (Citation File Format)
 THIRD_PARTY_NOTICES.md       What keeps its own license (the GLM-5.3 configuration files), history-only material, data
 pyproject.toml               Package metadata, exact dependency pins and extras, the glm-tpu script, package data, ruff
 .gitignore                   Keeps weights, results, secrets, private request files and build outputs out of Git
@@ -234,14 +236,14 @@ glm_tpu/entrypoints/         What a user runs or connects to
     server.py                python -m glm_tpu.entrypoints.serve.server: attach to a resident controller and serve
     http_handler.py          The handler: the page, /api/* behind Host and Origin checks (and X-GLM-UI to post), /v1 behind a key
     job_queue.py             JobQueue: persistent chat jobs handed one at a time to the resident controller
-    security.py              api_token: the owner-only API key file, created on first use
+    security.py              api_token: the API key file, readable only by you (mode 600), created on first use
   ui/                        The browser chat workspace
     __init__.py              Package docstring
     conversations.py         ConversationStore: saved conversations, kept in the job queue's document
     static/                  Package data served by http_handler
       index.html             The page
       app.js                 The script: conversations, the job stream, rendering, the context footer
-      style.css              The styling (the owner's own design)
+      style.css              The styling (the author's own design)
 ```
 
 ```text
@@ -290,11 +292,11 @@ glm_tpu/model_loader/        The checkpoint pipeline
   sharded_state/             The packed runtime checkpoint: one file per device slot
     __init__.py              Package docstring
     format.py                The packed format: file and tensor plans, headers, digests, RuntimePackConfig
-    writer.py                pack_runtime_slots and finalize_runtime_checkpoint: owner slot files, their records, the manifest
-    manifest.py              assemble_owner_manifest: the manifest from the eight hosts' owner receipts
+    writer.py                pack_runtime_slots and finalize_runtime_checkpoint: the per-slot files, their records, the manifest
+    manifest.py              assemble_owner_manifest: the manifest from the eight hosts' slot receipts
     seal.py                  The SUCCESS record, receipts and plans against a seal, the payload canary, seal installation
     verify.py                verify_runtime_checkpoint: metadata, manifest and SUCCESS seals, file hashes
-    loader.py                load_runtime_checkpoint: place verified owner files on the device mesh
+    loader.py                load_runtime_checkpoint: place verified slot files on the device mesh
 ```
 
 ```text
@@ -364,7 +366,7 @@ glm_tpu/distributed/         Multi-host runtime state
 ```text
 glm_tpu/utils/               Shared utilities; standard library only
   __init__.py                Package docstring
-  io_utils.py                Owner-only create-once writes, atomic replacing JSON writes, bounded reads, private-file checks
+  io_utils.py                Create-once writes readable only by you (mode 600), atomic replacing JSON writes, bounded reads, private-file checks
   json_utils.py              Canonical JSON: the hash contract and the wire bytes
 ```
 
@@ -496,8 +498,8 @@ tests/                       CPU tests, laid out like glm_tpu/ (not in the wheel
     test_source_marker.py    The completion marker: every file compared with upstream; the runtime reads what it writes
     sharded_state/           The packed checkpoint
       __init__.py            Package docstring
-      test_format.py         Pack, verify and load of the 32 owner files; a failure never commits a manifest
-      test_manifest.py       Manifest assembly from real tiny owner files
+      test_format.py         Pack, verify and load of the 32 slot files; a failure never commits a manifest
+      test_manifest.py       Manifest assembly from real tiny slot files
       test_seal.py           SUCCESS admitted by verify, receipt and plan comparisons, the canary, one-time install
       test_verify.py         The names the verification helpers answer to
   models/                    Tests of glm_tpu/models
@@ -576,6 +578,9 @@ tools/                       Developer tools (not in the wheel)
 docs/                        Documentation (not in the wheel)
   API.md                     The loopback OpenAI-compatible /v1 API
   UI.md                      The browser chat workspace
+  development/               Development records
+    HANDOFF.md               State of the repository, evidence, how to resume, the backlog and the limitations
+    goal.md                  Goal of the public-structure release and its acceptance criteria
   release/                   Release documentation and the compact result receipts
     ARCHITECTURE.md          Module map, request path, parallelism, the model, numerical conventions
     CHECKPOINTS.md           The pinned source and its marker, the packed checkpoint, inventory and verify, packing, capacity
@@ -605,7 +610,7 @@ licenses/                    License texts of material kept only in the reposito
 1. `python -m glm_tpu ask "..."` runs `glm_tpu/__main__.py`, then
    `entrypoints/cli/main.py` (`AskSubcommand`) and `entrypoints/cli/ask.py`. The
    question is rendered with the pinned template and tokenized
-   (`engine/request.py`, `config/model.py`) into an owner-only `request.json`
+   (`engine/request.py`, `config/model.py`) into a `request.json` readable only by you (mode 600)
    under the site's run root (`config/site.py`).
 2. The controller, `executor/multihost_executor.py` `main`, runs in that process
    on rank 0: the launch policy picks the commit (`executor/launch_policy.py`),
@@ -617,7 +622,7 @@ licenses/                    License texts of material kept only in the reposito
    (`config/site.py` `site_args`), joins the fleet and builds the mesh
    (`distributed/parallel_state.py`, `distributed/topology.py`,
    `distributed/mesh.py`) and creates the runner.
-4. `runner/tpu_runner.py` `TPUModelRunner` verifies and loads the four owner files
+4. `runner/tpu_runner.py` `TPUModelRunner` verifies and loads the four slot files
    of its host (`model_loader/sharded_state/verify.py`, `loader.py`), builds the
    resident BF16 tables (`models/glm_moe_dsa/weights.py`) and the program set
    (`runner/programs.py`: the cache initializer of `runner/kv_cache_manager.py`,
@@ -657,7 +662,7 @@ into the session's inbox.
 | Request preparation, capacities, the template | `glm_tpu/engine/request.py`, `glm_tpu/config/model.py` |
 | The `/v1` API or the chat UI | `glm_tpu/entrypoints/openai/`, `glm_tpu/entrypoints/serve/`, `glm_tpu/entrypoints/ui/` ([API](docs/API.md), [UI](docs/UI.md)) |
 | Launch, staging, SSH, locks and cleanup | `glm_tpu/executor/` ([OPERATIONS](docs/release/OPERATIONS.md)); helper texts are recorded byte for byte (G9) |
-| Model numerics, a layer or a kernel | `glm_tpu/models/glm_moe_dsa/`, `glm_tpu/layers/`, `glm_tpu/kernels/`; any change here moves the frozen G1-G3 records and needs the owner's baseline decision first |
+| Model numerics, a layer or a kernel | `glm_tpu/models/glm_moe_dsa/`, `glm_tpu/layers/`, `glm_tpu/kernels/`; any change here moves the frozen G1-G3 records and needs the maintainer's baseline decision first |
 | Compilation, memory or collective admission | `glm_tpu/runner/` |
 | The checkpoint format, inventory or verify | `glm_tpu/model_loader/` ([CHECKPOINTS](docs/release/CHECKPOINTS.md)) |
 | Mesh, topology, fleet votes | `glm_tpu/distributed/` |

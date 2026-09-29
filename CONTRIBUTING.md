@@ -18,7 +18,8 @@ described in the [README](README.md#repository-layout) and in
   payloads. Preserve third-party copyright and license headers
   ([notices](THIRD_PARTY_NOTICES.md)).
 - Review the actual diff, tests, dependencies, claims, failures and retention
-  before merge; self-review is not independent review.
+  before merge. A review by the change's author, or by an AI agent working for
+  the author, is not independent review; describe review as it was done.
 - Never change a check to relabel a historical failure as a pass. Do not rewrite
   history or change the repository's visibility during cleanup.
 - Cosmetic cleanup needs no new TPU run; an execution change needs its own

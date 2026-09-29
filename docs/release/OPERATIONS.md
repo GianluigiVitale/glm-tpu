@@ -39,12 +39,13 @@ platform.
 ## What a run does
 
 1. Validates the site file and the prepared request (outside the checkout,
-   owner-only), resolves the launch commit and reads the remote helper texts
-   of that commit (their SHA-256s go to the run's `helpers.json`).
-2. Creates an owner-only run directory under the site's `paths.run_root` and
-   prints `RUN <directory>`.
+   readable only by you, mode 600), resolves the launch commit and reads the
+   remote helper texts of that commit (their SHA-256s go to the run's
+   `helpers.json`).
+2. Creates a run directory only you can access (mode 700) under the site's
+   `paths.run_root` and prints `RUN <directory>`.
 3. Takes the site's locks: every `locks.workload` lock without waiting (a live
-   owner is a refusal) and every `locks.sync` lock, waiting (a scheduled backup
+   holder is a refusal) and every `locks.sync` lock, waiting (a scheduled backup
    only delays staging).
 4. Checks over SSH that all eight hosts are idle and that it runs on rank 0.
 5. Stages the source archive, the request and the resolved site configuration
@@ -52,7 +53,7 @@ platform.
    preflight on each; the eight environments must agree. It then releases the
    sync locks.
 6. Starts the eight workers. Each verifies the staged source, the site, the
-   topology binding and the checkpoint, loads its owner files, compiles the
+   topology binding and the checkpoint, loads its slot files, compiles the
    programs, checks the compiled graphs' collectives and the live memory, and
    serves the request with an all-host vote at every phase and token.
 7. After the workers end (completion, stop or failure), checks all hosts idle
@@ -139,7 +140,7 @@ rerunning the model to regenerate evidence.
 |---|---|
 | Launch-policy or source refusal | Publish the intended commit on an allowed branch and launch from a clean checkout of it; do not bypass the policy. |
 | Workload lock busy | Another model owns the fleet: use its inbox or wait for it; never remove a lock. |
-| Hosts not idle, or preflight environments differ | Find and authenticate the owner; do not launch beside it. |
+| Hosts not idle, or preflight environments differ | Find and authenticate the process that is running there; do not launch beside it. |
 | Checkpoint or memory refusal | Diagnose the named pin or resource ([CHECKPOINTS](CHECKPOINTS.md)); do not lower a floor or repack an intact checkpoint. |
 | Output stops at the context limit during reasoning | Report the terminal reason; it is not a completed answer. |
 | Collection failed on a host | The other hosts' records are kept (`uncollected_ranks`); fetch that host's run directory by hand after it is idle. |
@@ -191,6 +192,6 @@ rebuilt with `checkpoint pack --recover-seal`, under a new `checkpoint.root` nam
 with the same pins. Mounted weights alone do not prove
 that a cold start will succeed. Keep private questions, answers and raw databases out of
 Git and keep compact receipts instead. Do not make full-size safety copies of the
-source weights. The one exception is the owner-approved backup of the packed runtime
+source weights. The one exception is the maintainer-approved backup of the packed runtime
 checkpoint in the project's bucket: after a host restart, restoring it into tmpfs
 and running `checkpoint verify` replaces a multi-hour repack.

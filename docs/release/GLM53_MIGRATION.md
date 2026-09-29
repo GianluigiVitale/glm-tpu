@@ -9,8 +9,8 @@ they were written during the migration; module and command names are updated to
 the current tree where a reader would look them up. The exact pre-release text is
 `git show c2f60efe:docs/release/GLM53_MIGRATION.md`.
 
-The owner requested freezing GLM-5.2, removing its stored weights, and moving
-the same TPU implementation to GLM-5.3. The completed GLM-5.2 code is preserved
+The migration froze GLM-5.2, removed its stored weights, and moved the same TPU
+implementation to GLM-5.3. The completed GLM-5.2 code is preserved
 at the tag `glm-5.2`, commit `edbced29315b6afce92cf994ae70785bf8f6d995`, with its
 verified source archive. The completed migration retains the earlier failures and
 recovery details below.
@@ -26,12 +26,12 @@ byte-range recovery retained 38 verified shards and completed the remaining 103.
 The original failed receipts and source generations remain preserved.
 
 The first packing preflight rejected the new inventory because the retained
-geometry parser unconditionally names GLM-5.2. No owner files were written;
+geometry parser unconditionally names GLM-5.2. No slot files were written;
 eight-host cleanup passed and the completed inventory was preserved. The ordinary
 packing and inference boundaries now use the pinned GLM-5.3 configuration and
 model identity while keeping every numerical dimension and the unchanged parser
 (`glm_tpu/config/model.py`). CPU checks cover this distinction. Packing then
-completed on all 8 hosts at `90777a44`, producing 32 owner files (786,181,673,984
+completed on all 8 hosts at `90777a44`, producing 32 slot files (786,181,673,984
 bytes). All local file hashes passed the checkpoint verifier; eight-host cleanup
 and the regional backup and readback of the seal metadata passed. Inference and
 answer validation were still pending at that point. The site configuration (then
@@ -44,8 +44,8 @@ checks; passing CPU checks do not establish real-weight answers or speed.
 
 ## Acquisition recovery
 
-The owner authorized autonomous diagnosis, fixes and retries to finish the
-release. The continuation preserved the 17 verified source generations and
+Diagnosis, fixes and retries then continued autonomously, as authorized for
+the release. The continuation preserved the 17 verified source generations and
 acquired the 124 missing shards. Its transfer checks retain exact failure phases,
 byte counts, hashes and traceback locations. Eight offline transfer and
 failure-reporting cases passed. The original failed script and receipts stayed
@@ -69,8 +69,8 @@ authenticated idle hosts, and both workload leases were released.
 
 The failed gate was **complete verified canonical source acquisition**. Packing
 and GLM-5.3 inference had not started. The initial attempt stopped under the
-then-current no-retry instruction, later superseded by the owner's recovery
-authorization above. The original evidence and the partial source remain intact.
+then-current no-retry rule, later superseded by the recovery authorization
+above. The original evidence and the partial source remain intact.
 The failure receipt is preserved at the tag `archive/research-20260922`
 (`git show archive/research-20260922:docs/release/glm53-acquisition-failure-20260921.json`).
 The request integration at `fc95150d` had 69 passing affected CPU checks and a
@@ -102,7 +102,7 @@ and evidence identities.
 
 ## GLM-5.2 weight retirement
 
-Owner-authorized deletion removed 359 inventoried cloud weight files totaling
+An authorized deletion removed 359 inventoried cloud weight files totaling
 1,706,606,624,800 bytes from the GLM-5.2 model and checkpoint prefixes of the
 project bucket. Deleting 68 runtime, MTP and partial weight files reclaimed
 812,943,126,528 bytes of host RAM filesystem capacity across the eight hosts.
@@ -135,19 +135,19 @@ verifies the pinned source-completion marker before opening devices. Missing or
 incomplete assets are rejected. With the site configuration installed,
 real-weight inference was the next acceptance step.
 
-The ordinary runtime binds the dense layers directly from its base owner shards
+The ordinary runtime binds the dense layers directly from its base slot files
 and prepares their resident BF16 representation; it does not call a dense-overlay
-loader. The migration therefore needed the owner shards, not a separate overlay
+loader. The migration therefore needed the slot files, not a separate overlay
 or a rebuilt checkpoint of the older pipeline layout, which keeps the tested
 ordinary numerical path.
 
 Distributed preparation uses `pack_runtime_slots`
-(`glm_tpu/model_loader/sharded_state/writer.py`) on each host's four owner slots.
+(`glm_tpu/model_loader/sharded_state/writer.py`) on each host's four slots.
 The receipt assembler (`assemble_owner_manifest`,
 `glm_tpu/model_loader/sharded_state/manifest.py`) reproduces the checkpoint
 manifest without needing all 32 files on one host. Tiny real-file CPU tests
 compare it with the complete packer, verify each host's local files through the
-verifier and loader, and reject missing or inconsistent owner evidence. This was
+verifier and loader, and reject missing or inconsistent per-slot evidence. This was
 preparation coverage; real GLM-5.3 packing and inference were still pending.
 
 Local preparation of the unchanged four GSM8K questions with the actual pinned
@@ -173,7 +173,7 @@ source files alone do not make this inference command ready.
 The acquisition streamed the pinned FP8 source into the project bucket without a
 full disk copy, verified every byte count and upstream SHA-256, preserved headers
 and provenance, and published a completion marker only after all shards and
-metadata passed. The required owner shards were then rebuilt with the packing
+metadata passed. The required slot files were then rebuilt with the packing
 path, the verified site binding installed, and the affected CPU and bounded
 real-weight inference behaviour checked. No GLM-5.2 answer or speed receipt
 qualifies GLM-5.3.
@@ -184,14 +184,15 @@ The original four-chat release remains preserved at `e7898dff` and its receipts.
 Executable `5c3c1d6b` added optional residency, a private sequential inbox and a
 32K ordinary default. The solo run measured 13.57 tokens/s; its same loaded model
 then processed GSM8K test rows 0–769, with 740 correct completed finals and three
-context-exhausted attempts among the 30 unsuccessful cases. The owner cancelled
-the remaining 549 questions. This partial evaluation supersedes the four-example
+context-exhausted attempts among the 30 unsuccessful cases. The remaining 549
+test questions were not run. This partial evaluation supersedes the four-example
 check as the larger quality sample; it does not replace the separate concurrency
 evidence or constitute a full GSM8K score. No answers were rerun to improve it.
 See the [current status](STATUS.md) and the [receipt](glm53-resident-results-20260922.json).
 
 The scorer and the completion notifier were stopped, the remaining inbox entries
 kept outside the active queue, and all eight model workers authenticated live.
-The original private inputs, references, outputs, cancelled inputs and per-row
+The original private inputs, references, outputs, unrun inputs and per-row
 receipts remain preserved with the operational records. Neither prompts nor raw
-outputs are in the repository. Review is assistant self-review.
+outputs are in the repository. This work was reviewed only by the AI coding
+agent that built it, not by independent human review.

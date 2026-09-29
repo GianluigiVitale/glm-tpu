@@ -2,9 +2,8 @@
 
 The GLM-5.3-FP8 inference release (eight hosts, 32 TPU v4 chips; resident and
 four-chat modes; measured speed and answers) was finished on 2026-09-22. Its
-results are in the [release status](docs/release/STATUS.md); its goal, with the
-authorization it carried, is preserved as
-`git show archive/research-20260922:goal.md`.
+results are in the [release status](../release/STATUS.md); its goal document is
+preserved as `git show archive/research-20260922:goal.md`.
 
 The public-structure release that followed had one goal: **turn the released
 engine into a package that a reader can navigate, test and extend, without
@@ -16,7 +15,7 @@ the branch `release/public-structure-20260922` and was released on `main` as
 ## Acceptance
 
 Every criterion is met; the evidence is in the [handoff](HANDOFF.md#evidence)
-and the [release status](docs/release/STATUS.md).
+and the [release status](../release/STATUS.md).
 
 1. **Layout and names.** One package, `glm_tpu/`, laid out like the vLLM and
    tpu-inference projects (entry points, executor, worker, engine, runner,
@@ -60,19 +59,20 @@ and the [release status](docs/release/STATUS.md).
 
 `main` was fast-forwarded to the release branch at `6fa21301`, which the
 annotated tag `v1.0.0` marks; the pre-refactor release keeps the tag
-`pre-refactor-main-20260922`. The owner decided to make the repository public
-after a full-history secret scan ([SECURITY](SECURITY.md#history-scan)).
+`pre-refactor-main-20260922`. The repository was made public after a
+full-history secret scan ([SECURITY](../../SECURITY.md#history-scan)).
 
-## Left to the owner
+## Open items
 
-- Schedule the [post-release backlog](HANDOFF.md#post-release-backlog).
+- The [post-release backlog](HANDOFF.md#post-release-backlog) is not yet
+  scheduled.
 
 ## Direction for later work
 
-Keep the equivalence discipline of [AGENTS](AGENTS.md#changing-the-code): a
+Keep the equivalence discipline of [AGENTS](../../AGENTS.md#changing-the-code): a
 restructuring change leaves every record equal. A change meant to alter the
 device programs, the numerics or host behaviour (a performance, model or
-operations change) is declared as such, carries its own tests, needs the owner's
+operations change) is declared as such, carries its own tests, needs the maintainer's
 decision on a new baseline where it changes the frozen records (they hold the
 `181c013e` programs), and is confirmed by a TPU comparison before it is released.
 Prefer a working, evidenced release over further research.

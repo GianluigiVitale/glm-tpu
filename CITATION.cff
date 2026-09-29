@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "glm-tpu: GLM-5.3 FP8 inference on a 32-chip TPU v4 pod"
+abstract: >-
+  A multi-host inference engine for the GLM-5.3 FP8 mixture-of-experts model,
+  written in native JAX with custom Pallas kernels, for a Cloud TPU v4-64 slice
+  (32 TPU v4 chips on 8 hosts). It provides resident and four-chat batched
+  serving, a local chat UI and an OpenAI-compatible API, and a graph-equivalence
+  harness that checks refactors against recorded TPU programs.
+authors:
+  - family-names: Vitale
+    given-names: Gianluigi
+version: 1.0.0
+date-released: 2026-09-29
+license: Apache-2.0
+repository-code: "https://github.com/GianluigiVitale/glm-tpu"
+keywords:
+  - JAX
+  - Pallas
+  - TPU
+  - mixture of experts
+  - FP8
+  - sparse attention
+  - LLM inference

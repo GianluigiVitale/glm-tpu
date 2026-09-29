@@ -31,7 +31,7 @@ and restarts nothing. `--dispatch` takes an explicit receipt instead (`pid`,
 
 Forward port **8011** through VS Code's Ports panel or an SSH tunnel, using the
 same local port, then open **http://127.0.0.1:8011**. The server listens only on
-loopback. This is a single-owner workspace, without accounts or public hosting;
+loopback. This is a single-user workspace, without accounts or public hosting;
 other local users who can reach that port are inside its trust boundary. Keep
 the tunnel private. Host/origin checks intentionally reject public proxy hosts.
 The UI uses only bundled assets, with no CDN, telemetry or external fonts.
@@ -83,13 +83,13 @@ startup and queue wait. This UI does not change the model's measured performance
 ## Design provenance
 
 The palette, sidebar, message layout, composer and responsive styling are adapted
-from the owner's own private `as-pt` project, file `aspt_rag/web/index.html` at
+from the author's own private `as-pt` project, file `aspt_rag/web/index.html` at
 commit `4ed7937910538eef2754b31d0af316c6888ad9ba` (file SHA-256
-`3b93ef59be703bf7caba4bdee9b74d3c0f10e00d3dbb944867110560feb925d3`; the owner's
+`3b93ef59be703bf7caba4bdee9b74d3c0f10e00d3dbb944867110560feb925d3`; the author's
 backups of that file were checked to be byte-identical and were not changed).
 The GLM resident bridge and conversation frontend are implemented here; that
 project's retrieval and citation logic and its private data are not included.
-The owner contributes the adaptation under this repository's license; nothing
+The author contributes the adaptation under this repository's license; nothing
 else of `as-pt` is licensed by it ([notices](../THIRD_PARTY_NOTICES.md)).
 
 ## Offline checks

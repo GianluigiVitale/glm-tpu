@@ -4,8 +4,8 @@ its target), and every test file a documented command names exists.
 The pages are the tracked Markdown files at the repository root and under ``docs/``, ``tests/`` and ``tools/``, and
 a link or a documented test file must name a tracked path (``git ls-files``): an untracked file in a checkout is not
 documentation and does not satisfy a link. In a tree without git metadata (a ``git archive`` export, which holds the
-tracked files only) the file system stands in. The governance files (``AGENTS.md``, ``HANDOFF.md``, ``goal.md``,
-``docs/release/STATUS.md``) are pages like every other.
+tracked files only) the file system stands in. The governance files (``AGENTS.md``, ``docs/development/HANDOFF.md``,
+``docs/development/goal.md``, ``docs/release/STATUS.md``) are pages like every other.
 
 The repository map of ``AGENTS.md`` stays current: every tracked file and directory under ``glm_tpu/`` and ``tools/``
 has an entry, every entry names a tracked path and says what it does, and no path is listed twice.
@@ -22,7 +22,7 @@ import subprocess
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-GOVERNANCE = {"AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md"}
+GOVERNANCE = {"AGENTS.md", "docs/development/HANDOFF.md", "docs/development/goal.md", "docs/release/STATUS.md"}
 
 
 def _tracked() -> frozenset[str] | None:

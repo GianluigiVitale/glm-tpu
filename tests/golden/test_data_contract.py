@@ -33,7 +33,7 @@ HARNESS_SOURCES = sorted(
 # The governance files and the release receipts, scanned with PRIVATE_SOURCE and a cloud-zone pattern. A receipt
 # names the run it measured by its timestamped run directory (the value of its ``run`` or ``run_id`` key, the evidence
 # id); no other key or value of it may match.
-GOVERNANCE_FILES = ("AGENTS.md", "HANDOFF.md", "goal.md", "docs/release/STATUS.md")
+GOVERNANCE_FILES = ("AGENTS.md", "docs/development/HANDOFF.md", "docs/development/goal.md", "docs/release/STATUS.md")
 RECEIPTS = sorted((HARNESS_REPO / "docs" / "release").glob("*.json"))
 ZONE = re.compile(r"\b(?:us|europe|asia|australia|northamerica|southamerica|me|africa)-[a-z]+[0-9]+-[a-z]\b")
 RUN_ID_KEYS = frozenset({"run", "run_id"})

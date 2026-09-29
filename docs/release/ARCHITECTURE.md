@@ -23,7 +23,7 @@ as it is; the measured results are in [STATUS](STATUS.md).
 | `model_loader`, `model_loader/sharded_state` | `source_inventory`, `source_marker`, `placement`, `pack_worker`; `format`, `writer`, `manifest`, `seal`, `verify`, `loader` | the checkpoint pipeline: source inventory and completion marker, per-device placement, packing, the packed format, the seal, verification and loading |
 | `distributed` | `mesh`, `topology`, `topology_capture`, `parallel_state` | the logical and physical mesh, the topology capture and binding, JAX distributed initialization and the all-host vote |
 | `config` | `model`, `cache`, `site`, `parallel` | the pinned model geometry and identity, the cache configuration and numerical contracts, the site file, the mesh axis names |
-| top level | `envs`, `exceptions`, `utils/{io_utils,json_utils}` | environment variables, fail-closed errors, owner-only create-once writes, canonical JSON |
+| top level | `envs`, `exceptions`, `utils/{io_utils,json_utils}` | environment variables, fail-closed errors, create-once writes readable only by you (mode 600), canonical JSON |
 
 The configuration, executor and utility packages import no JAX, so the controller
 and the command line run without initializing a device. `tests/` mirrors this
@@ -34,7 +34,7 @@ layout.
 1. **Preparation** (`glm-tpu ask` or `prepare-request`, CPU only). The chat is
    rendered with the pinned GLM-5.3 template and tokenized with the pinned
    tokenizer (`engine/request.py`); the prepared request is canonical JSON with its
-   own SHA-256, written owner-only outside the checkout. The whole input is
+   own SHA-256, written outside the checkout and readable only by you (mode 600). The whole input is
    tokenized; nothing is truncated. A request that does not fit its capacity is
    refused.
 2. **Launch** (`executor/multihost_executor.py`, rank 0). The launch policy picks
@@ -45,7 +45,7 @@ layout.
 3. **Load and compile** (`worker/tpu_worker.py`, `runner/tpu_runner.py`). Each worker
    verifies its staged source, the site configuration, the topology binding and
    its four checkpoint files, initializes JAX distributed with the fleet, loads its
-   owner files onto its four chips, builds the program set (`runner/programs.py`),
+   slot files onto its four chips, builds the program set (`runner/programs.py`),
    compiles each program and admits it: the compiled graph's collectives are
    parsed and checked (`runner/admission.py`, `runner/hlo_utils.py`) and the live
    memory is projected against every chip's limit. Every phase ends with an

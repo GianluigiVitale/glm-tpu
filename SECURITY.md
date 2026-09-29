@@ -20,8 +20,8 @@ to ordinary public issues.
 Never commit credentials, service-account keys, local environment files, the
 site file, weights, runtime databases, private benchmark questions or references,
 user prompts or raw user responses. Token IDs can reveal prompt contents too.
-Prepare requests outside the checkout: the preparation commands create owner-only
-output and refuse to overwrite. `.gitignore` adds defense in depth; it is not
+Prepare requests outside the checkout: the preparation commands create output
+readable only by you (mode 600) and refuse to overwrite. `.gitignore` adds defense in depth; it is not
 permission to commit sensitive files under other names.
 
 Keep credentials in the existing operator-managed authentication environment. Do
@@ -54,8 +54,8 @@ Also build the wheel from an exported copy of the commit
 contains. `tests/golden/test_data_contract.py` (part of the second pytest run)
 refuses home-directory paths, private addresses, private run names and bucket
 URIs in the equivalence harness and its records, and the same literals and cloud
-zone names in the governance files (`AGENTS.md`, `HANDOFF.md`, `goal.md`,
-`docs/release/STATUS.md`) and the release receipts, where a receipt may name a
+zone names in the governance files (`AGENTS.md`, `docs/development/HANDOFF.md`,
+`docs/development/goal.md`, `docs/release/STATUS.md`) and the release receipts, where a receipt may name a
 run only under its `run` or `run_id` key. These checks cover the software
 contracts; they do not authorize a deployment, which needs the hardware steps of
 [OPERATIONS](docs/release/OPERATIONS.md).
@@ -111,8 +111,8 @@ Before the repository was made public, the whole Git history was scanned on
   files) was ever committed.
 
 Earlier commits keep infrastructure names (bucket, node, zone and host names,
-internal addresses, home paths). They grant no access, and the owner accepts
-them in the history; new commits keep them out (see [above](#keep-outside-git)).
+internal addresses, home paths). They grant no access and stay in the history,
+which is not rewritten; new commits keep them out (see [above](#keep-outside-git)).
 Like the earlier audit, the scan is heuristic, not complete security clearance,
 and it looked for credentials only: it is no review of third-party provenance
 ([notices](THIRD_PARTY_NOTICES.md)) or of benchmark data permissions.

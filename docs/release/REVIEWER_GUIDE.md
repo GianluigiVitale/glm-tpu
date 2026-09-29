@@ -9,8 +9,8 @@
    ownership and independent stopping are in `glm_tpu/layers/attention/kv_cache.py`
    and `glm_tpu/engine/request_session.py`.
 3. Inspect the [resident receipt](glm53-resident-results-20260922.json) and the
-   [scoring and timing definitions](STATUS.md). The 740/770 result is a partial,
-   owner-stopped GSM8K evaluation. The separate
+   [scoring and timing definitions](STATUS.md). The 740/770 result is a partial
+   GSM8K evaluation: the first 770 of the 1,319 test questions. The separate
    [four-chat receipt](glm53-four-answers-20260921.json) establishes concurrency.
    All-host token agreement is separate from correctness.
 4. Follow [checkpoint verification](CHECKPOINTS.md), then the source-bound launch,
@@ -35,8 +35,9 @@ repository.
 The GLM-5.2 release, the research branches and the original evidence remain
 preserved. The trained weights, the model architecture and the compiler and
 runtime are reused; the implementation and systems integration are the
-contribution. [Notices](../../THIRD_PARTY_NOTICES.md). Review is assistant
-self-review, not an independent assessment.
+contribution. [Notices](../../THIRD_PARTY_NOTICES.md). The software was built
+with AI coding agents under the author's direction; changes are verified by the
+automated equivalence checks and test suite, not by independent human review.
 
 ## Source package
 

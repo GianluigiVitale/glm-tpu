@@ -5,7 +5,7 @@ are covered: the **GLM-5.3 inference release** of 2026-09-22, whose
 measurements below are unchanged, and the **public-structure release** (this
 tree), which restructured that engine without changing what runs on the TPU and
 proved it on the CPU and on the fleet. The state of the work is in the
-[handoff](../../HANDOFF.md).
+[handoff](../development/HANDOFF.md).
 
 ## The current tree
 
@@ -79,8 +79,8 @@ Resident ordinary inference was executed at
 then reused the same loaded model for 770 independent GSM8K requests.
 [Resident result receipt](glm53-resident-results-20260922.json).
 
-That 32K session was stopped on 2026-09-22 at the owner's instruction and
-replaced by a 166,912-slot session for agent work. Every measurement below
+That 32K session was stopped on 2026-09-22 and replaced by a 166,912-slot
+session for agent work. Every measurement below
 describes the earlier 32K session. The 166,912-slot session has one completed
 answer of its own at 11.20 decode tokens/s and 28.94 GB peak HBM per chip; a
 262,144-slot profile was refused by HBM admission.
@@ -109,9 +109,10 @@ passed. Authenticated workers remained live with libtpu after answering.
 
 ### Partial GSM8K evaluation
 
-The owner stopped at the ordered prefix of test rows 0–769 from
-`openai/gsm8k`, configuration `main`, revision
-`740312add88f781978c0658806c59bc2815b9866`. All 770 were freshly executed in
+The evaluation covered the first 770 of the 1,319 test questions of
+`openai/gsm8k` (configuration `main`, revision
+`740312add88f781978c0658806c59bc2815b9866`): test rows 0–769, in order. The
+remaining 549 questions were not run. All 770 were freshly executed in
 independent conversations; prior demonstration answers were not reused.
 
 | Outcome | Count |
@@ -120,7 +121,7 @@ independent conversations; prior demonstration answers were not reused.
 | Incorrect scored final answers with normal EOS | 27 |
 | Context exhausted, counted incorrect | 3 |
 | Total processed | 770 |
-| Unrun after owner cancellation | 549 |
+| Not run (test rows 770–1,318) | 549 |
 | Accuracy on the processed subset | 96.103896% |
 
 Prompts were original questions plus a boxed-answer format instruction, without
@@ -146,8 +147,8 @@ memory evidence were checked per result. The remaining queue was withdrawn;
 the scorer/notifier exited, while the model and its workload leases were retained.
 
 This is **not a full-test-set GSM8K result**. Public benchmark familiarity,
-ordered-prefix selection and stopping after observed progress limit comparison
-with independently chosen complete evaluations. No full-32K-input quality claim.
+ordered-prefix selection and a prefix length that was not fixed in advance
+limit comparison with independently chosen complete evaluations. No full-32K-input quality claim.
 
 ### Four concurrent chats
 
@@ -179,19 +180,22 @@ and its resident change passed 65 affected tests; unchanged numerical code
 reused those and the TPU evidence. Its final release checks were recorded in
 publication receipts kept outside the repository.
 
-Review: the GLM-5.3 release was reviewed by the assistant that built it. The
-public-structure release was implemented by assistant sessions. From S4.2b on,
-each unit's code commit was checked with its raw gate evidence by a separate
-adversarial verifier session before it was pushed (in all units but one, on the
-local commit); fixes for its findings were amended into the unpushed commit, the
-other findings were recorded as follow-ups, and a re-baseline commit, where the
-unit needed one, was recorded after that pass. Before S4.2b there was no
+Review: both releases were built with AI coding agents under the author's
+direction. The GLM-5.3 release was reviewed by the agent that built it. In the
+public-structure release, from the commit that made the Pallas kernel names
+public (`27b1b411`) on, each unit's code commit was checked with its raw
+equivalence-check evidence by a separate adversarial verifier (another agent
+session) before it was pushed (in all units but one, on the local commit);
+fixes for its findings were amended into the unpushed commit, the other
+findings were recorded as follow-ups, and a re-baseline commit, where the unit
+needed one, was recorded after that pass. Before that commit there was no
 standing verifier step: some commits cite review rounds or a verifier, many cite
-none. The owner reviews afterwards. None of this is independent human review.
+none. The maintainer reviews the units after they are pushed. None of this is
+independent human review.
 
 ## Limitations
 
-Source: 141 verified shards / 755,632,050,320 bytes; owner pack: 32 files /
+Source: 141 verified shards / 755,632,050,320 bytes; packed checkpoint: 32 slot files /
 786,181,673,984 bytes. The checkpoint and source identities are pins in the
 untracked site file's `[checkpoint]` table ([CHECKPOINTS](CHECKPOINTS.md),
 [template](../../examples/site.example.toml)). The [local chat UI](../UI.md) and
