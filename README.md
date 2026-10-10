@@ -5,7 +5,8 @@ GLM-5.3 FP8 inference in native JAX and Pallas on 32 TPU v4 chips.
 [Abstract](#abstract) · [Contributions](#contributions) ·
 [System design](#system-design) · [Evaluation](#evaluation) ·
 [Reproducibility](#reproducibility) · [Layout](#repository-layout) ·
-[Documentation](#documentation) · [License](#license) · [Citation](#citation)
+[Documentation](#documentation) · [License](#license) ·
+[Acknowledgements](#acknowledgements) · [Citation](#citation)
 
 ## Abstract
 
@@ -450,6 +451,13 @@ retired. The research tree this release was cut from (research history, the
 curation ledger, the legacy sampled and long-context interfaces, benchmarks and
 their evidence) is at `archive/research-20260922`; for example
 `git show archive/research-20260922:docs/perf/README.md`.
+
+## Acknowledgements
+
+This work was supported with Cloud TPUs from Google's
+[TPU Research Cloud (TRC)](https://sites.research.google/trc/about/).
+All development and every measurement in this repository ran on a
+TRC-provided Cloud TPU v4-64 slice.
 
 ## License
 
