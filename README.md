@@ -18,9 +18,9 @@ FP8 arithmetic, so the engine keeps the routed-expert weights in FP8 and decodes
 them inside its kernels, while an 8 x 4 device mesh shards every layer over the
 32 chips. It answers single questions and serves a resident session that keeps
 the model loaded, a browser chat UI, an OpenAI-compatible `/v1` API and batches
-of four chats. One chat decodes at 13.57 tokens/s, four simultaneous chats at
-4.89–5.12 tokens/s each, and on the first 770 GSM8K test questions the engine
-answered 740 correctly (96.1%; a partial evaluation).
+of four chats. One chat decodes at 13.57 tokens/s and four simultaneous chats
+at 4.89–5.12 tokens/s each. Its GSM8K evaluation is an unplanned 770-question
+ordered prefix, not a benchmark score.
 
 ## Contributions
 
@@ -29,18 +29,24 @@ answered 740 correctly (96.1%; a partial evaluation).
   in FP8 with 128x128 block scales; non-routed weights are converted once, at
   load, to resident BF16 ([architecture](docs/release/ARCHITECTURE.md#the-model)).
 - **Pallas TPU kernels** for the two dominant operations: a route-grouped FP8
-  expert projection whose grid covers only the selected experts, and fused
-  sparse attention that copies only aligned tiles around the selected cache
-  rows into on-chip memory (`glm_tpu/kernels/`).
+  expert projection whose grid covers only the selected experts, and sparse
+  attention over the selected cache rows (`glm_tpu/kernels/`). In decode, each
+  expert-axis chip gathers the 2,048 selected latent rows it owns from its
+  striped cache with an XLA gather, the chips combine them with one
+  expert-axis all-reduce (2.6 MB per layer), and a Pallas kernel runs
+  absorbed-MLA online softmax over the gathered block. Prefill attends
+  owner-locally and merges partial results by log-sum-exp.
 - **Resident and batched serving** with independent conversation state: one
   loaded session answered 770 questions in sequence, each from a fresh cache,
   and a batch mode decodes four chats together
   ([ordinary inference](docs/release/OPTIMIZED_INFERENCE.md),
   [four chats](docs/release/CONCURRENT.md)).
 - **A graph-equivalence method** for refactoring a hardware-bound system from a
-  CPU host. A harness lowers every production TPU program on the CPU and
-  compares normalized program digests, CPU numerics, checkpoint identities,
-  import structure and wire formats with a recorded baseline. Through the
+  CPU host. A harness lowers the TPU programs on the CPU (98 fixture-tier and
+  66 production-tier program instances across 6 and 4 runtime configurations
+  respectively) and compares normalized program digests, CPU numerics,
+  checkpoint identities, import structure and wire formats with a recorded
+  baseline. Through the
   restructuring for this release the program, numerics and checkpoint-identity
   records never changed; the others changed only in separate, reviewed
   re-baseline commits. A TPU comparison confirmed identical tokens for 17 of 17
@@ -117,11 +123,11 @@ flowchart LR
 | Maximum observed HBM per chip, resident evaluation | 28.23 GB |
 | Four simultaneous chats, per active chat | 4.89–5.12 tokens/s |
 
-**GSM8K.** Evaluated on the first 770 of the 1,319 GSM8K test questions (rows
-0–769, in order): 740 correct (96.1%). The 30 unsuccessful cases include three
-that exhausted the context. This is a partial evaluation, not a full test-set
-score. The weights and compiled programs were reused across all 770 questions;
-each question started from a fresh conversation state
+**GSM8K.** An unplanned 770-question ordered prefix (rows 0–769 of the 1,319
+test questions, in order), not a benchmark score. On that prefix 740 answers
+were correct (96.1%); the 30 unsuccessful cases include three that exhausted the
+context. The weights and compiled programs were reused across all 770
+questions; each question started from a fresh conversation state
 ([receipt](docs/release/glm53-resident-results-20260922.json)).
 
 **Solo example.** The single-chat answer is checkable by hand (house profit):
@@ -136,7 +142,8 @@ of sequence. Its aggregate decode rate over the mixed-length batch was
 produced identical token streams for 10 sequential, 4 concurrent and 3 resident
 requests on the same fleet. Decode speed was 0.994–1.024 of the baseline, and
 the programs compiled on the TPUs equal the ones the harness lowers on the CPU
-(9/9 programs, 1,062/1,062 Pallas kernels).
+(9/9 programs; all 1,062 Pallas kernel calls in the lowered programs, 4
+distinct kernels, `glm_tpu/kernels/names.py:18-24`).
 
 ### Limitations
 
@@ -147,7 +154,7 @@ Scoring checks final numbers, not every reasoning step. The prompts were short,
 so they do not establish quality with a full 32K input. Resident mode serves
 requests one at a time; four-chat batching is a separate invocation. There is
 no automatic recovery of the loaded model or its cache after a process failure.
-The CPU equivalence proof does not run XLA's TPU compiler, so a compiler or
+The CPU equivalence check does not run XLA's TPU compiler, so a compiler or
 libtpu change needs a new TPU comparison.
 [Timing boundaries and all limitations](docs/release/STATUS.md).
 
@@ -479,7 +486,7 @@ If you use this software, please cite it
 ```bibtex
 @software{vitale_glm_tpu_2026,
   author  = {Vitale, Gianluigi},
-  title   = {glm-tpu: {GLM-5.3} {FP8} inference on a 32-chip {TPU} v4 pod},
+  title   = {glm-tpu: {GLM-5.3} {FP8} inference on a 32-chip {TPU} v4 slice},
   year    = {2026},
   month   = sep,
   version = {1.0.0},

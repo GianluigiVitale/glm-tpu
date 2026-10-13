@@ -131,9 +131,10 @@ runs of the tree on the same fleet, with the same prepared requests. B1 (10
 sequential requests) 10/10, B2 (4 concurrent) 4/4 and R3 (resident: a first
 request and two inbox rounds, then stop) 3/3 token streams identical; slowest-host decode speed
 0.994–1.024 of the baseline; the programs the fleet compiled equal the ones the
-harness lowers (9/9 programs, 1,062/1,062 Pallas kernels, for both trees); the
-site check passed before and after; a dirty checkout was refused; the chat UI
-and the `/v1` API answered against the resident session. Details:
+harness lowers (9/9 programs and all 1,062 Pallas kernel calls, 4 distinct
+kernels, for both trees); the site check passed before and after; a dirty
+checkout was refused; the chat UI and the `/v1` API answered against the
+resident session. Details:
 [release status](../release/STATUS.md#tpu-comparison-of-the-current-tree) and
 [harness README](../../tools/equivalence/README.md#tpu-comparison-compare_runpy).
 

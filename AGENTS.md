@@ -67,7 +67,7 @@ instructions to restart that work; the older version of this file is
   suspected secret.
 - **No force-push**, no history rewriting, no change of visibility or upstream;
   push only to this repository, fast-forward. Preserve other people's
-  changes, every tag (among them `v1.0.0`, `glm-5.2`, `glm-5.3`,
+  changes, every tag (among them `v1.0.0`, `v1.0.1`, `glm-5.2`, `glm-5.3`,
   `archive/research-20260922`, `pre-refactor-main-20260922` and
   `freeze-correct-128k-20260712`), the research
   branches, the receipts and the original evidence.
@@ -126,7 +126,7 @@ never beside it. Run the gates of every row that applies, on the tree you commit
 
 ### Equivalence rules
 
-The [graph-equivalence harness](tools/equivalence/README.md) proves that a change
+The [graph-equivalence harness](tools/equivalence/README.md) checks that a change
 leaves the lowered TPU device programs, the CPU numerics, the checkpoint
 identities, the import closures, the executed functions and the wire formats
 equal to the records in `tests/golden/data/`. A recorded difference is never
@@ -345,7 +345,7 @@ glm_tpu/kernels/             Pallas TPU kernels, one package per operation
   names.py                   KERNEL_NAMES: the pallas_call name of every kernel, looked up at trace time
   sparse_mla/                Sparse MLA attention
     __init__.py              Package docstring
-    kernel.py                Decode: the fused selected-KV gather and sparse MLA
+    kernel.py                Decode: absorbed-MLA online softmax over the pre-gathered selected KV rows
     partial_kernel.py        Prefill: owner-local partial attention with log-sum-exp outputs
   fp8_grouped_matmul/        Routed-expert FP8 matmuls with 128x128 block scales
     __init__.py              Package docstring

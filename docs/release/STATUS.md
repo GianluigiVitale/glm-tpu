@@ -24,16 +24,16 @@ License 2.0. The pre-refactor release is kept at the tag
 
 The restructuring was checked on the CPU, commit by commit, against records of
 `181c013e` ([equivalence harness](../../tools/equivalence/README.md)): the TPU
-device programs of the 98 fixture-tier and 66 production-tier programs, lowered
-for the TPU with the compiler options production binds; the CPU execution
-goldens; the checkpoint identities; the import closures; the executed functions;
-the wire formats. A few early commits deferred the heavy gates to their stage's
-close, as their messages state. The device-program, numerics and identity
-records have not changed since the harness was finished (`d54572a3`, before the
-first restructuring commit) and were only ever recorded from the `181c013e`
-production paths. After that the other records changed only in separate,
-reviewed re-baseline commits that name the stage, work unit or host change
-behind the difference.
+device programs of the 98 fixture-tier and 66 production-tier program instances,
+lowered for the TPU with the compiler options production binds; the CPU
+execution goldens; the checkpoint identities; the import closures; the executed
+functions; the wire formats. A few early commits deferred the heavy gates to
+their stage's close, as their messages state. The device-program, numerics and
+identity records have not changed since the harness was finished (`d54572a3`,
+before the first restructuring commit) and were only ever recorded from the
+`181c013e` production paths. After that the other records changed only in
+separate, reviewed re-baseline commits that name the stage, work unit or host
+change behind the difference.
 
 Behaviour changes, each declared and tested in its commit: the resident stop
 keeps every collected record (the release crashed there with `FileExistsError`;
@@ -61,7 +61,7 @@ and the same prepared GSM8K requests. No file under `glm_tpu/` changed after
 | B2: 4 concurrent conversations | 4/4 identical |
 | R3: resident session, first request and two inbox rounds, then stop | 3/3 identical; the stop exits 0 with every record collected, where `181c013e` ends in `FileExistsError` |
 | Slowest-host decode speed, this tree / `181c013e` | 0.994–1.024 |
-| Compiled programs (`authenticity`) | the TPU originals of both trees equal the programs the harness lowers on the CPU: 9/9 programs, 1,062/1,062 Pallas kernels |
+| Compiled programs (`authenticity`) | the TPU originals of both trees equal the programs the harness lowers on the CPU: 9/9 programs and all 1,062 Pallas kernel calls in the lowered programs (4 distinct kernels) |
 | Site identity (`site-check`) | pass before and after the runs; a baseline with one changed fact fails |
 | Launch policy | a checkout with an untracked file is refused; the remote helpers each run staged were the commit's own |
 | Chat UI and `/v1` API on a resident session | the model list, a chat answer and a streamed chat answer returned 200, the stream ended with `[DONE]`, the UI page carried its content-security policy, and the stop exited 0 |

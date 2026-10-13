@@ -29,11 +29,13 @@ speed come from a known model, checkpoint and commit.
   resident BF16 tensors.
 - **Attention.** The KV cache holds one latent row per position, striped by
   position over the chips. A DSA indexer selects the top 2,048 cached positions
-  per query; a fused Pallas kernel copies only the aligned tiles around the
-  selected rows into on-chip memory and attends to them. Prefill (processing the prompt) runs
-  layer-major blocks of 128 prompt rows and merges partial attentions by
-  log-sum-exp; decode (generating one token per step) is one compiled
-  `shard_map` program over all 78 layers.
+  per query. In decode (generating one token per step), each expert-axis chip
+  gathers the 2,048 selected latent rows it owns from its striped cache with an
+  XLA gather, the chips combine them with one expert-axis all-reduce (2.6 MB per
+  layer), and a Pallas kernel runs absorbed-MLA online softmax over the gathered
+  block; decode is one compiled `shard_map` program over all 78 layers. Prefill
+  (processing the prompt) runs layer-major blocks of 128 prompt rows, attends
+  owner-locally and merges partial results by log-sum-exp.
 - **Serving.** A resident session keeps the loaded weights and compiled
   programs and serves sequential requests, each with a fresh cache. A batch mode
   shares the weights across four independent 32K caches, prefilling the prompts
@@ -51,14 +53,17 @@ speed come from a known model, checkpoint and commit.
 
 1. Multi-host FP8 mixture-of-experts inference with DeepSeek Sparse Attention
    on 32 TPU v4 chips, which have no FP8 arithmetic.
-2. Pallas TPU kernels for route-grouped FP8 expert projections and for fused
-   sparse attention over the selected cache rows, in decode and in prefill.
+2. Pallas TPU kernels for route-grouped FP8 expert projections and for
+   absorbed-MLA online-softmax attention over the selected cache rows, in
+   decode and in prefill.
 3. Resident and four-chat batched serving with independent conversation state,
    exposed through a command line, a chat UI and an OpenAI-compatible API.
-4. A graph-equivalence method that lowers every production TPU program on a CPU
-   host and compares it with a recorded baseline. It showed that restructuring
-   the code base for release left the device programs unchanged, and a TPU
-   comparison confirmed identical tokens.
+4. A graph-equivalence method that lowers the TPU programs on a CPU host (98
+   fixture-tier and 66 production-tier program instances across 6 and 4
+   runtime configurations respectively) and compares them with a recorded
+   baseline. Its checks are evidence that restructuring the code base for
+   release left the device programs unchanged, and a TPU comparison confirmed
+   identical tokens.
 
 ## Evaluation
 
@@ -77,17 +82,18 @@ Decode rates exclude prompt prefill, queue overhead and startup.
 | Peak HBM per chip | 28.23 GB |
 | Four simultaneous chats, per active chat | 4.89–5.12 tokens/s |
 
-GSM8K: evaluated on the first 770 of the 1,319 test questions (rows 0–769, in
-order): 740 correct (96.1%). The 30 unsuccessful cases are 27 incorrect final
-answers and 3 answers that exhausted the context, which count as incorrect.
-This is a partial evaluation, not a full test-set score. The separate four-chat
-test answered four questions correctly at normal end of sequence.
+GSM8K: an unplanned 770-question ordered prefix (rows 0–769 of the 1,319 test
+questions, in order), not a benchmark score. On that prefix 740 answers were
+correct (96.1%); the 30 unsuccessful cases are 27 incorrect final answers and
+3 answers that exhausted the context, which count as incorrect. The separate
+four-chat test answered four questions correctly at normal end of sequence.
 
 Equivalence: on the same fleet and the same prepared requests, the released tree
 and the pre-restructure baseline produced identical token streams for 17 of 17
 requests (10 sequential, 4 concurrent, 3 resident). Decode speed was 0.994–1.024
 of the baseline, and the programs the TPUs compiled equal the ones the CPU
-harness lowers (9/9 programs, 1,062/1,062 Pallas kernels).
+harness lowers (9/9 programs; all 1,062 Pallas kernel calls in the lowered
+programs, 4 distinct kernels, `glm_tpu/kernels/names.py:18-24`).
 
 [Receipts, scoring and timing boundaries](STATUS.md).
 
@@ -102,7 +108,7 @@ harness lowers (9/9 programs, 1,062/1,062 Pallas kernels).
   chat UI and the API use that one queue: there is no parallel decoding, online
   batch admission or durable KV recovery. Model processes stay loaded until an
   explicit stop or a failure.
-- The CPU equivalence proof lowers the TPU programs but does not run XLA's TPU
+- The CPU equivalence check lowers the TPU programs but does not run XLA's TPU
   compiler; a compiler or libtpu change needs a new TPU comparison.
 
 ## Reuse and provenance
